@@ -61,17 +61,20 @@ Per roadmap §20:
 
 ## Workflow
 
-Every spec is shipped as a GitHub issue + branch + PR.
+Every spec is shipped as a GitHub issue + branch + PR. The detailed flow lives in the [`nexus-spec-workflow` skill](../.claude/skills/nexus-spec-workflow/SKILL.md). Short version:
 
 1. **Draft the spec file** under the appropriate phase folder.
-2. **Open a GitHub issue** that mirrors the spec: title `Spec NNN — <title>`, body links to the spec file, label with the matching `phase-N` and `spec`.
-3. **Create a branch** named `spec/NNN-<slug>` off the latest `main`.
-4. Set spec status to `in-progress`. Add a dated entry in **Work log**.
-5. Do the work. As files are created/modified, append them to **Files touched** in the spec.
-6. **Open a PR** with title `Spec NNN — <title>`, body that summarises the work, references the issue with `Closes #<issue>`, and links the spec markdown file.
-7. When acceptance criteria are met, mark the spec `done` in its frontmatter, update this README's tracker, and merge the PR.
-8. If blocked, set status to `blocked` and note the blocker in **Work log** + leave a comment on the issue.
+2. **Open a GitHub issue** mirroring the spec: title `Spec NNN — <title>`, labels `spec` + `phase-N`.
+3. **Branch** `spec/NNN-<slug>` off the latest `main`. Flip spec status to `in-progress` and log the issue/branch in the Work log.
+4. **Implement.** Update `Files touched` in the spec as you go. Run tests locally.
+5. **Self-review.** Run the `superpowers:code-reviewer` agent on `git diff main...HEAD`. Address material findings; surface stylistic ones in the PR body.
+6. **Open the PR.** Title `Spec NNN — <title>`. Body must include `Closes #<issue>` so GitHub auto-closes the issue with reason `completed` on merge.
+7. **CI must be green.** `.github/workflows/ci.yml` runs Pint, `php artisan test`, and `npm run build`. Branch protection on `main` requires it.
+8. **Wait for the user.** No auto-merge. After explicit go-ahead, squash-merge with `gh pr merge --squash --delete-branch`.
+9. **Verify the issue closed as completed** (`gh issue view <n> --json state,stateReason`). Manual fallback: `gh issue close <n> --reason completed`.
+10. **Bookkeeping commit on `main`:** flip spec frontmatter to `done`, update tracker tables in this file and the phase README.
 
 ### Notes
 - Spec 001 (initial scaffold) was committed directly to `main` to bootstrap the repo. From spec 002 onward we use the issue → branch → PR flow.
 - Tasks *within* a spec are tracked as a checklist in the spec file (and in the local `TaskCreate` list during the active session). They do **not** get their own GitHub issues — that would be too noisy.
+- Tooling/workflow changes (CI tweaks, skill updates, etc.) may go on `main` directly with a `chore:` prefix. Spec implementation never goes to `main` directly.

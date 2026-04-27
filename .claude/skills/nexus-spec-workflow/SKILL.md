@@ -42,9 +42,11 @@ If the user is just exploring the codebase, debugging, or making a one-off fix t
    ```
    Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
    ```
-7. **Open the PR** when acceptance criteria are met:
+7. **Self-review pass before opening the PR.** Invoke the `superpowers:code-reviewer` agent on the diff (`git diff main...HEAD`). Capture its findings. Address anything material (real bugs, security issues, missed acceptance criteria) before the PR; surface stylistic suggestions to the user in the PR body but don't necessarily fix them.
+8. **Open the PR** when acceptance criteria are met:
    - Title: `Spec NNN — <spec title>`
-   - Body:
+   - Body MUST include `Closes #<issue-number>` so GitHub auto-closes the issue with reason **completed** when the PR merges.
+   - Body template:
      ```
      Closes #<issue-number>
 
@@ -55,10 +57,17 @@ If the user is just exploring the codebase, debugging, or making a one-off fix t
 
      ## Test plan
      <bulleted checklist matching the acceptance criteria>
+
+     ## Self-review notes
+     <bullets from the code-reviewer agent — what was checked, what was changed, any deferred items>
      ```
    - Use `gh pr create` with a HEREDOC body.
-8. **Pause for review.** Per the user's preference, do not auto-merge. Wait for explicit "merge" before merging.
-9. **After merge:** set spec status to `done`, update `specs/README.md` tracker, and `git checkout main && git pull && git branch -d spec/NNN-<slug>`.
+9. **CI is the only hard gate.** The `.github/workflows/ci.yml` job runs Pint, `php artisan test`, and `npm run build`. Branch protection on `main` requires it green before merge. Watch the run with `gh pr checks <pr-number> --watch`. If it fails, fix and push — never bypass.
+10. **Pause for the user.** Per the user's preference, do not auto-merge. Wait for explicit "merge it" before merging.
+11. **Merging** (after explicit user go-ahead): squash-merge so each spec lands on `main` as one commit. Use `gh pr merge <pr-number> --squash --delete-branch`.
+12. **Verify the issue closed as completed.** After the merge, run `gh issue view <n> --json state,stateReason`. State should be `CLOSED`, stateReason `COMPLETED`. If for any reason it didn't auto-close (e.g. the `Closes #N` keyword got mangled), close it explicitly: `gh issue close <n> --reason completed`. Never use `--reason "not planned"` for a successfully-merged spec — that reason is reserved for abandoned work.
+13. **Local cleanup:** `git checkout main && git pull --ff-only && git branch -d spec/NNN-<slug>`.
+14. **Update spec & tracker:** set spec frontmatter `status: done`, update `specs/README.md` and the relevant `phase-N/README.md` to flip the task to 🟢. Commit this directly to `main` as a small `chore:` commit — it's just bookkeeping, not implementation.
 
 ## Naming conventions (locked)
 
@@ -71,9 +80,12 @@ If the user is just exploring the codebase, debugging, or making a one-off fix t
 ## Anti-patterns (do not do)
 
 - Opening a separate GitHub issue per task within a spec — the spec markdown's checklist is the single source of truth for sub-task progress.
-- Working directly on `main` (only spec 001 was committed to main as a one-time bootstrap exception).
+- Working directly on `main` (spec 001 was committed to main as a one-time bootstrap exception; small workflow/tooling commits like CI changes or skill updates may go on main directly with a `chore:` prefix, but never spec implementation work).
 - Pushing `--force` to `main` or any shared branch.
 - Auto-merging the PR. Always pause for review unless the user explicitly says "merge it" or has put the auto-merge instruction in CLAUDE.md.
+- Skipping the self-review pass. Even when the change is small, running `superpowers:code-reviewer` is cheap and catches things.
+- Bypassing CI (e.g. `--admin` merge to ignore failing checks). If CI is red, fix the underlying issue.
+- Closing an issue with `--reason "not planned"` after a successful merge. That reason is for abandoned work.
 - Skipping the spec markdown update — the markdown is the durable record; the GitHub issue/PR are the workflow chrome.
 
 ## Quick reference: gh commands used
@@ -109,8 +121,23 @@ Spec: specs/phase-0-foundation/002-auth-scaffolding.md
 
 ## Test plan
 - [ ] ...
+
+## Self-review notes
+- <bullets from superpowers:code-reviewer agent>
 EOF
 )"
+
+# Watch CI on the PR
+gh pr checks <pr-number> --watch
+
+# Squash-merge after user approval (delete branch on remote)
+gh pr merge <pr-number> --squash --delete-branch
+
+# Verify issue auto-closed as completed
+gh issue view <n> --json state,stateReason
+
+# Manual fallback if it didn't auto-close
+gh issue close <n> --reason completed
 ```
 
 ## Updating this skill
