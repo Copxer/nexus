@@ -10,7 +10,7 @@ const props = withDefaults(
     {
         align: 'right',
         width: '48',
-        contentClasses: 'py-1 bg-white dark:bg-gray-700',
+        contentClasses: 'py-1 bg-background-panel backdrop-blur-xl',
     },
 );
 
@@ -71,7 +71,7 @@ const open = ref(false);
                 @click="open = false"
             >
                 <div
-                    class="rounded-md ring-1 ring-black ring-opacity-5"
+                    class="overflow-hidden rounded-lg border border-border-subtle shadow-panel"
                     :class="contentClasses"
                 >
                     <slot name="content" />

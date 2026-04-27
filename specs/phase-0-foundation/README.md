@@ -12,7 +12,7 @@ Stand up a Laravel 12 + Vue 3 + Inertia + Tailwind project with authentication, 
 |---|------|--------|
 | 001 | Laravel 13 + Inertia + Vue 3 + TS scaffold | 🟢 |
 | 002 | Auth scaffolding (login / register / verified email) | 🟢 |
-| 003 | Design tokens + Tailwind theme (dark, glassmorphism, neon accents) | ⬜ |
+| 003 | Design tokens + Tailwind theme (dark, glassmorphism, neon accents) | 🟢 |
 | 004 | AppLayout + Sidebar + TopBar + RightActivityRail | ⬜ |
 | 005 | CommandPalette (Cmd+K) shell | ⬜ |
 | 006 | Overview page with mock KPI cards, sparklines, status badges | ⬜ |

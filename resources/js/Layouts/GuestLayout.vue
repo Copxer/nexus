@@ -5,16 +5,31 @@ import { Link } from '@inertiajs/vue3';
 
 <template>
     <div
-        class="flex min-h-screen flex-col items-center bg-gray-100 pt-6 sm:justify-center sm:pt-0 dark:bg-gray-900"
+        class="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-app-gradient px-4 py-12 sm:px-6"
     >
-        <div>
-            <Link href="/">
-                <ApplicationLogo class="h-20 w-20 fill-current text-gray-500" />
+        <!-- Soft neon ambient glows behind the card. -->
+        <div
+            aria-hidden="true"
+            class="pointer-events-none absolute -top-40 left-1/2 h-[480px] w-[480px] -translate-x-1/2 rounded-full bg-accent-cyan/10 blur-3xl"
+        />
+        <div
+            aria-hidden="true"
+            class="pointer-events-none absolute -bottom-40 right-10 h-[420px] w-[420px] rounded-full bg-accent-purple/10 blur-3xl"
+        />
+
+        <div class="relative">
+            <Link href="/" class="flex flex-col items-center gap-3">
+                <ApplicationLogo
+                    class="h-14 w-14 fill-current text-accent-cyan drop-shadow-[0_0_18px_rgba(34,211,238,0.55)]"
+                />
+                <span class="text-sm font-semibold uppercase tracking-[0.32em] text-text-secondary">
+                    Nexus Control Center
+                </span>
             </Link>
         </div>
 
         <div
-            class="mt-6 w-full overflow-hidden bg-white px-6 py-4 shadow-md sm:max-w-md sm:rounded-lg dark:bg-gray-800"
+            class="glass-card relative mt-8 w-full px-8 py-9 sm:max-w-md"
         >
             <slot />
         </div>

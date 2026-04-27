@@ -31,18 +31,28 @@ const submit = () => {
     <GuestLayout>
         <Head title="Log in" />
 
-        <div v-if="status" class="mb-4 text-sm font-medium text-green-600">
+        <h1 class="text-xl font-semibold text-text-primary">
+            Sign in
+        </h1>
+        <p class="mt-2 text-sm text-text-secondary">
+            Welcome back to your command center.
+        </p>
+
+        <div
+            v-if="status"
+            class="mt-4 rounded-lg border border-status-success/40 bg-status-success/10 px-3 py-2 text-sm font-medium text-status-success"
+        >
             {{ status }}
         </div>
 
-        <form @submit.prevent="submit">
+        <form class="mt-6 space-y-5" @submit.prevent="submit">
             <div>
                 <InputLabel for="email" value="Email" />
 
                 <TextInput
                     id="email"
                     type="email"
-                    class="mt-1 block w-full"
+                    class="mt-2 block w-full"
                     v-model="form.email"
                     required
                     autofocus
@@ -52,13 +62,13 @@ const submit = () => {
                 <InputError class="mt-2" :message="form.errors.email" />
             </div>
 
-            <div class="mt-4">
+            <div>
                 <InputLabel for="password" value="Password" />
 
                 <TextInput
                     id="password"
                     type="password"
-                    class="mt-1 block w-full"
+                    class="mt-2 block w-full"
                     v-model="form.password"
                     required
                     autocomplete="current-password"
@@ -67,32 +77,38 @@ const submit = () => {
                 <InputError class="mt-2" :message="form.errors.password" />
             </div>
 
-            <div class="mt-4 block">
-                <label class="flex items-center">
+            <div class="flex items-center justify-between">
+                <label class="flex items-center gap-2">
                     <Checkbox name="remember" v-model:checked="form.remember" />
-                    <span class="ms-2 text-sm text-gray-600 dark:text-gray-400"
-                        >Remember me</span
-                    >
+                    <span class="text-sm text-text-secondary">Remember me</span>
                 </label>
-            </div>
 
-            <div class="mt-4 flex items-center justify-end">
                 <Link
                     v-if="canResetPassword"
                     :href="route('password.request')"
-                    class="rounded-md text-sm text-gray-600 underline hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:text-gray-400 dark:hover:text-gray-100 dark:focus:ring-offset-gray-800"
+                    class="text-sm text-text-secondary transition hover:text-accent-cyan focus:outline-none"
                 >
                     Forgot your password?
                 </Link>
-
-                <PrimaryButton
-                    class="ms-4"
-                    :class="{ 'opacity-25': form.processing }"
-                    :disabled="form.processing"
-                >
-                    Log in
-                </PrimaryButton>
             </div>
+
+            <PrimaryButton
+                class="w-full"
+                :class="{ 'opacity-50': form.processing }"
+                :disabled="form.processing"
+            >
+                Log in
+            </PrimaryButton>
         </form>
+
+        <p class="mt-6 text-center text-sm text-text-secondary">
+            New here?
+            <Link
+                :href="route('register')"
+                class="font-semibold text-accent-cyan transition hover:text-accent-cyan/80"
+            >
+                Create an account
+            </Link>
+        </p>
     </GuestLayout>
 </template>
