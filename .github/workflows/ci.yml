@@ -53,8 +53,8 @@ jobs:
       - name: Lint with Pint
         run: vendor/bin/pint --test
 
-      - name: Run PHP tests
-        run: php artisan test
-
       - name: Build frontend
         run: npm run build
+
+      - name: Run PHP tests
+        run: php artisan test
