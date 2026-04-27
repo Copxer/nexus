@@ -22,56 +22,59 @@ const capabilities: Capability[] = [
     {
         title: 'Repository risk',
         description:
-            'Open issues, stale PRs, failed workflows — surfaced per repo so you know what needs attention before standup.',
+            'Designed to surface stale PRs, failing workflows, and unattended issues — per repo, before standup.',
         accent: 'cyan',
     },
     {
         title: 'Deployment timeline',
         description:
-            'Every release across every project on one timeline. Failed runs and rollbacks are unmissable.',
+            'A single timeline of every release, every environment. Failed runs and rollbacks will be unmissable.',
         accent: 'purple',
     },
     {
         title: 'Website performance',
         description:
-            'Continuous probes for uptime, response time, and TLS health, charted against your SLA targets.',
+            'Probes for uptime, response time, and TLS health, charted against your SLA targets — coming with phase 5.',
         accent: 'success',
     },
     {
         title: 'Container metrics',
         description:
-            'Live CPU, memory, network, and health for every Docker host you connect — no public API exposure required.',
+            'Built to ingest CPU, memory, network, and health from every Docker host through a lightweight agent — no public API exposure required.',
         accent: 'magenta',
     },
     {
         title: 'Active alerts',
         description:
-            'A single queue for warnings and critical incidents from webhooks, probes, and host agents — with one-click acknowledge and resolve.',
+            'A single queue for warnings and critical incidents from webhooks, probes, and host agents — acknowledge or resolve in one click.',
         accent: 'danger',
     },
     {
         title: 'Activity heatmap',
         description:
-            'When and where the system is busiest, at a glance — so post-incident reviews and capacity planning have a starting point.',
+            'When and where the system is busiest, at a glance — to give post-incident reviews and capacity planning a real starting point.',
         accent: 'warning',
     },
 ];
 
+// Decorative dots only — per visual-reference.md, glow is reserved for active /
+// critical / online states. Keep these flat so the hero CTA remains the only
+// neon surface on the page.
 const accentClasses: Record<Capability['accent'], { dot: string; ring: string }> = {
     cyan: {
-        dot: 'bg-accent-cyan shadow-glow-cyan',
+        dot: 'bg-accent-cyan',
         ring: 'ring-accent-cyan/40',
     },
     purple: {
-        dot: 'bg-accent-purple shadow-glow-purple',
+        dot: 'bg-accent-purple',
         ring: 'ring-accent-purple/40',
     },
     magenta: {
-        dot: 'bg-accent-magenta shadow-glow-magenta',
+        dot: 'bg-accent-magenta',
         ring: 'ring-accent-magenta/40',
     },
     success: {
-        dot: 'bg-status-success shadow-glow-success',
+        dot: 'bg-status-success',
         ring: 'ring-status-success/40',
     },
     warning: {
@@ -79,7 +82,7 @@ const accentClasses: Record<Capability['accent'], { dot: string; ring: string }>
         ring: 'ring-status-warning/40',
     },
     danger: {
-        dot: 'bg-status-danger shadow-glow-danger',
+        dot: 'bg-status-danger',
         ring: 'ring-status-danger/40',
     },
 };
@@ -110,7 +113,11 @@ const accentClasses: Record<Capability['accent'], { dot: string; ring: string }>
             <div
                 class="mx-auto flex max-w-7xl items-center justify-between px-6 py-6 sm:px-10"
             >
-                <Link href="/" class="flex items-center gap-3">
+                <Link
+                    href="/"
+                    aria-label="Nexus home"
+                    class="flex items-center gap-3"
+                >
                     <ApplicationLogo
                         class="h-10 w-10 fill-current text-accent-cyan drop-shadow-[0_0_18px_rgba(34,211,238,0.55)]"
                     />
@@ -133,7 +140,7 @@ const accentClasses: Record<Capability['accent'], { dot: string; ring: string }>
                     <template v-else>
                         <Link
                             :href="route('login')"
-                            class="rounded-lg px-4 py-2 text-sm font-medium text-text-secondary transition hover:text-text-primary"
+                            class="rounded-lg px-4 py-2 text-sm font-medium text-text-secondary transition hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
                         >
                             Log in
                         </Link>
@@ -157,10 +164,8 @@ const accentClasses: Record<Capability['accent'], { dot: string; ring: string }>
                 <span
                     class="inline-flex items-center gap-2 rounded-full border border-accent-cyan/30 bg-accent-cyan/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.32em] text-accent-cyan"
                 >
-                    <span
-                        class="h-1.5 w-1.5 rounded-full bg-accent-cyan shadow-glow-cyan"
-                    />
-                    Engineering Command Center
+                    <span class="h-1.5 w-1.5 rounded-full bg-accent-cyan" />
+                    Engineering command center · in active development
                 </span>
 
                 <h1
@@ -176,10 +181,10 @@ const accentClasses: Record<Capability['accent'], { dot: string; ring: string }>
                 <p
                     class="mt-6 max-w-2xl text-pretty text-base text-text-secondary sm:text-lg"
                 >
-                    Nexus aggregates GitHub repositories, deployments, Docker
-                    hosts, website probes, and alerts into a single real-time
-                    command center — so you spend less time switching tabs and
-                    more time deciding what matters.
+                    A single command center for GitHub repositories,
+                    deployments, Docker hosts, website probes, and alerts —
+                    being built phase by phase, in the open. Authentication and
+                    the visual foundation are live; the integrations are next.
                 </p>
 
                 <div
@@ -221,12 +226,12 @@ const accentClasses: Record<Capability['accent'], { dot: string; ring: string }>
                     <span
                         class="text-[11px] font-semibold uppercase tracking-[0.32em] text-accent-cyan"
                     >
-                        What Nexus answers
+                        What Nexus is being built to answer
                     </span>
                     <h2
                         class="text-2xl font-semibold text-text-primary sm:text-3xl"
                     >
-                        Six questions you stop re-asking
+                        Six questions, one cockpit
                     </h2>
                 </div>
 
@@ -265,7 +270,7 @@ const accentClasses: Record<Capability['accent'], { dot: string; ring: string }>
         <!-- Footer -->
         <footer class="relative z-10 mt-auto border-t border-border-subtle">
             <div
-                class="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-6 py-6 text-xs text-text-muted sm:flex-row sm:px-10"
+                class="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-6 py-6 text-xs text-text-secondary sm:flex-row sm:px-10"
             >
                 <span>
                     Nexus Control Center · An engineering operations cockpit.
