@@ -72,9 +72,10 @@ Every spec is shipped as a GitHub issue + branch + PR. The detailed flow lives i
 7. **CI must be green.** `.github/workflows/ci.yml` runs Pint, `php artisan test`, and `npm run build`. Branch protection on `main` requires it.
 8. **Wait for the user.** No auto-merge. After explicit go-ahead, squash-merge with `gh pr merge --squash --delete-branch`.
 9. **Verify the issue closed as completed** (`gh issue view <n> --json state,stateReason`). Manual fallback: `gh issue close <n> --reason completed`.
-10. **Bookkeeping commit on `main`:** flip spec frontmatter to `done`, update tracker tables in this file and the phase README.
+10. **Spec & tracker bookkeeping** ride inside the same spec PR — flip spec frontmatter to `done` and update tracker tables before opening the PR, so when it merges, `main` is consistent in one shot.
 
 ### Notes
-- Spec 001 (initial scaffold) was committed directly to `main` to bootstrap the repo. From spec 002 onward we use the issue → branch → PR flow.
+- Spec 001 (initial scaffold) was committed directly to `main` to bootstrap the repo. From spec 002 onward every change flows through a PR.
 - Tasks *within* a spec are tracked as a checklist in the spec file (and in the local `TaskCreate` list during the active session). They do **not** get their own GitHub issues — that would be too noisy.
-- Tooling/workflow changes (CI tweaks, skill updates, etc.) may go on `main` directly with a `chore:` prefix. Spec implementation never goes to `main` directly.
+- Non-spec changes (tooling, CI tweaks, skill updates, hotfixes, doc-only edits) also go through a PR. Branch naming: `<type>/<slug>` matching the conventional-commit prefix (`chore/`, `fix/`, `docs/`, `refactor/`, `ci/`). PR title uses the same prefix.
+- The "Protect main" ruleset enforces this: pushes to `main` are rejected unless they carry a green `ci` check, which only PRs can produce.

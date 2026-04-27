@@ -69,15 +69,16 @@ If the user is just exploring the codebase, debugging, or making a one-off fix t
 ## Naming conventions (locked)
 
 - Spec file: `specs/phase-<N>-<phase-slug>/<NNN>-<slug>.md`
-- Branch: `spec/<NNN>-<slug>` (slug matches spec filename slug)
-- Issue title: `Spec <NNN> — <title>`
-- PR title: `Spec <NNN> — <title>`
+- Spec branch: `spec/<NNN>-<slug>` (slug matches spec filename slug)
+- Spec issue title: `Spec <NNN> — <title>`
+- Spec PR title: `Spec <NNN> — <title>`
+- Non-spec branches (tooling, CI tweaks, docs, hotfixes, etc.): `<type>/<slug>` where `<type>` matches the conventional-commit prefix — `chore/`, `fix/`, `docs/`, `refactor/`, `ci/`. PR title uses the same prefix in conventional-commit form (e.g. `chore(workflow): drop trailer requirement`). Non-spec PRs do not need a backing GitHub issue unless the work warrants one.
 - Commit messages: free-form. **No Co-Authored-By trailer.**
 
 ## Anti-patterns (do not do)
 
 - Opening a separate GitHub issue per task within a spec — the spec markdown's checklist is the single source of truth for sub-task progress.
-- Working directly on `main` (spec 001 was committed to main as a one-time bootstrap exception; small workflow/tooling commits like CI changes or skill updates may go on main directly with a `chore:` prefix, but never spec implementation work).
+- Working directly on `main`. Every change — spec, chore, fix, doc — goes through a branch and a PR. Spec 001 was the one-time bootstrap exception. The "Protect main" ruleset rejects any push to `main` that doesn't have a green `ci` check, so direct-push attempts will be rejected even if attempted.
 - Pushing `--force` to `main` or any shared branch.
 - Auto-merging the PR. Always pause for review unless the user explicitly says "merge it" or has put the auto-merge instruction in CLAUDE.md.
 - Skipping the self-review pass. Even when the change is small, running `superpowers:code-reviewer` is cheap and catches things.
