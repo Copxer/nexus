@@ -60,7 +60,7 @@ const showingNavigationDropdown = ref(false);
                                                 type="button"
                                                 class="inline-flex items-center rounded-lg border border-border-subtle bg-slate-950/50 px-3 py-2 text-sm font-medium leading-4 text-text-secondary transition hover:border-border-active hover:text-text-primary focus:outline-none"
                                             >
-                                                {{ $page.props.auth.user.name }}
+                                                {{ $page.props.auth.user?.name }}
 
                                                 <svg
                                                     class="-me-0.5 ms-2 h-4 w-4"
@@ -160,10 +160,10 @@ const showingNavigationDropdown = ref(false);
                     <div class="border-t border-border-subtle pb-1 pt-4">
                         <div class="px-4">
                             <div class="text-base font-medium text-text-primary">
-                                {{ $page.props.auth.user.name }}
+                                {{ $page.props.auth.user?.name }}
                             </div>
                             <div class="text-sm font-medium text-text-muted">
-                                {{ $page.props.auth.user.email }}
+                                {{ $page.props.auth.user?.email }}
                             </div>
                         </div>
 

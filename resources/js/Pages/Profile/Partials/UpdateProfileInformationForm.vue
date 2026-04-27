@@ -10,7 +10,8 @@ defineProps<{
     status?: String;
 }>();
 
-const user = usePage().props.auth.user;
+// Profile route is auth-gated, so auth.user is guaranteed non-null here.
+const user = usePage().props.auth.user!;
 
 const form = useForm({
     name: user.name,
