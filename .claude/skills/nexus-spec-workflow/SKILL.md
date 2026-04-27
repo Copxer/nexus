@@ -38,10 +38,7 @@ If the user is just exploring the codebase, debugging, or making a one-off fix t
    The slug must match the spec file's slug (e.g. `spec/002-auth-scaffolding`).
 4. **Update the spec frontmatter:** `status: in-progress`, bump `updated:` to today's date, add a dated entry in **Work log** noting the branch + issue number.
 5. **Do the work.** Use TaskCreate for the task list inside the spec. Update the spec's `Files touched` as you go.
-6. **Commit incrementally.** One topical commit per logical change is fine; many small commits are fine. Commit messages follow the existing repo style (see `git log`). Always include the trailer:
-   ```
-   Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
-   ```
+6. **Commit incrementally.** One topical commit per logical change is fine; many small commits are fine. Commit messages follow the existing repo style (see `git log`). **Do not add a Co-Authored-By trailer** — the repo owner does not want Claude/Anthropic co-author trailers on commits.
 7. **Self-review pass before opening the PR.** Invoke the `superpowers:code-reviewer` agent on the diff (`git diff main...HEAD`). Capture its findings. Address anything material (real bugs, security issues, missed acceptance criteria) before the PR; surface stylistic suggestions to the user in the PR body but don't necessarily fix them.
 8. **Open the PR** when acceptance criteria are met:
    - Title: `Spec NNN — <spec title>`
@@ -75,7 +72,7 @@ If the user is just exploring the codebase, debugging, or making a one-off fix t
 - Branch: `spec/<NNN>-<slug>` (slug matches spec filename slug)
 - Issue title: `Spec <NNN> — <title>`
 - PR title: `Spec <NNN> — <title>`
-- Commit messages: free-form, but one trailer required: `Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>`
+- Commit messages: free-form. **No Co-Authored-By trailer.**
 
 ## Anti-patterns (do not do)
 
