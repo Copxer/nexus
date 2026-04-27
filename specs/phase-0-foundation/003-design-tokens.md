@@ -82,6 +82,12 @@ Roadmap reference: §7 UX Direction, §22 Visual Design Specification.
 - `resources/js/Components/Checkbox.vue` — dark + cyan accent.
 - `resources/js/Components/NavLink.vue` — cyan underline when active.
 - `resources/js/Components/ResponsiveNavLink.vue` — cyan left border + tinted bg when active.
+- `resources/js/Components/Dropdown.vue` — glass-style content panel (post-review fix).
+- `resources/js/Components/DropdownLink.vue` — token-driven hover (post-review fix).
+- `resources/js/Pages/Auth/ForgotPassword.vue` — repainted with the new heading/subhead pattern (post-review fix).
+- `resources/js/Pages/Auth/ResetPassword.vue` — same.
+- `resources/js/Pages/Auth/VerifyEmail.vue` — same.
+- `resources/js/Pages/Auth/ConfirmPassword.vue` — same.
 - `package.json` / `package-lock.json` — added `@fontsource/inter`, `@fontsource/jetbrains-mono`.
 
 ## Work log
@@ -96,6 +102,12 @@ Roadmap reference: §7 UX Direction, §22 Visual Design Specification.
 - Repainted the entire Breeze component library (8 components) so any new page automatically gets the right look.
 - Repainted Login, Register, GuestLayout, AuthenticatedLayout, and the Overview placeholder.
 - `vendor/bin/pint --test` ✅, `npm run build` ✅, `php artisan test` 25/25 ✅.
+- Ran `superpowers:code-reviewer` self-review on the diff. Findings (no blockers):
+  - **[material]** `Dropdown.vue` and `DropdownLink.vue` still carried `bg-white dark:bg-gray-700` / `text-gray-700 dark:text-gray-300 dark:hover:bg-gray-800`. They open from the repainted `AuthenticatedLayout` user menu, so the half-painted effect was visible. **Fixed:** repainted both with `bg-background-panel`, `border-border-subtle`, `shadow-panel`, and `text-text-secondary` hover-on-`bg-background-panel-hover`.
+  - **[material]** Secondary auth pages (`ForgotPassword`, `ResetPassword`, `VerifyEmail`, `ConfirmPassword`) still carried Breeze grays — they sit inside `GuestLayout`'s glass card so looked half-painted. **Fixed:** repainted all four with the same heading/subhead/spacing pattern as Login/Register, removed `text-gray-600`/`text-green-600`/`text-indigo-500`.
+  - **[material]** `text-text-muted` (#64748B) on `bg-background-panel` is ~3.5:1 — fails WCAG AA for body copy. Used on Login/Register subheads and the "Forgot your password?" / "New here?" / "Already have an account?" text. **Fixed:** bumped to `text-text-secondary` (#CBD5E1) on those non-metadata strings.
+  - **[nit]** `app.blade.php` body had `bg-background-base` while `app.css` `@layer base` set `bg-app-gradient bg-fixed` on `body` — the inline class won, so the gradient never appeared on body. **Fixed:** removed `bg-background-base` from the blade body so `app.css`'s gradient is the single source.
+- Re-verified Pint + build + 25/25 tests after the review fixes. All green.
 - Visual smoke test deferred to PR review (the user will verify via `composer run dev`).
 
 ## Open questions / blockers

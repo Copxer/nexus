@@ -29,7 +29,7 @@ const submit = () => {
         <h1 class="text-xl font-semibold text-text-primary">
             Create your account
         </h1>
-        <p class="mt-1 text-sm text-text-muted">
+        <p class="mt-2 text-sm text-text-secondary">
             Spin up your control center.
         </p>
 
@@ -110,7 +110,7 @@ const submit = () => {
             </PrimaryButton>
         </form>
 
-        <p class="mt-6 text-center text-sm text-text-muted">
+        <p class="mt-6 text-center text-sm text-text-secondary">
             Already have an account?
             <Link
                 :href="route('login')"
