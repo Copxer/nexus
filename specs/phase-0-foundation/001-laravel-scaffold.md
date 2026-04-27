@@ -1,7 +1,7 @@
 ---
 spec: laravel-scaffold
 phase: 0-foundation
-status: in-progress
+status: done
 owner: yoany
 created: 2026-04-27
 updated: 2026-04-27
@@ -54,12 +54,50 @@ Roadmap reference: §4 Tech Stack, §21 Step 1.
 - [ ] `git log` has at least one commit (the scaffold)
 
 ## Files touched
-- (to be filled in as work progresses)
+- `composer.json`, `composer.lock` — Laravel 13.6 + Breeze + Horizon + Reverb + Spatie Permission + Predis
+- `.env`, `.env.example` — MySQL `nexus`, Redis for cache/queue/session/broadcast, Reverb credentials, integration env placeholders
+- `.gitignore` — added `/.claude/settings.local.json`
+- `package.json`, `package-lock.json` — Vue 3, Inertia, TypeScript, Vite, axios
+- `resources/js/` — Breeze stubs (`app.ts`, `bootstrap.ts`, `Pages/`, `Components/`, `Layouts/`, `types/`)
+- `resources/css/app.css` — Tailwind entry
+- `routes/auth.php`, `routes/web.php`, `routes/console.php` — Breeze auth + welcome routes
+- `app/Http/Controllers/Auth/*` — Breeze auth controllers
+- `app/Http/Controllers/ProfileController.php`, `app/Http/Controllers/Controller.php`
+- `app/Http/Middleware/HandleInertiaRequests.php`
+- `app/Http/Requests/Auth/LoginRequest.php`, `app/Http/Requests/ProfileUpdateRequest.php`
+- `app/Models/User.php` — default User model
+- `app/Providers/HorizonServiceProvider.php` — published by `horizon:install`
+- `config/permission.php`, `config/horizon.php`, `config/reverb.php`
+- `database/migrations/*` — users, cache, jobs, permission_tables
+- `bootstrap/providers.php` — registered HorizonServiceProvider
+- `tests/Feature/Auth/*` — Breeze test suite
 
 ## Work log
 
 ### 2026-04-27
 - Spec drafted. Awaiting user confirmation before scaffolding (since this creates many files at the project root).
+- User locked all decisions: Breeze + MySQL `nexus` + Redis + native (no Sail) + pause-after-each-task.
+- Verified tooling: PHP 8.4, Composer 2.8, Node 25.9, Laravel installer present, Redis `PONG`, MySQL 8.3.
+- Ran `composer create-project laravel/laravel _scaffold` → Laravel **13.6.0** (newer than the roadmap's "Laravel 12" — patterns identical, going with current stable).
+- `rsync -a _scaffold/ . && rm -rf _scaffold` to relocate files alongside roadmap/specs/screenshot.
+- Configured `.env` for MySQL + Redis + Reverb. User filled in DB credentials.
+- Confirmed MySQL connectivity, ensured database `nexus` exists.
+- `composer require laravel/breeze --dev` then `php artisan breeze:install vue --typescript --dark`.
+- Hit known Breeze bug: `app.ts` imports `./bootstrap` but the stub is missing. Created `resources/js/bootstrap.ts` with axios setup; installed `axios`.
+- `npm run build` ✅ green.
+- `php artisan migrate --force` ✅ users/cache/jobs tables created in MySQL.
+- `composer require laravel/horizon laravel/reverb spatie/laravel-permission predis/predis`.
+- `php artisan horizon:install` ✅; `printf 'yes\n' | php artisan reverb:install` ✅; published Spatie Permission migration.
+- Generated Reverb app credentials with `random_bytes` and wrote them into `.env`.
+- `php artisan migrate --force` ✅ permission tables created.
+- Smoke test: `php artisan horizon:list` works; Redis read/write round-trip via `app("redis")` succeeds.
+- Confirmed `.env` is gitignored (DB password not staged).
+- `git init -b main`, staged 127 files, committed as `9f04dfb`.
+- User added GitHub remote: `https://github.com/Copxer/nexus.git`. Added locally; **not pushed** (waiting for explicit go-ahead per system rules).
+
+## Notable deviations from roadmap
+- **Laravel 13** instead of 12 — current stable. Patterns from §6 (actions, services, DTOs, etc.) all still apply.
+- Added `predis/predis` (the roadmap doesn't pin a Redis client; Predis is the default in `config/database.php` for Laravel 13 if no extension is preferred). The `.env` keeps `REDIS_CLIENT=phpredis` — switch to `predis` if the phpredis extension isn't available locally.
 
 ## Decisions (locked 2026-04-27)
 - **Auth starter:** Breeze with `vue --typescript`. `Team` model added by hand later.
