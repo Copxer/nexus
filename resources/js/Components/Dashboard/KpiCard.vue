@@ -90,8 +90,13 @@ const accentIconClass: Record<Accent, string> = {
         <!-- Value cluster -->
         <div class="flex flex-col gap-1">
             <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                <!-- Value font-size ramps with card width:
+                       2-col mobile / 3-col tablet → text-2xl (220–290px cards)
+                       3-col laptop (lg)            → text-3xl (~330px cards)
+                       6-col xl                     → text-2xl (~210px cards)
+                       6-col 2xl+                   → text-3xl (~250px+) -->
                 <span
-                    class="font-display text-3xl font-semibold tabular-nums text-text-primary"
+                    class="font-display text-2xl font-semibold tabular-nums text-text-primary lg:text-3xl xl:text-2xl 2xl:text-3xl"
                 >
                     {{ value }}
                 </span>
@@ -101,11 +106,16 @@ const accentIconClass: Record<Accent, string> = {
                     :value="trend.value"
                 />
             </div>
+            <!-- Allow wrapping at < md so long secondary labels (e.g.
+                 "100% healthy") don't get truncated mid-letter. -->
             <div
-                class="flex items-center justify-between gap-2 text-xs text-text-muted"
+                class="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5 text-xs text-text-muted"
             >
                 <span class="truncate">{{ label }}</span>
-                <span v-if="secondary" class="shrink-0 text-text-secondary">
+                <span
+                    v-if="secondary"
+                    class="shrink-0 text-text-secondary"
+                >
                     {{ secondary }}
                 </span>
             </div>

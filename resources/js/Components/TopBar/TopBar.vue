@@ -75,7 +75,7 @@ const initials = computed(() => {
             class="hidden cursor-not-allowed items-center gap-2 rounded-lg border border-border-subtle bg-slate-950/40 px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-text-secondary transition focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60 sm:inline-flex"
             aria-label="Change time range"
             aria-disabled="true"
-            title="Time-range filtering will arrive with Analytics (spec 008)."
+            title="Time-range filtering will arrive with Analytics (Phase 8)."
         >
             <Clock class="h-3.5 w-3.5" aria-hidden="true" />
             24h
@@ -99,10 +99,12 @@ const initials = computed(() => {
             </span>
         </button>
 
-        <!-- Activity rail toggle (visible only when rail is collapsed: tablet + laptop) -->
+        <!-- Activity rail toggle — visible whenever the rail isn't a
+             persistent column (i.e. below 2xl). Includes mobile so users
+             can reach the populated feed via the drawer. -->
         <button
             type="button"
-            class="hidden h-9 w-9 items-center justify-center rounded-lg border border-border-subtle bg-slate-950/40 text-text-muted transition hover:border-accent-cyan/40 hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60 md:inline-flex 2xl:hidden"
+            class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border-subtle bg-slate-950/40 text-text-muted transition hover:border-accent-cyan/40 hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60 2xl:hidden"
             aria-label="Toggle activity rail"
             @click="emit('open-activity-rail')"
         >

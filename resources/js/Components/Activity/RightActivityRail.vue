@@ -31,8 +31,10 @@ const hasEvents = () => props.events.length > 0;
 </script>
 
 <template>
+    <!-- Cap drawer width to 88vw at < sm so the backdrop stays a generous
+         click target on small phones (360px viewport → ~43px backdrop). -->
     <aside
-        class="flex h-full w-80 flex-col gap-4 overflow-y-auto border-s border-border-subtle bg-background-panel px-4 py-6 backdrop-blur-xl"
+        class="flex h-full w-80 max-w-[88vw] flex-col gap-4 overflow-y-auto border-s border-border-subtle bg-background-panel px-4 py-6 backdrop-blur-xl"
         aria-label="Activity feed"
     >
         <header class="flex items-center justify-between gap-2">

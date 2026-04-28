@@ -247,7 +247,7 @@ const visualizationStubs = [
                                 Issues &amp; Pull Requests
                             </h2>
                         </div>
-                        <span class="font-mono text-[11px] text-text-muted">
+                        <span class="hidden font-mono text-[11px] text-text-muted sm:inline">
                             {{ stubIssues.length }} open · mock
                         </span>
                     </header>
@@ -292,23 +292,34 @@ const visualizationStubs = [
                                 Top Repositories
                             </h2>
                         </div>
-                        <span class="font-mono text-[11px] text-text-muted">
+                        <span class="hidden font-mono text-[11px] text-text-muted sm:inline">
                             7d · mock
                         </span>
                     </header>
-                    <ul class="flex flex-col gap-3">
+                    <!-- At < sm we stack name+commits over a full-width bar
+                         so the bar isn't squeezed to nothing on small phones. -->
+                    <ul class="flex flex-col gap-3 sm:gap-3">
                         <li
                             v-for="repo in stubRepos"
                             :key="repo.name"
-                            class="flex items-center gap-3"
+                            class="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3"
                         >
-                            <span
-                                class="w-32 shrink-0 truncate font-mono text-xs text-text-secondary"
-                            >
-                                {{ repo.name }}
-                            </span>
                             <div
-                                class="relative h-2 flex-1 overflow-hidden rounded-full bg-background-panel-hover"
+                                class="flex items-baseline justify-between gap-3 sm:contents"
+                            >
+                                <span
+                                    class="truncate font-mono text-xs text-text-secondary sm:w-32 sm:shrink-0"
+                                >
+                                    {{ repo.name }}
+                                </span>
+                                <span
+                                    class="shrink-0 text-right font-mono text-[11px] tabular-nums text-text-muted sm:order-2 sm:w-20"
+                                >
+                                    {{ repo.commits }} commits
+                                </span>
+                            </div>
+                            <div
+                                class="relative h-2 flex-1 overflow-hidden rounded-full bg-background-panel-hover sm:order-1"
                             >
                                 <span
                                     class="block h-full rounded-full bg-gradient-to-r from-accent-cyan to-accent-magenta"
@@ -317,11 +328,6 @@ const visualizationStubs = [
                                     }"
                                 />
                             </div>
-                            <span
-                                class="w-20 shrink-0 text-right font-mono text-[11px] tabular-nums text-text-muted"
-                            >
-                                {{ repo.commits }} commits
-                            </span>
                         </li>
                     </ul>
                     <footer class="text-[11px] text-text-muted">
@@ -344,7 +350,7 @@ const visualizationStubs = [
                                 Container Hosts
                             </h2>
                         </div>
-                        <span class="font-mono text-[11px] text-text-muted">
+                        <span class="hidden font-mono text-[11px] text-text-muted sm:inline">
                             {{ stubHosts.length }} hosts · mock
                         </span>
                     </header>
@@ -421,15 +427,18 @@ const visualizationStubs = [
                                 Service Health
                             </h2>
                         </div>
-                        <span class="font-mono text-[11px] text-text-muted">
+                        <span class="hidden font-mono text-[11px] text-text-muted sm:inline">
                             {{ stubServices.length }} services · mock
                         </span>
                     </header>
+                    <!-- Sparkline column shrinks 100→140px from sm to lg
+                         so the row template doesn't squeeze the service name
+                         on narrow viewports. -->
                     <ul class="flex flex-col gap-3">
                         <li
                             v-for="svc in stubServices"
                             :key="svc.name"
-                            class="grid grid-cols-[auto_1fr_140px] items-center gap-3"
+                            class="grid grid-cols-[auto_1fr_100px] items-center gap-3 lg:grid-cols-[auto_1fr_140px]"
                         >
                             <StatusBadge :tone="svc.status" dot-only />
                             <span class="truncate text-sm text-text-primary">
@@ -466,7 +475,7 @@ const visualizationStubs = [
                                 Activity Heatmap
                             </h2>
                         </div>
-                        <span class="font-mono text-[11px] text-text-muted">
+                        <span class="hidden font-mono text-[11px] text-text-muted sm:inline">
                             7 days · 4-hour buckets · mock
                         </span>
                     </header>
@@ -493,7 +502,7 @@ const visualizationStubs = [
                         <StatusBadge tone="muted">Pending</StatusBadge>
                     </header>
                     <div
-                        class="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5"
+                        class="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5"
                     >
                         <div
                             v-for="placeholder in visualizationStubs"

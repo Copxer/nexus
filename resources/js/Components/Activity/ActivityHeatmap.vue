@@ -61,9 +61,10 @@ const cellClass = (count: number) => {
         <!-- Grid: a `min-content` label column + 7 fixed day cols. We avoid
              `auto` for the label column because grid greedily expands it to
              absorb any leftover container width, pushing the cells right.
-             `w-fit` on the figure keeps the whole heatmap left-aligned. -->
+             `w-fit` on the figure keeps the whole heatmap left-aligned.
+             Cell sizes ramp 24px → 32px → 40px from mobile to desktop. -->
         <div
-            class="grid w-fit grid-cols-[min-content_repeat(7,32px)] gap-1.5 sm:grid-cols-[min-content_repeat(7,40px)]"
+            class="grid w-fit grid-cols-[min-content_repeat(7,24px)] gap-1.5 sm:grid-cols-[min-content_repeat(7,32px)] md:grid-cols-[min-content_repeat(7,40px)]"
         >
             <!-- Header row: empty corner + day initials -->
             <div aria-hidden="true" />
@@ -93,9 +94,10 @@ const cellClass = (count: number) => {
             </template>
         </div>
 
-        <!-- Legend strip -->
+        <!-- Legend strip — centred on mobile so it doesn't get pushed
+             outside the card; right-aligned at sm+ where it can fit. -->
         <figcaption
-            class="ms-auto flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted"
+            class="mx-auto flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted sm:ms-auto sm:me-0"
         >
             Less
             <span class="flex items-center gap-1">

@@ -67,9 +67,11 @@ defineEmits<{
 </script>
 
 <template>
+    <!-- Drawer width is capped to 88vw at < sm so the backdrop click target
+         stays generous on small phones (360px viewport → ~43px backdrop). -->
     <aside
         class="flex h-full flex-col gap-6 border-r border-border-subtle bg-background-panel px-4 py-6 backdrop-blur-xl"
-        :class="variant === 'drawer' ? 'w-72' : 'w-60'"
+        :class="variant === 'drawer' ? 'w-72 max-w-[88vw]' : 'w-60'"
     >
         <!-- Header row: wordmark, plus a close button when in drawer mode -->
         <div class="flex items-center justify-between gap-2">
