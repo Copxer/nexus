@@ -1,0 +1,115 @@
+<script setup lang="ts">
+import Sparkline from '@/Components/Dashboard/Sparkline.vue';
+import StatusBadge from '@/Components/Dashboard/StatusBadge.vue';
+import TrendChip from '@/Components/Dashboard/TrendChip.vue';
+import type { LucideIcon } from 'lucide-vue-next';
+import { computed } from 'vue';
+
+type Accent = 'cyan' | 'blue' | 'purple' | 'magenta' | 'success' | 'danger';
+
+const props = withDefaults(
+    defineProps<{
+        label: string;
+        /** Big numeric (or short) value rendered in tabular nums. */
+        value: string;
+        /** Tiny secondary label beneath the value, e.g. "Successful", "Online". */
+        secondary?: string;
+        icon: LucideIcon;
+        /** Drives the icon glow + sparkline accent. */
+        accent?: Accent;
+        /** Optional trend indicator next to the value. */
+        trend?: { direction: 'up' | 'down' | 'flat'; value: string };
+        /** Optional health pill rendered top-right of the card. */
+        status?: 'success' | 'warning' | 'danger' | 'info';
+        statusLabel?: string;
+        /** Optional inline mini-sparkline data. */
+        sparkline?: number[];
+        /**
+         * Click-to-detail target. When omitted (or `disabled` is true) the
+         * card is rendered as inert with `aria-disabled` — mirrors the
+         * sidebar/palette "Soon" treatment until target sections exist.
+         */
+        href?: string;
+        disabled?: boolean;
+    }>(),
+    {
+        accent: 'cyan',
+        disabled: true,
+    },
+);
+
+const isInert = computed(() => props.disabled || !props.href);
+
+const accentIconClass: Record<Accent, string> = {
+    cyan: 'text-accent-cyan shadow-[0_0_24px_rgba(34,211,238,0.45)]',
+    blue: 'text-accent-blue shadow-[0_0_24px_rgba(56,189,248,0.45)]',
+    purple: 'text-accent-purple shadow-[0_0_24px_rgba(139,92,246,0.45)]',
+    magenta: 'text-accent-magenta shadow-[0_0_24px_rgba(217,70,239,0.45)]',
+    success: 'text-status-success shadow-glow-success',
+    danger: 'text-status-danger shadow-glow-danger',
+};
+</script>
+
+<template>
+    <component
+        :is="isInert ? 'div' : 'a'"
+        :href="!isInert ? href : undefined"
+        :aria-disabled="isInert ? 'true' : undefined"
+        :tabindex="isInert ? 0 : undefined"
+        :title="
+            isInert
+                ? `${label} detail view lands when the section ships`
+                : undefined
+        "
+        class="glass-card group relative flex flex-col gap-4 p-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
+        :class="[isInert ? 'cursor-default' : 'cursor-pointer']"
+    >
+        <!-- Top row: icon (with accent glow) + status pill -->
+        <div class="flex items-start justify-between gap-3">
+            <span
+                class="flex h-9 w-9 items-center justify-center rounded-xl border border-border-subtle bg-background-panel-hover transition group-hover:border-accent-cyan/30"
+            >
+                <component
+                    :is="icon"
+                    class="h-4 w-4 transition"
+                    :class="accentIconClass[accent]"
+                    aria-hidden="true"
+                />
+            </span>
+            <StatusBadge v-if="status" :tone="status">
+                {{ statusLabel ?? status }}
+            </StatusBadge>
+        </div>
+
+        <!-- Value cluster -->
+        <div class="flex flex-col gap-1">
+            <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                <span
+                    class="font-display text-3xl font-semibold tabular-nums text-text-primary"
+                >
+                    {{ value }}
+                </span>
+                <TrendChip
+                    v-if="trend"
+                    :direction="trend.direction"
+                    :value="trend.value"
+                />
+            </div>
+            <div
+                class="flex items-center justify-between gap-2 text-xs text-text-muted"
+            >
+                <span class="truncate">{{ label }}</span>
+                <span v-if="secondary" class="shrink-0 text-text-secondary">
+                    {{ secondary }}
+                </span>
+            </div>
+        </div>
+
+        <!-- Sparkline footer -->
+        <Sparkline
+            v-if="sparkline && sparkline.length > 1"
+            :points="sparkline"
+            :accent="accent"
+        />
+    </component>
+</template>

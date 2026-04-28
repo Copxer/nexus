@@ -95,6 +95,13 @@ Dated notes as work progresses.
 ### 2026-04-27
 - Spec drafted; scope confirmed (4 decisions locked: roll-our-own SVG sparkline, inert+aria-disabled click-to-detail, thin controller, populated stub widgets).
 - Opened issue [#12](https://github.com/Copxer/nexus/issues/12) and branch `spec/006-overview-kpi` off `main`.
+- Implemented `Components/Dashboard/{Sparkline,StatusBadge,TrendChip,KpiCard}.vue` (4 primitives), `OverviewController` (single-action, hardcoded §8.1.1 payload + per-card `sparkline` + `status`), `routes/web.php` switched to controller, `types/index.d.ts` extended with `DashboardStatus` + `DashboardPayload`, `Pages/Overview.vue` rebuilt with the 6-card KPI row + 4 populated stub widgets (Issues & PRs, Top Repositories, Container Hosts, Service Health) + a single Visualizations placeholder card for the chart-heavy widgets that need their own specs (map, charts, gauges, timeline).
+- Extended `tests/Feature/SmokeTest.php` with an Inertia `assertInertia` that verifies the `dashboard` prop carries all 6 KPI keys + correct status tokens for projects (`success`) and alerts (`danger`).
+- Manual verification in dev server (Playwright Chrome) at three breakpoints:
+    - **1440 × 900 (desktop):** 6 KPIs in a single row with full sparklines + glowing icons + status pills + trend chips. 4 stub widgets in 7+5 / 6+6 columns. Visualizations card spans 12 cols at the bottom.
+    - **768 × 900 (tablet):** KPIs collapse to 3 cols × 2 rows. Stub widgets stack to single column.
+    - **390 × 900 (mobile):** KPIs in 2 cols × 3 rows. All widgets stack. Hosts CPU/MEM bars and the gradient repo bars remain readable. **Found:** Uptime KPI's `99.98%` value + the `+0.01%` trend chip overflowed the column. **Fix:** changed the value cluster from `flex items-baseline gap-2` to `flex flex-wrap items-baseline gap-x-2 gap-y-1` so the trend chip drops below the value when crowded. Re-verified — chip now wraps cleanly on Hosts and Uptime cards at mobile width.
+- Pipeline: vue-tsc clean, Pint clean, `npm run build` green (Overview chunk = 17 KB / 5 KB gzipped, AppLayout chunk unchanged). 2 SmokeTest cases pass with 24 assertions.
 
 ## Decisions (locked 2026-04-27)
 - **Sparkline implementation — roll our own.** Pure-SVG polyline + faint area fill (~30 LOC), no dep. Charting library is a future phase decision when real charts ship.
