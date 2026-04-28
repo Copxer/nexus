@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import Dropdown from '@/Components/Dropdown.vue';
 import DropdownLink from '@/Components/DropdownLink.vue';
+import TopBarSearch from '@/Components/TopBar/TopBarSearch.vue';
 import { usePage } from '@inertiajs/vue3';
 import {
     Bell,
@@ -9,7 +10,6 @@ import {
     LogOut,
     Menu,
     PanelRight,
-    Search,
     UserCog,
 } from 'lucide-vue-next';
 import { computed } from 'vue';
@@ -24,6 +24,8 @@ const emit = defineEmits<{
     (e: 'open-sidebar'): void;
     /** Tablet rail toggle pressed — AppLayout opens the activity rail drawer. */
     (e: 'open-activity-rail'): void;
+    /** Search trigger pressed — AppLayout opens the command palette. */
+    (e: 'open-palette'): void;
 }>();
 
 const page = usePage();
@@ -64,27 +66,8 @@ const initials = computed(() => {
             </slot>
         </div>
 
-        <!-- Search — visual only; real search lands with the command palette in spec 005 -->
-        <div class="relative hidden items-center md:flex">
-            <Search
-                class="pointer-events-none absolute start-3 h-4 w-4 text-text-muted"
-                aria-hidden="true"
-            />
-            <input
-                type="search"
-                aria-label="Global search"
-                placeholder="Search projects, repos, hosts…"
-                title="Global search arrives with the command palette in spec 005."
-                class="w-64 cursor-not-allowed rounded-lg border border-border-subtle bg-slate-950/60 ps-9 pe-16 py-2 text-sm text-text-primary placeholder:text-text-muted shadow-inner shadow-black/20 transition focus:border-accent-cyan focus:ring-2 focus:ring-accent-cyan/40 lg:w-72"
-                aria-disabled="true"
-                readonly
-            />
-            <span
-                class="pointer-events-none absolute end-3 hidden font-mono text-[11px] text-text-muted lg:inline"
-            >
-                ⌘K
-            </span>
-        </div>
+        <!-- Search — opens the command palette (spec 005) -->
+        <TopBarSearch @open-palette="emit('open-palette')" />
 
         <!-- Time-range pill — visual only -->
         <button

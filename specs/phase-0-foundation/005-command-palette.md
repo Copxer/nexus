@@ -120,6 +120,20 @@ Dated notes as work progresses.
 ### 2026-04-27
 - Spec drafted; scope confirmed with the user (4 decisions locked: defer JS tests, skip `/`, list "Soon" items, roll our own).
 - Opened issue [#9](https://github.com/Copxer/nexus/issues/9) and branch `spec/005-command-palette` off `main`.
+- Implemented `lib/fuzzyMatch.ts` (substring + acronym scorer), `lib/commands.ts` (typed registry with 19 commands: 3 real, 15 "Soon" mirroring §7.6 sidebar nav + roadmap §7.10 actions, 1 "Soon" theme toggle), `Components/CommandPalette/{CommandPalette,CommandPaletteRow}.vue`, extracted `Components/TopBar/TopBarSearch.vue` (the search markup was previously inlined inside `TopBar.vue`), wired Cmd+K listener + palette mount into `AppLayout.vue`, added `tests/Feature/SmokeTest.php`.
+- Manual verification in dev server (Playwright Chrome, 1440×900):
+    - Cmd+K opens, Esc closes, backdrop click closes, click on top-bar trigger opens.
+    - Filter narrows correctly: typing `log` reduces list to "Log out" under ACTIONS with cyan-stripe highlight.
+    - Real commands work end-to-end: Enter on "Log out" logged the test user out and redirected to `/`.
+    - ArrowDown navigation skips all 10 disabled "Soon" entries between "Go to Profile" and "Log out" exactly once.
+    - "No matching commands." empty state renders for `xyzzz`.
+    - Focus restored to the top-bar trigger on close — visible cyan focus ring.
+    - Group labels (NAVIGATION, ACTIONS) render in stable order; "Soon" pills carry phase labels.
+- Two issues found and fixed during manual verification:
+    - **[material]** Cursor parked over a list row at the moment Cmd+K rendered the dialog stole the keyboard-set highlight via `@mouseenter` (browsers fire it on elements that appear under the cursor). Fix: added a `mouseMovedSinceOpen` guard — `@mouseenter` on a row only updates `highlightedIndex` after the user has moved the mouse inside the dialog. `@mousemove` on the dialog flips the guard. Reset on each open.
+    - **[nit]** Top-bar trigger placeholder "Search projects, repos, hosts…" wrapped to 2 lines at md/lg widths because the `Ctrl K` pill ate width. Shortened to "Search or run a command…" and added `min-w-0 truncate whitespace-nowrap` so it never wraps regardless of label length.
+- **Local test failure note:** 14 pre-existing tests fail locally on PHP 8.5.5 (Homebrew) with HTTP 419 (CSRF mismatch) on every `$this->post(...)` call. Confirmed they fail on bare `main` too via `git stash` — not introduced by this spec. CI runs PHP 8.4 where they pass; the new `SmokeTest::test_overview_renders_for_a_verified_user` passes locally and will pass on CI. A follow-up chore PR to investigate the PHP 8.5 / Laravel 13.6 testing-CSRF interaction is out of scope here.
+- Pipeline (local): vue-tsc clean, Pint clean, `npm run build` green (AppLayout chunk grew 22 KB → ~34 KB; the palette + 19 lucide icons + commands registry account for the delta).
 
 ## Decisions (locked 2026-04-27)
 - **JS test runner — defer.** Vitest is not wired up; adding it ships in a separate small chore PR right after this spec. This spec relies on manual verification + a PHP smoke test.

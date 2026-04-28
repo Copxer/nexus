@@ -1,25 +1,45 @@
 <script setup lang="ts">
 import RightActivityRail from '@/Components/Activity/RightActivityRail.vue';
+import CommandPalette from '@/Components/CommandPalette/CommandPalette.vue';
 import Sidebar from '@/Components/Sidebar/Sidebar.vue';
 import TopBar from '@/Components/TopBar/TopBar.vue';
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 const sidebarOpen = ref(false);
 const activityRailOpen = ref(false);
+const paletteOpen = ref(false);
 
-// Lock body scroll while a drawer is open. Reset on unmount in case the user
-// navigates away mid-drawer.
+// Lock body scroll while a drawer or the palette is open. Reset on unmount
+// in case the user navigates away mid-overlay.
 const setBodyScroll = (locked: boolean) => {
     document.body.classList.toggle('overflow-hidden', locked);
 };
 
-watch([sidebarOpen, activityRailOpen], ([s, a]) => {
-    setBodyScroll(s || a);
+watch([sidebarOpen, activityRailOpen, paletteOpen], ([s, a, p]) => {
+    setBodyScroll(s || a || p);
 });
 
-// Close any open drawer on Escape — required for `role="dialog" aria-modal".
+// True when focus is inside a text-input-like element. Used to avoid
+// hijacking Cmd+K while the user is typing into a real form field.
+const isTextInput = (target: EventTarget | null): boolean => {
+    if (!(target instanceof HTMLElement)) return false;
+    const tag = target.tagName;
+    return tag === 'INPUT' || tag === 'TEXTAREA' || target.isContentEditable;
+};
+
 const onKeydown = (event: KeyboardEvent) => {
+    // Cmd+K (mac) / Ctrl+K (others) opens the command palette from anywhere
+    // outside text inputs. The palette's own Escape/Enter/arrow handling
+    // takes over once it's open and focused.
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        if (isTextInput(event.target)) return;
+        event.preventDefault();
+        paletteOpen.value = true;
+        return;
+    }
+
     if (event.key !== 'Escape') return;
+    // Drawers handle Escape here; the palette has its own internal handler.
     if (sidebarOpen.value) {
         sidebarOpen.value = false;
     } else if (activityRailOpen.value) {
@@ -83,6 +103,7 @@ onBeforeUnmount(() => {
             <TopBar
                 @open-sidebar="sidebarOpen = true"
                 @open-activity-rail="activityRailOpen = true"
+                @open-palette="paletteOpen = true"
             >
                 <template v-if="$slots.title" #title>
                     <slot name="title" />
@@ -138,5 +159,11 @@ onBeforeUnmount(() => {
                 />
             </div>
         </Transition>
+
+        <!-- Global command palette (spec 005) -->
+        <CommandPalette
+            :open="paletteOpen"
+            @close="paletteOpen = false"
+        />
     </div>
 </template>
