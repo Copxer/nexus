@@ -75,7 +75,7 @@ const initials = computed(() => {
             class="hidden cursor-not-allowed items-center gap-2 rounded-lg border border-border-subtle bg-slate-950/40 px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-text-secondary transition focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60 sm:inline-flex"
             aria-label="Change time range"
             aria-disabled="true"
-            title="Time-range filtering will arrive with Analytics (spec 008)."
+            title="Time-range filtering will arrive with Analytics (Phase 8)."
         >
             <Clock class="h-3.5 w-3.5" aria-hidden="true" />
             24h

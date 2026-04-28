@@ -138,6 +138,10 @@ Dated notes as work progresses.
     - **768 (tablet):** drawer sidebar + drawer rail; all 6 KPI chips inline with the new lg-only `text-3xl` rule. Stub widgets stack to single column.
     - **360 (mobile):** drawer sidebar + drawer rail (rail toggle now visible); all KPI chips inline; Top Repositories stacks 2-row; heatmap fits with 24 px cells; legend centred.
 - Pipeline: vue-tsc clean, Pint clean, `npm run build` green. SmokeTest still passes (3 cases, 48 assertions).
+- Self-review with `superpowers:code-reviewer`. **No blockers, 1 material finding addressed:**
+    - **[material, fixed]** `TopBar.vue:78` time-range pill tooltip said "arrive with Analytics (spec 008)" — pre-existing string but spec 008 is now this responsive polish spec, so the reference was inconsistent. Updated to "Analytics (Phase 8)" — phase-language is more durable than spec numbers anyway.
+    - Reviewer confirmed: `sm:contents` Top Repositories trick is robust (a11y tree unaffected), `max-w-[88vw]` is LTR/RTL safe, `min-w-0 flex-1` on the SidebarNavLink label doesn't break the icon/pill flex tracks, `text-3xl` skipped at md is the right trade-off (chip wrap at 768 was worse than a slightly smaller value), header-metadata strips at < sm contain only "· mock" disclaimers (no information loss), TopBar mobile button row is readable at 360 px because the time-range pill is already `sm:inline-flex` and the title `truncate` absorbs the squeeze.
+    - Note for future self: **value font-size ramp inverts at md→lg→xl** (text-2xl → text-3xl → text-2xl). It's intentional — the 6-col xl grid makes cards narrower than the 3-col lg grid, so the value size has to come back down. If anyone re-litigates this, point them at this work-log entry.
 
 ## Decisions (locked 2026-04-28)
 - **Mobile activity-rail entry point — show.** The `PanelRight` toggle becomes visible at all breakpoints below 2xl so mobile users can still reach the feed via the drawer.
