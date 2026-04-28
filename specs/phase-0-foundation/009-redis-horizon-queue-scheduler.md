@@ -113,6 +113,24 @@ Dated notes as work progresses.
 ### 2026-04-28
 - Spec drafted; scope confirmed (5 decisions locked: ship heartbeat sample, open Horizon gate in local, add `schedule:work` to dev script, keep `inspire` canary, keep two feature tests).
 - Opened issue [#21](https://github.com/Copxer/nexus/issues/21) and branch `spec/009-redis-horizon-queue-scheduler` off `main`.
+- Implemented the heartbeat path:
+    - `app/Jobs/HeartbeatPing.php` — `ShouldQueue` job. `handle()` writes `Log::info('Heartbeat ping at <iso8601>')`.
+    - `app/Console/Commands/HeartbeatPingCommand.php` — `app:heartbeat` artisan command, dispatches `HeartbeatPing`.
+    - `routes/console.php` — `Schedule::command('app:heartbeat')->everyTenMinutes()` + `Schedule::command('inspire')->hourly()` canary.
+- Opened the Horizon gate: `App\Providers\HorizonServiceProvider::gate()` allows any verified user when `app()->environment('local', 'testing')`. Non-local allow-list stays empty (phase 9 deploy spec populates it). Cleaned the unused `Horizon` import + the commented notification-routing examples that came from `horizon:install`.
+- `composer.json` `dev:horizon` script gained `php artisan schedule:work` so the local stack now boots server + horizon + reverb + scheduler + pail + vite via one command.
+- `.env.example` already carried all §26.3 keys (`QUEUE_CONNECTION=redis`, `CACHE_STORE=redis`, `SESSION_DRIVER=redis`, `BROADCAST_CONNECTION=reverb`, `REDIS_*`) — no diff needed.
+- Tests added:
+    - `tests/Feature/Console/HeartbeatPingTest.php` — 2 cases: `Queue::fake()` confirms the command pushes `HeartbeatPing`; `Log::spy()` confirms `handle()` logs the expected ping line.
+    - `tests/Feature/Horizon/AccessTest.php` — verified user can reach `/horizon` in the testing environment (gate's `local|testing` branch is hit).
+- Local boot smoke walk:
+    - `redis-cli ping` → `PONG` ✓
+    - `php artisan horizon` → "Horizon started successfully." (3-sec timeout, exit 0) ✓
+    - `php artisan queue:work --once` → exits 0 (queue reachable) ✓
+    - `php artisan schedule:list` → shows both entries (`*/10` heartbeat, `0 *` inspire) ✓
+    - `php artisan schedule:work` → "Running scheduled tasks." ✓
+    - `php artisan app:heartbeat` → "Heartbeat ping dispatched." + log line confirmed in `storage/logs/laravel.log` ✓
+- Pipeline: vue-tsc clean, Pint clean, `npm run build` green. **6/6 tests pass with 53 assertions** (2 new heartbeat + 1 new horizon access + 3 existing smoke).
 
 ## Decisions (locked 2026-04-28)
 - **Heartbeat sample job — ship.** `HeartbeatPing` queueable job + `app:heartbeat` artisan command + 10-minute schedule. Proves the queue → Horizon → log path round-trips and doubles as a smoke target for future phases.
