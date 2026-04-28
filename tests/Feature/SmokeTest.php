@@ -46,4 +46,30 @@ class SmokeTest extends TestCase
                     )
             );
     }
+
+    public function test_overview_carries_activity_feed_and_heatmap_payloads(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+        ]);
+
+        $this->actingAs($user)
+            ->get('/overview')
+            ->assertInertia(
+                fn (AssertableInertia $page) => $page
+                    ->component('Overview')
+                    ->has('recentActivity', 9)
+                    ->has('recentActivity.0', fn (AssertableInertia $event) => $event
+                        ->has('id')
+                        ->has('type')
+                        ->has('severity')
+                        ->has('title')
+                        ->has('source')
+                        ->has('occurred_at')
+                        ->etc()
+                    )
+                    ->has('activityHeatmap', 7)
+                    ->has('activityHeatmap.0', 6)
+            );
+    }
 }

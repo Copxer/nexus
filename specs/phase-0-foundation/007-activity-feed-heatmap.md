@@ -95,6 +95,20 @@ Dated notes as work progresses.
 - Spec drafted; scope confirmed (4 decisions locked: 7×6 heatmap, 8–10 events, visual-only filter/cell-click, layout-prop plumbing).
 - Opened issue [#15](https://github.com/Copxer/nexus/issues/15) and branch `spec/007-activity-feed-heatmap` off `main`.
 
+### 2026-04-28
+- Implemented `ActivityFeedItem.vue` (event-type → lucide icon map covering all §8.10 types; severity-tinted icon + title + source/time meta + optional metadata pill), `ActivityFeed.vue` (visual-only Recent/All tab pill + scrollable list), and `ActivityHeatmap.vue` (7×6 grid, 5-step purple→magenta intensity ramp, native `<title>` + `aria-label` per cell, Less/More legend).
+- Wired the feed into `RightActivityRail.vue` — accepts optional `events` prop; renders `<ActivityFeed>` when populated, falls back to the existing empty-state otherwise (so Profile/Edit and other non-feed pages keep their current behavior). Updated the filter button tooltip from spec-language to phase-language.
+- `AppLayout.vue` now accepts an optional `activityEvents` prop and forwards it to both rail instances (column + drawer). `Overview.vue` passes `recentActivity` through; other pages omit it and inherit the empty-state.
+- `OverviewController` extended with two new top-level Inertia props: `recentActivity` (9 mock events with realistic relative `occurred_at` strings + a §8.10-type-mix: deployment, PR merge, alert, workflow fail, review request, website recovery, container OOM, issue, host recovery) and `activityHeatmap` (7×6 with a believable rhythm — quieter overnight + weekends, peak Wed 12 PM = 10 events).
+- `Pages/Overview.vue` renders an `ActivityHeatmap` section between Service Health and the Visualizations card. Trimmed the now-redundant "ActivityFeed + Heatmap render in spec 007" line from the Visualizations footer.
+- New types in `resources/js/types/index.d.ts`: `ActivityEventType` (union of §8.10 vocabulary), `ActivityEvent`, `ActivityHeatmapPayload`.
+- `SmokeTest` adds `test_overview_carries_activity_feed_and_heatmap_payloads` — verifies `recentActivity` length is 9 with the expected per-event fields, and `activityHeatmap` is a 7×6 array.
+- Manual verification at four breakpoints (Playwright Chrome): 1600 / 1024 (drawer) / 768 / 390:
+    - Right rail shows the populated feed at desktop and the drawer variant on tablet, with the full 9-event list, severity-tinted icons, metadata pills (`US-EAST`, `CRITICAL`).
+    - Heatmap reads as a compact grid in all viewports — peak (Wed 12 PM) is the brightest pink/magenta; weekend and overnight cells are darker.
+    - Found and fixed: `auto` first column in the heatmap grid greedily absorbed leftover container width (~612px) and pushed all data cells to the right of the card. Switched to `min-content` for the label column + fixed-width day columns + `w-fit` on the figure so the heatmap stays compact and left-aligned regardless of card width.
+- Pipeline (local): vue-tsc clean, Pint clean, `npm run build` green. 3 SmokeTest cases pass with 48 assertions.
+
 ## Decisions (locked 2026-04-27)
 - **Heatmap shape — 7 cols × 6 rows.** Day-of-week × 4-hour bucket per roadmap §8.11. 7×24 is too dense at dashboard size.
 - **Feed length — 8–10 mock events.** Fits the rail without scrolling on desktop; bigger sets feel padded.

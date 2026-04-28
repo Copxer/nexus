@@ -58,6 +58,99 @@ class OverviewController extends Controller
                     'status' => 'success',
                 ],
             ],
+
+            // Mock activity events covering the §8.10 vocabulary. Pre-formatted
+            // `occurred_at` strings keep the UI server-rendered (no client
+            // time math). Real events ship with phase 2/3/4 integrations.
+            'recentActivity' => [
+                [
+                    'id' => 'evt-001',
+                    'type' => 'deployment.succeeded',
+                    'severity' => 'success',
+                    'title' => 'Deployed nexus-api v2.14.3 to production',
+                    'source' => 'nexus-api',
+                    'occurred_at' => '2 min ago',
+                    'metadata' => 'us-east',
+                ],
+                [
+                    'id' => 'evt-002',
+                    'type' => 'pull_request.merged',
+                    'severity' => 'info',
+                    'title' => 'PR #142 — Switch session driver to Redis cluster',
+                    'source' => 'nexus-web',
+                    'occurred_at' => '14 min ago',
+                ],
+                [
+                    'id' => 'evt-003',
+                    'type' => 'alert.triggered',
+                    'severity' => 'danger',
+                    'title' => 'CPU sustained > 90% on prod-api-02 for 5 min',
+                    'source' => 'monitoring',
+                    'occurred_at' => '38 min ago',
+                    'metadata' => 'critical',
+                ],
+                [
+                    'id' => 'evt-004',
+                    'type' => 'workflow.failed',
+                    'severity' => 'danger',
+                    'title' => 'CI failed — flaky test on nexus-mail#main',
+                    'source' => 'nexus-mail',
+                    'occurred_at' => '52 min ago',
+                ],
+                [
+                    'id' => 'evt-005',
+                    'type' => 'pull_request.review_requested',
+                    'severity' => 'info',
+                    'title' => 'Review requested on PR #218 — Billing webhook hardening',
+                    'source' => 'nexus-api',
+                    'occurred_at' => '1 h ago',
+                ],
+                [
+                    'id' => 'evt-006',
+                    'type' => 'website.recovered',
+                    'severity' => 'success',
+                    'title' => 'status.nexus.io recovered after 3 m 12 s outage',
+                    'source' => 'monitoring',
+                    'occurred_at' => '2 h ago',
+                ],
+                [
+                    'id' => 'evt-007',
+                    'type' => 'container.unhealthy',
+                    'severity' => 'warning',
+                    'title' => 'billing-worker container restarted after OOM',
+                    'source' => 'prod-api-02',
+                    'occurred_at' => '3 h ago',
+                ],
+                [
+                    'id' => 'evt-008',
+                    'type' => 'issue.created',
+                    'severity' => 'muted',
+                    'title' => 'Login flow rejects valid 2FA codes intermittently',
+                    'source' => 'nexus-web',
+                    'occurred_at' => '4 h ago',
+                ],
+                [
+                    'id' => 'evt-009',
+                    'type' => 'host.recovered',
+                    'severity' => 'success',
+                    'title' => 'edge-eu-01 back online after scheduled maintenance',
+                    'source' => 'edge-eu-01',
+                    'occurred_at' => '6 h ago',
+                ],
+            ],
+
+            // 7×6 mock heatmap. Outer index = day-of-week (Sun..Sat), inner =
+            // 4-hour bucket (12 AM, 4 AM, 8 AM, 12 PM, 4 PM, 8 PM). Rhythm:
+            // quieter overnight + weekends, busier weekday mid-day.
+            'activityHeatmap' => [
+                [1, 0, 1, 3, 2, 1], // Sun
+                [2, 1, 4, 7, 6, 3], // Mon
+                [1, 1, 5, 9, 8, 4], // Tue
+                [2, 1, 6, 10, 9, 5], // Wed
+                [2, 1, 5, 9, 7, 4], // Thu
+                [1, 0, 4, 6, 5, 2], // Fri
+                [0, 0, 1, 2, 1, 1], // Sat
+            ],
         ]);
     }
 }

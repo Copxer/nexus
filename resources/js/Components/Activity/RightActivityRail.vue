@@ -1,17 +1,33 @@
 <script setup lang="ts">
+import ActivityFeed from '@/Components/Activity/ActivityFeed.vue';
+import type { ActivityEvent } from '@/types';
 import { Activity, Filter, X } from 'lucide-vue-next';
 
-defineProps<{
-    /**
-     * `column` is the desktop layout (≥ 2xl). `drawer` is the slide-over used
-     * on tablet/laptop where the rail isn't always visible.
-     */
-    variant?: 'column' | 'drawer';
-}>();
+const props = withDefaults(
+    defineProps<{
+        /**
+         * `column` is the desktop layout (≥ 2xl). `drawer` is the slide-over used
+         * on tablet/laptop where the rail isn't always visible.
+         */
+        variant?: 'column' | 'drawer';
+        /**
+         * Optional populated feed. When omitted (or empty) the rail falls back
+         * to the empty-state block; pages without an activity feed (Profile,
+         * etc.) get the empty-state automatically.
+         */
+        events?: ActivityEvent[];
+    }>(),
+    {
+        variant: 'column',
+        events: () => [],
+    },
+);
 
 defineEmits<{
     (e: 'close'): void;
 }>();
+
+const hasEvents = () => props.events.length > 0;
 </script>
 
 <template>
@@ -38,7 +54,7 @@ defineEmits<{
                     class="flex h-8 w-8 cursor-not-allowed items-center justify-center rounded-lg border border-border-subtle bg-slate-950/40 text-text-muted transition focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
                     aria-label="Filter activity"
                     aria-disabled="true"
-                    title="Activity filters arrive with the real feed (spec 007)."
+                    title="Activity filtering arrives when real integrations land."
                 >
                     <Filter class="h-3.5 w-3.5" aria-hidden="true" />
                 </button>
@@ -54,8 +70,12 @@ defineEmits<{
             </div>
         </header>
 
-        <!-- Empty state — real feed lands in spec 007 -->
+        <!-- Populated feed when events were forwarded from the page; otherwise
+             the empty-state block shipped in spec 004 (used on Profile/Edit
+             and any future page that doesn't supply events). -->
+        <ActivityFeed v-if="hasEvents()" :events="events" />
         <div
+            v-else
             class="flex flex-1 flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border-subtle bg-slate-950/40 px-4 py-10 text-center"
         >
             <span
