@@ -131,6 +131,7 @@ Dated notes as work progresses.
     - `php artisan schedule:work` → "Running scheduled tasks." ✓
     - `php artisan app:heartbeat` → "Heartbeat ping dispatched." + log line confirmed in `storage/logs/laravel.log` ✓
 - Pipeline: vue-tsc clean, Pint clean, `npm run build` green. **6/6 tests pass with 53 assertions** (2 new heartbeat + 1 new horizon access + 3 existing smoke).
+- Self-review with `superpowers:code-reviewer`. **No blockers, no material findings.** One nit addressed: the empty production allow-list in `HorizonServiceProvider::gate()` now has a `TODO(phase-9)` comment so a pre-deploy grep finds it. Reviewer also confirmed: including `testing` in the open-gate set is the right call (testing the real gate path, not bypassing it); the `(new HeartbeatPing)->handle()` direct-instantiation test is sufficient since the job has no model properties to serialize; Horizon's `/horizon` Blade dashboard renders without a live supervisor or Redis hit on the initial GET; the `dev:horizon` composer script's 6 processes / 6 colors / 6 names match cleanly with no Windows quoting issues.
 
 ## Decisions (locked 2026-04-28)
 - **Heartbeat sample job — ship.** `HeartbeatPing` queueable job + `app:heartbeat` artisan command + 10-minute schedule. Proves the queue → Horizon → log path round-trips and doubles as a smoke target for future phases.

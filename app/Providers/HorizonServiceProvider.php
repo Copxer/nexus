@@ -28,7 +28,7 @@ class HorizonServiceProvider extends HorizonApplicationServiceProvider
             }
 
             return in_array($user->email, [
-                //
+                // TODO(phase-9): populate this allow-list before deploying.
             ], strict: true);
         });
     }
