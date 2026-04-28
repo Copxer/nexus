@@ -16,7 +16,7 @@ Stand up a Laravel 12 + Vue 3 + Inertia + Tailwind project with authentication, 
 | 004 | AppLayout + Sidebar + TopBar + RightActivityRail | 🟢 |
 | 005 | CommandPalette (Cmd+K) shell | 🟢 |
 | 006 | Overview page with mock KPI cards, sparklines, status badges | 🟢 |
-| 007 | ActivityFeed + ActivityHeatmap components (mock data) | ⬜ |
+| 007 | ActivityFeed + ActivityHeatmap components (mock data) | 🟢 |
 | 008 | Responsive behavior (desktop / laptop / tablet / mobile) | ⬜ |
 | 009 | Redis / Horizon / queue / scheduler wired up | ⬜ |
 
