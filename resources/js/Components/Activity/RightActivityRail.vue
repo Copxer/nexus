@@ -32,8 +32,7 @@ const hasEvents = () => props.events.length > 0;
 
 <template>
     <aside
-        class="flex h-full flex-col gap-4 overflow-y-auto border-s border-border-subtle bg-background-panel px-4 py-6 backdrop-blur-xl"
-        :class="variant === 'drawer' ? 'w-80' : 'w-80'"
+        class="flex h-full w-80 flex-col gap-4 overflow-y-auto border-s border-border-subtle bg-background-panel px-4 py-6 backdrop-blur-xl"
         aria-label="Activity feed"
     >
         <header class="flex items-center justify-between gap-2">

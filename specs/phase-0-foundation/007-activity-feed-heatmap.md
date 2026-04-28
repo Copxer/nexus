@@ -108,6 +108,14 @@ Dated notes as work progresses.
     - Heatmap reads as a compact grid in all viewports — peak (Wed 12 PM) is the brightest pink/magenta; weekend and overnight cells are darker.
     - Found and fixed: `auto` first column in the heatmap grid greedily absorbed leftover container width (~612px) and pushed all data cells to the right of the card. Switched to `min-content` for the label column + fixed-width day columns + `w-fit` on the figure so the heatmap stays compact and left-aligned regardless of card width.
 - Pipeline (local): vue-tsc clean, Pint clean, `npm run build` green. 3 SmokeTest cases pass with 48 assertions.
+- Self-review with `superpowers:code-reviewer`. **No blockers, no material findings.** Reviewer confirmed:
+    - Heatmap a11y model (`role="img"` + per-cell `<title>` + `aria-label`) is the right call vs an ARIA grid pattern for a static glyph.
+    - Bucket math correct on both branches (`count > 0` always lands in 1..4; `|| 1` fallback on `maxCount` protects all-zeros even if unreachable thanks to the `count <= 0` early return).
+    - Type union vs controller payload is drift-free (all 9 controller `type` strings exist in the `ActivityEventType` union).
+    - Layered defaults on `events` (AppLayout + RightActivityRail) earn their keep — both layers stay.
+    - `<li aria-label>` + `<ul aria-label>` is screen-reader-friendly.
+    - Lucide icon overlap with sidebar / commands registry is genuine but premature to extract — different semantic uses.
+    - 2 nits addressed: trimmed two stale "spec 007" comment references → phase-language; collapsed redundant `:class="variant === 'drawer' ? 'w-80' : 'w-80'"` into a single static class. Skipped: combining parallel `dayLabels`/`dayNames` arrays (cosmetic; reviewer flagged as "fine for 7 entries").
 
 ## Decisions (locked 2026-04-27)
 - **Heatmap shape — 7 cols × 6 rows.** Day-of-week × 4-hour bucket per roadmap §8.11. 7×24 is too dense at dashboard size.

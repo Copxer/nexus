@@ -8,8 +8,8 @@ defineProps<{
 }>();
 
 /**
- * Visual-only "Recent / All" tab pill. Real filtering arrives with the
- * real feed in a later phase — see spec 007 Decisions.
+ * Visual-only "Recent / All" tab pill. Real filtering arrives when real
+ * integrations land — same treatment as the disabled rail-header filter.
  */
 const activeTab = ref<'recent' | 'all'>('recent');
 </script>

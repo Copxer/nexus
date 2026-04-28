@@ -451,7 +451,7 @@ const visualizationStubs = [
                     </footer>
                 </section>
 
-                <!-- Activity Heatmap (spec 007) — 7 days × 6 four-hour buckets -->
+                <!-- Activity Heatmap — 7 days × 6 four-hour buckets per §8.11 -->
                 <section
                     aria-label="Activity Heatmap"
                     class="glass-card flex flex-col gap-4 p-5 lg:col-span-12"
