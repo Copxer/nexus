@@ -32,6 +32,13 @@ const onKeydown = (event: KeyboardEvent) => {
     // outside text inputs. The palette's own Escape/Enter/arrow handling
     // takes over once it's open and focused.
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        // No-op (but still preventDefault) when the palette is already open
+        // so the keystroke isn't delivered to the palette's own input or
+        // hijacked by the browser's "search bar" shortcut.
+        if (paletteOpen.value) {
+            event.preventDefault();
+            return;
+        }
         if (isTextInput(event.target)) return;
         event.preventDefault();
         paletteOpen.value = true;
@@ -39,7 +46,10 @@ const onKeydown = (event: KeyboardEvent) => {
     }
 
     if (event.key !== 'Escape') return;
-    // Drawers handle Escape here; the palette has its own internal handler.
+    // Palette has its own Escape handler scoped to the dialog; bail here so
+    // we don't double-fire (and so a future drawer + palette overlap doesn't
+    // close the wrong overlay).
+    if (paletteOpen.value) return;
     if (sidebarOpen.value) {
         sidebarOpen.value = false;
     } else if (activityRailOpen.value) {

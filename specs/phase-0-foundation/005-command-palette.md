@@ -134,6 +134,12 @@ Dated notes as work progresses.
     - **[nit]** Top-bar trigger placeholder "Search projects, repos, hosts…" wrapped to 2 lines at md/lg widths because the `Ctrl K` pill ate width. Shortened to "Search or run a command…" and added `min-w-0 truncate whitespace-nowrap` so it never wraps regardless of label length.
 - **Local test failure note:** 14 pre-existing tests fail locally on PHP 8.5.5 (Homebrew) with HTTP 419 (CSRF mismatch) on every `$this->post(...)` call. Confirmed they fail on bare `main` too via `git stash` — not introduced by this spec. CI runs PHP 8.4 where they pass; the new `SmokeTest::test_overview_renders_for_a_verified_user` passes locally and will pass on CI. A follow-up chore PR to investigate the PHP 8.5 / Laravel 13.6 testing-CSRF interaction is out of scope here.
 - Pipeline (local): vue-tsc clean, Pint clean, `npm run build` green (AppLayout chunk grew 22 KB → ~34 KB; the palette + 19 lucide icons + commands registry account for the delta).
+- Self-review with `superpowers:code-reviewer`. No blockers; 2 material findings + 1 nit addressed:
+    - **[material]** Cmd+K while the palette is already open delivered the keystroke to the dialog's own search input. Fix: short-circuit in `AppLayout.onKeydown` — when `paletteOpen` is true, `preventDefault` and no-op (matches Linear/GitHub convention; user closes via Esc).
+    - **[material, future-proofing]** AppLayout's Escape branch could double-fire with the palette's own Escape. Fix: early `return` from the Escape branch when `paletteOpen` is true — palette has its own scoped handler, and a future drawer + palette overlap won't close the wrong overlay.
+    - **[nit]** `flatVisible` was a redundant alias for `filtered`. Removed; consolidated to `filtered` everywhere.
+    - Skipped (acceptable per spec/agent agreement): trapping Shift+Tab beyond the input (input is the only tabbable element and `aria-activedescendant` correctly drives screen-reader option announcements); migrating inline `title` strings in TopBar/Overview from spec-number to phase-number language (deferred — both are stable references).
+- Re-ran the pipeline after fixes: vue-tsc clean, Pint clean, `npm run build` green; manual re-verification of the Cmd+K-while-open path passed (search field stays empty, palette stays open).
 
 ## Decisions (locked 2026-04-27)
 - **JS test runner — defer.** Vitest is not wired up; adding it ships in a separate small chore PR right after this spec. This spec relies on manual verification + a PHP smoke test.

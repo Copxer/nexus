@@ -74,14 +74,11 @@ const grouped = computed<{ group: CommandGroup; items: Command[] }[]>(() => {
         .map(([group, items]) => ({ group, items }));
 });
 
-/** Flat array of visible commands — index aligns with `highlightedIndex`. */
-const flatVisible = computed<Command[]>(() => filtered.value);
-
-const noMatches = computed(() => flatVisible.value.length === 0);
+const noMatches = computed(() => filtered.value.length === 0);
 
 /** Find the first non-disabled visible row, or 0 if everything is disabled. */
 const firstEnabledIndex = computed(() => {
-    const idx = flatVisible.value.findIndex((c) => !c.disabled);
+    const idx = filtered.value.findIndex((c) => !c.disabled);
     return idx === -1 ? 0 : idx;
 });
 
@@ -118,7 +115,7 @@ watch(highlightedIndex, async () => {
 });
 
 const moveHighlight = (delta: number) => {
-    const list = flatVisible.value;
+    const list = filtered.value;
     if (list.length === 0) return;
     let next = highlightedIndex.value;
     for (let step = 0; step < list.length; step++) {
@@ -129,7 +126,7 @@ const moveHighlight = (delta: number) => {
 };
 
 const runHighlighted = () => {
-    const cmd = flatVisible.value[highlightedIndex.value];
+    const cmd = filtered.value[highlightedIndex.value];
     if (!cmd || cmd.disabled || !cmd.run) return;
     cmd.run();
     emit('close');
@@ -168,8 +165,8 @@ const onKeydown = (event: KeyboardEvent) => {
     }
 };
 
-/** Resolve the absolute index of a command in flatVisible (for hover highlight). */
-const indexOf = (cmd: Command) => flatVisible.value.indexOf(cmd);
+/** Resolve the absolute index of a command in `filtered` (for hover highlight). */
+const indexOf = (cmd: Command) => filtered.value.indexOf(cmd);
 </script>
 
 <template>
@@ -223,8 +220,8 @@ const indexOf = (cmd: Command) => flatVisible.value.indexOf(cmd);
                         aria-label="Command palette search"
                         aria-controls="command-palette-list"
                         :aria-activedescendant="
-                            flatVisible[highlightedIndex]
-                                ? `command-${flatVisible[highlightedIndex].id}`
+                            filtered[highlightedIndex]
+                                ? `command-${filtered[highlightedIndex].id}`
                                 : undefined
                         "
                         autocomplete="off"
