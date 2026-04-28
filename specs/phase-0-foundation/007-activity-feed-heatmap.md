@@ -1,12 +1,13 @@
 ---
 spec: activity-feed-heatmap
 phase: 0-foundation
-status: in-progress
+status: done
 owner: yoany
 created: 2026-04-27
-updated: 2026-04-27
+updated: 2026-04-28
 issue: https://github.com/Copxer/nexus/issues/15
 branch: spec/007-activity-feed-heatmap
+pr: https://github.com/Copxer/nexus/pull/16
 ---
 
 # 007 — ActivityFeed + ActivityHeatmap components (mock data)
