@@ -120,6 +120,24 @@ Dated notes as work progresses.
 ### 2026-04-28
 - Spec drafted from the running list of responsive issues spotted during specs 005–007 manual verification; scope confirmed (5 decisions locked: show rail toggle on mobile, truncate sidebar labels, shrink heatmap cells but keep readable labels, defer tablet icon-only mode, defer mobile bottom-nav).
 - Opened issue [#18](https://github.com/Copxer/nexus/issues/18) and branch `spec/008-responsive-polish` off `main`.
+- Implemented punch-list fixes:
+    - **KpiCard responsive value sizing** — `text-2xl` at base, `lg:text-3xl` (laptop wide cards), `xl:text-2xl` (6-col tight cards), `2xl:text-3xl` (large desktop wide cards). Initial draft used `sm:text-3xl` which forced an over-sized value on the md tablet 3-col grid; the final breakpoint chain only goes large where the card width supports it. Also enabled wrapping on the secondary-label row so long labels don't truncate.
+    - **Top Repositories stub** — 2-row stack at < sm (name + commits on line 1, full-width gradient bar on line 2) using `flex-col` + `sm:contents` to flatten back into the parent flex on sm+.
+    - **Service Health stub** — sparkline column shrinks `100px` → `lg:140px` so the row template doesn't squeeze the service name on narrow viewports.
+    - **Visualizations placeholder** — 1-col at < sm, 2-col at sm, 3 at md, 5 at lg.
+    - **ActivityHeatmap mobile** — cells ramp `24px → 32px → 40px` from base → sm → md so the grid fits inside its card at 360 px. Legend strip becomes `mx-auto` at < sm (centred) and `ms-auto` at sm+ (right-aligned).
+    - **Drawer width caps** — `RightActivityRail` and `Sidebar` (drawer variant) gain `max-w-[88vw]` so the backdrop click target stays generous on small phones (360 px → ~43 px backdrop).
+    - **Sidebar nav-link truncation** — added `min-w-0 flex-1 truncate` to the label span and `shrink-0 whitespace-nowrap` to the "Soon" pill so labels truncate cleanly instead of wrapping to two lines.
+    - **TopBar mobile rail toggle** — removed the `md:` floor; the activity-rail toggle is now visible at all breakpoints below 2xl. Mobile users can reach the populated feed via the drawer.
+    - **Stub widget headers** — metadata strings (e.g. "7 days · 4-hour buckets · mock") hide at < sm so the header titles don't wrap to two lines on the heatmap card.
+    - **Profile/Edit page** — already used `mx-auto max-w-3xl` (no leftover Breeze `max-w-7xl`); no changes needed. The pre-existing `text-gray-*` classes in `DeleteUserForm.vue` are a theming issue, not responsive — deferred to a dedicated Breeze-partials re-theme task.
+- Manual verification (Playwright Chrome) at 5 viewports (1920 / 1536 / 1280 / 768 / 360):
+    - **1920 (large desktop):** sidebar + main + persistent rail; all KPI cards show value + trend on one line.
+    - **1536 (2xl):** sidebar + main + persistent rail; some chip wrapping on Hosts/Uptime cards because the 6-col grid keeps cards narrow even at this width.
+    - **1280 (xl):** sidebar + main + drawer rail; Hosts/Uptime chip wraps below value (sub-pixel space — the cards genuinely cannot fit "99.98%" + "↑ +0.01%" + gap inside ~115 px of cluster width). The wrap is the graceful fallback rather than a layout bug.
+    - **768 (tablet):** drawer sidebar + drawer rail; all 6 KPI chips inline with the new lg-only `text-3xl` rule. Stub widgets stack to single column.
+    - **360 (mobile):** drawer sidebar + drawer rail (rail toggle now visible); all KPI chips inline; Top Repositories stacks 2-row; heatmap fits with 24 px cells; legend centred.
+- Pipeline: vue-tsc clean, Pint clean, `npm run build` green. SmokeTest still passes (3 cases, 48 assertions).
 
 ## Decisions (locked 2026-04-28)
 - **Mobile activity-rail entry point — show.** The `PanelRight` toggle becomes visible at all breakpoints below 2xl so mobile users can still reach the feed via the drawer.

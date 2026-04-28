@@ -43,12 +43,14 @@ withDefaults(
             ]"
             aria-hidden="true"
         />
-        <span class="truncate">
+        <!-- min-w-0 lets the truncate kick in instead of forcing the flex
+             parent wider than the sidebar/drawer can hold. -->
+        <span class="min-w-0 flex-1 truncate">
             <slot />
         </span>
         <span
             v-if="disabled"
-            class="ms-auto rounded-full border border-border-subtle px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-text-muted"
+            class="ms-auto shrink-0 whitespace-nowrap rounded-full border border-border-subtle px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-text-muted"
         >
             {{ soonLabel }}
         </span>
