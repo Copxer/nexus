@@ -118,7 +118,7 @@ Dated notes as work progresses.
     - `app/Console/Commands/HeartbeatPingCommand.php` — `app:heartbeat` artisan command, dispatches `HeartbeatPing`.
     - `routes/console.php` — `Schedule::command('app:heartbeat')->everyTenMinutes()` + `Schedule::command('inspire')->hourly()` canary.
 - Opened the Horizon gate: `App\Providers\HorizonServiceProvider::gate()` allows any verified user when `app()->environment('local', 'testing')`. Non-local allow-list stays empty (phase 9 deploy spec populates it). Cleaned the unused `Horizon` import + the commented notification-routing examples that came from `horizon:install`.
-- `composer.json` `dev:horizon` script gained `php artisan schedule:work` so the local stack now boots server + horizon + reverb + scheduler + pail + vite via one command.
+- `composer.json` `dev:horizon` script gained `php artisan schedule:work` so the local stack now boots server + horizon + reverb + scheduler + pail + vite via one command. Mirrored the change into the plain `dev` script too (queue:listen variant) — both stacks now boot the scheduler so heartbeat schedules fire on either.
 - `.env.example` already carried all §26.3 keys (`QUEUE_CONNECTION=redis`, `CACHE_STORE=redis`, `SESSION_DRIVER=redis`, `BROADCAST_CONNECTION=reverb`, `REDIS_*`) — no diff needed.
 - Tests added:
     - `tests/Feature/Console/HeartbeatPingTest.php` — 2 cases: `Queue::fake()` confirms the command pushes `HeartbeatPing`; `Log::spy()` confirms `handle()` logs the expected ping line.
