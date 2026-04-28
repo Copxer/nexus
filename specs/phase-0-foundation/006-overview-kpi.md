@@ -1,12 +1,13 @@
 ---
 spec: overview-kpi
 phase: 0-foundation
-status: in-progress
+status: done
 owner: yoany
 created: 2026-04-27
 updated: 2026-04-27
 issue: https://github.com/Copxer/nexus/issues/12
 branch: spec/006-overview-kpi
+pr: https://github.com/Copxer/nexus/pull/13
 ---
 
 # 006 — Overview page with mock KPI cards, sparklines, status badges
