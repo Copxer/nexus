@@ -1,12 +1,13 @@
 ---
 spec: responsive-polish
 phase: 0-foundation
-status: in-progress
+status: done
 owner: yoany
 created: 2026-04-28
 updated: 2026-04-28
 issue: https://github.com/Copxer/nexus/issues/18
 branch: spec/008-responsive-polish
+pr: https://github.com/Copxer/nexus/pull/19
 ---
 
 # 008 — Responsive behavior (desktop / laptop / tablet / mobile)
