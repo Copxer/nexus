@@ -24,6 +24,7 @@
     "dependencies": {
         "@fontsource/inter": "^5.2.8",
         "@fontsource/jetbrains-mono": "^5.2.8",
-        "axios": "^1.15.2"
+        "axios": "^1.15.2",
+        "lucide-vue-next": "^1.0.0"
     }
 }
