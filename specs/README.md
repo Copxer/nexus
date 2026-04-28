@@ -35,7 +35,7 @@ Status legend: ⬜ not started · 🟡 in progress · 🟢 done · 🔴 blocked
 
 | # | Phase | Status | Notes |
 |---|-------|--------|-------|
-| 0 | Foundation (auth, layout, static overview) | 🟡 | 5/9 specs done (001–005). Next: 006 Overview KPI cards. |
+| 0 | Foundation (auth, layout, static overview) | 🟡 | 6/9 specs done (001–006). Next: 007 ActivityFeed + ActivityHeatmap. |
 | 1 | Projects & Repositories | ⬜ | — |
 | 2 | GitHub Integration MVP | ⬜ | — |
 | 3 | GitHub Webhooks & Activity Feed | ⬜ | — |
