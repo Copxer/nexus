@@ -1,12 +1,13 @@
 ---
 spec: redis-horizon-queue-scheduler
 phase: 0-foundation
-status: in-progress
+status: done
 owner: yoany
 created: 2026-04-28
 updated: 2026-04-28
 issue: https://github.com/Copxer/nexus/issues/21
 branch: spec/009-redis-horizon-queue-scheduler
+pr: https://github.com/Copxer/nexus/pull/22
 ---
 
 # 009 — Redis / Horizon / queue / scheduler wired up

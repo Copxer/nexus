@@ -35,7 +35,7 @@ Status legend: ⬜ not started · 🟡 in progress · 🟢 done · 🔴 blocked
 
 | # | Phase | Status | Notes |
 |---|-------|--------|-------|
-| 0 | Foundation (auth, layout, static overview) | 🟡 | 8/9 specs done (001–008). Next: 009 Redis / Horizon / queue / scheduler. |
+| 0 | Foundation (auth, layout, static overview) | 🟢 | 9/9 specs done (001–009). Phase complete. |
 | 1 | Projects & Repositories | ⬜ | — |
 | 2 | GitHub Integration MVP | ⬜ | — |
 | 3 | GitHub Webhooks & Activity Feed | ⬜ | — |
