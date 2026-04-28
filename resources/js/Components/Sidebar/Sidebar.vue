@@ -6,7 +6,6 @@ import SidebarUserCard from '@/Components/Sidebar/SidebarUserCard.vue';
 import { Link } from '@inertiajs/vue3';
 import {
     Activity,
-    AlertTriangle,
     BarChart3,
     Bell,
     FolderKanban,
@@ -17,9 +16,9 @@ import {
     Rocket,
     Server,
     Settings as SettingsIcon,
+    X,
     type LucideIcon,
 } from 'lucide-vue-next';
-import { computed } from 'vue';
 
 interface NavItem {
     label: string;
@@ -61,31 +60,49 @@ defineProps<{
      */
     variant?: 'column' | 'drawer';
 }>();
+
+defineEmits<{
+    (e: 'close'): void;
+}>();
 </script>
 
 <template>
     <aside
-        class="flex h-full flex-col gap-6 overflow-y-auto border-r border-border-subtle bg-background-panel px-4 py-6 backdrop-blur-xl"
+        class="flex h-full flex-col gap-6 border-r border-border-subtle bg-background-panel px-4 py-6 backdrop-blur-xl"
         :class="variant === 'drawer' ? 'w-72' : 'w-60'"
     >
-        <!-- Wordmark -->
-        <Link
-            :href="route('overview')"
-            aria-label="Nexus home"
-            class="flex items-center gap-3 rounded-lg px-2 py-1 transition hover:bg-background-panel-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
-        >
-            <ApplicationLogo
-                class="h-8 w-8 fill-current text-accent-cyan drop-shadow-[0_0_14px_rgba(34,211,238,0.55)]"
-            />
-            <span
-                class="text-sm font-semibold uppercase tracking-[0.32em] text-text-secondary"
+        <!-- Header row: wordmark, plus a close button when in drawer mode -->
+        <div class="flex items-center justify-between gap-2">
+            <Link
+                :href="route('overview')"
+                aria-label="Nexus home"
+                class="flex items-center gap-3 rounded-lg px-2 py-1 transition hover:bg-background-panel-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
             >
-                Nexus
-            </span>
-        </Link>
+                <ApplicationLogo
+                    class="h-8 w-8 fill-current text-accent-cyan drop-shadow-[0_0_14px_rgba(34,211,238,0.55)]"
+                />
+                <span
+                    class="text-sm font-semibold uppercase tracking-[0.32em] text-text-secondary"
+                >
+                    Nexus
+                </span>
+            </Link>
+            <button
+                v-if="variant === 'drawer'"
+                type="button"
+                class="flex h-9 w-9 items-center justify-center rounded-lg border border-border-subtle bg-slate-950/40 text-text-muted transition hover:border-accent-cyan/40 hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
+                aria-label="Close navigation"
+                @click="$emit('close')"
+            >
+                <X class="h-4 w-4" aria-hidden="true" />
+            </button>
+        </div>
 
-        <!-- Primary nav -->
-        <nav aria-label="Primary" class="flex flex-1 flex-col gap-1">
+        <!-- Primary nav: scrollable region so the footer stays anchored -->
+        <nav
+            aria-label="Primary"
+            class="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto"
+        >
             <SidebarNavLink
                 v-for="item in nav"
                 :key="item.label"

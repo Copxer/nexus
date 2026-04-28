@@ -35,9 +35,10 @@ defineEmits<{
             <div class="flex items-center gap-1">
                 <button
                     type="button"
-                    class="flex h-8 w-8 items-center justify-center rounded-lg border border-border-subtle bg-slate-950/40 text-text-muted transition hover:border-accent-cyan/40 hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
+                    class="flex h-8 w-8 cursor-not-allowed items-center justify-center rounded-lg border border-border-subtle bg-slate-950/40 text-text-muted transition focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
                     aria-label="Filter activity"
-                    disabled
+                    aria-disabled="true"
+                    title="Activity filters arrive with the real feed (spec 007)."
                 >
                     <Filter class="h-3.5 w-3.5" aria-hidden="true" />
                 </button>

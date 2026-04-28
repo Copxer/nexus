@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import Dropdown from '@/Components/Dropdown.vue';
 import DropdownLink from '@/Components/DropdownLink.vue';
-import { Link, usePage } from '@inertiajs/vue3';
+import { usePage } from '@inertiajs/vue3';
 import {
     Bell,
     ChevronDown,
@@ -65,33 +65,34 @@ const initials = computed(() => {
         </div>
 
         <!-- Search — visual only; real search lands with the command palette in spec 005 -->
-        <label
-            class="relative hidden items-center md:flex"
-            aria-label="Global search"
-        >
+        <div class="relative hidden items-center md:flex">
             <Search
                 class="pointer-events-none absolute start-3 h-4 w-4 text-text-muted"
                 aria-hidden="true"
             />
             <input
                 type="search"
+                aria-label="Global search"
                 placeholder="Search projects, repos, hosts…"
-                class="w-64 rounded-lg border border-border-subtle bg-slate-950/60 ps-9 pe-16 py-2 text-sm text-text-primary placeholder:text-text-muted shadow-inner shadow-black/20 transition focus:border-accent-cyan focus:ring-2 focus:ring-accent-cyan/40 lg:w-72"
-                disabled
+                title="Global search arrives with the command palette in spec 005."
+                class="w-64 cursor-not-allowed rounded-lg border border-border-subtle bg-slate-950/60 ps-9 pe-16 py-2 text-sm text-text-primary placeholder:text-text-muted shadow-inner shadow-black/20 transition focus:border-accent-cyan focus:ring-2 focus:ring-accent-cyan/40 lg:w-72"
+                aria-disabled="true"
+                readonly
             />
             <span
                 class="pointer-events-none absolute end-3 hidden font-mono text-[11px] text-text-muted lg:inline"
             >
                 ⌘K
             </span>
-        </label>
+        </div>
 
         <!-- Time-range pill — visual only -->
         <button
             type="button"
-            class="hidden items-center gap-2 rounded-lg border border-border-subtle bg-slate-950/40 px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-text-secondary transition hover:border-accent-cyan/40 hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60 sm:inline-flex"
+            class="hidden cursor-not-allowed items-center gap-2 rounded-lg border border-border-subtle bg-slate-950/40 px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-text-secondary transition focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60 sm:inline-flex"
             aria-label="Change time range"
-            disabled
+            aria-disabled="true"
+            title="Time-range filtering will arrive with Analytics (spec 008)."
         >
             <Clock class="h-3.5 w-3.5" aria-hidden="true" />
             24h
@@ -101,14 +102,15 @@ const initials = computed(() => {
         <!-- Notifications -->
         <button
             type="button"
-            class="relative flex h-9 w-9 items-center justify-center rounded-lg border border-border-subtle bg-slate-950/40 text-text-muted transition hover:border-accent-cyan/40 hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
+            class="relative flex h-9 w-9 cursor-not-allowed items-center justify-center rounded-lg border border-border-subtle bg-slate-950/40 text-text-muted transition focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
             aria-label="Notifications"
-            disabled
+            aria-disabled="true"
+            title="Notifications arrive with the Alerts engine (spec 007)."
         >
             <Bell class="h-4 w-4" aria-hidden="true" />
             <span
                 v-if="notificationsCount && notificationsCount > 0"
-                class="absolute -end-1 -top-1 inline-flex min-w-[18px] items-center justify-center rounded-full border border-background-base bg-status-danger px-1 font-mono text-[10px] font-semibold text-white"
+                class="absolute -end-1 -top-1 inline-flex min-w-[18px] items-center justify-center rounded-full border border-background-base bg-status-danger px-1 font-mono text-[10px] font-semibold text-text-primary"
             >
                 {{ notificationsCount > 9 ? '9+' : notificationsCount }}
             </span>

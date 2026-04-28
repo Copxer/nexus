@@ -1,7 +1,7 @@
 ---
 spec: app-shell
 phase: 0-foundation
-status: in-progress
+status: done
 owner: yoany
 created: 2026-04-27
 updated: 2026-04-27
@@ -59,7 +59,7 @@ Visual target: [`../visual-reference.md`](../visual-reference.md) → [`../../ne
 3. Compose `Sidebar.vue`.
 4. Build `TopBar/TopBarSearch.vue` and `TopBar/TopBarActions.vue`. Compose `TopBar.vue`.
 5. Build `RightActivityRail.vue` with its empty state.
-6. Build `AppLayout.vue` that arranges them in a CSS Grid: `[sidebar] [main] [rail]` on desktop, with breakpoints for tablet/mobile.
+6. Build `AppLayout.vue` that arranges them in a flex row: `[sidebar 240 px] [main 1fr] [rail 320 px]` on desktop, with breakpoints for tablet/mobile.
 7. Migrate consumers:
     - `Overview.vue` → `AppLayout`.
     - `Pages/Profile/Edit.vue` → `AppLayout`.
@@ -70,7 +70,7 @@ Visual target: [`../visual-reference.md`](../visual-reference.md) → [`../../ne
 11. Self-review with `superpowers:code-reviewer`.
 
 ## Acceptance criteria
-- [ ] `AppLayout.vue` exists and renders sidebar + main + activity rail in a 12-column desktop grid that matches the visual reference's three-column composition.
+- [ ] `AppLayout.vue` exists and renders sidebar + main + activity rail as a three-column flex row on desktop that matches the visual reference's composition.
 - [ ] Sidebar shows the **11 nav items** from §7.6 in order, each with a Lucide icon. `Overview` is the only active link; the rest carry a "Soon" pill and are `aria-disabled`.
 - [ ] Sidebar's bottom region shows the system status indicator + the user card; clicking the user-card menu opens a dark-glass dropdown with Profile / Log out (re-uses the existing `Dropdown` component).
 - [ ] Top bar shows the page title, a global search input, a `24h` time-range pill, a notifications bell, and a user avatar. None of these are wired to backend functionality yet.
@@ -82,12 +82,35 @@ Visual target: [`../visual-reference.md`](../visual-reference.md) → [`../../ne
 - [ ] No `gray-*` / `indigo-*` / `red-*` / `green-*` Tailwind classes leak into the new components — tokens only.
 
 ## Files touched
-- (filled in as work progresses)
+- `package.json` / `package-lock.json` — `lucide-vue-next ^1.0.0`.
+- `resources/js/Layouts/AppLayout.vue` — new three-column shell + drawer state + Escape handler + body-scroll lock.
+- `resources/js/Layouts/AuthenticatedLayout.vue` — **deleted**.
+- `resources/js/Components/Sidebar/Sidebar.vue` — column + drawer variants, 11 nav items, footer cluster, drawer close emit.
+- `resources/js/Components/Sidebar/SidebarNavLink.vue` — active / disabled (Soon pill) states with icon slot.
+- `resources/js/Components/Sidebar/SidebarSystemStatus.vue` — pulsing dot + status label.
+- `resources/js/Components/Sidebar/SidebarUserCard.vue` — initials avatar + Profile / Log out dropdown (uses `direction="up"`).
+- `resources/js/Components/TopBar/TopBar.vue` — title slot, search input, time-range pill, notifications, avatar; emits `open-sidebar` / `open-activity-rail`.
+- `resources/js/Components/Activity/RightActivityRail.vue` — column + drawer variants, empty state with copy referencing spec 007.
+- `resources/js/Components/Dropdown.vue` — added `direction: 'down' | 'up'` prop.
+- `resources/js/Pages/Overview.vue` — migrated to `AppLayout`, content wrapped in `glass-card`.
+- `resources/js/Pages/Profile/Edit.vue` — migrated to `AppLayout`; section wrappers use `glass-card`.
 
 ## Work log
 
 ### 2026-04-27
 - Spec drafted. Verified `main` includes spec 003 tokens, the welcome-landing PR (#6) is merged, and `AuthenticatedLayout.vue` is the only Breeze-shipped layout still in use.
+- Implemented Sidebar (column + drawer variants), TopBar, RightActivityRail (column + drawer variants), AppLayout shell, migrated Overview + Profile/Edit, deleted `AuthenticatedLayout.vue`. Lucide installed + tree-shaken (AppLayout chunk = ~22 KB gzipped).
+- Pipeline green: Pint clean, `npm run build` succeeds, 25/25 tests pass.
+- Ran `superpowers:code-reviewer` self-review. Findings (1 blocker + 4 material + 4 nits) addressed in commit `<TBD>`:
+    - **[blocker]** Sidebar user-card dropdown was clipped by the aside's `overflow-y-auto` and rendered below the viewport because the trigger sits at the bottom. Fix: removed `overflow-y-auto` from `<aside>` (moved to inner `<nav>`); added a `direction: 'down' | 'up'` prop to `Dropdown.vue`; sidebar user card now uses `direction="up"` so the menu opens above the trigger.
+    - **[material]** Drawer dialogs lacked an Escape key handler. Fix: AppLayout listens for `keydown.Escape` window-level and closes whichever drawer is open.
+    - **[material]** Mobile sidebar drawer had no visible close button (only backdrop click). Fix: drawer variant of `Sidebar.vue` now renders an X button next to the wordmark, emits `close`, AppLayout listens.
+    - **[material]** Disabled top-bar buttons (search, time-range, notifications, activity filter) were unreachable by keyboard. Fix: switched from native `disabled` to `aria-disabled="true"` + `title=` tooltips explaining when each will activate; kept `cursor-not-allowed`.
+    - **[material]** Search field's `aria-label` was on the `<label>` instead of the `<input>`. Fix: moved to the `<input>`, dropped the `<label>` wrapper, marked the input `readonly` + `aria-disabled`.
+    - **[nit]** Removed unused imports (`computed` in `Sidebar.vue`, `Link` in `TopBar.vue`).
+    - **[nit]** Notifications badge used `text-white`; switched to `text-text-primary` to stay token-driven.
+    - **[nit]** Spec text said "12-column grid"; implementation uses a flex row with fixed sidebar/rail widths and `flex-1` main. Updated spec text to match reality (visual is identical).
+    - Skipped: extracting initials computation into a composable (premature; two call sites isn't enough multiplication yet).
 
 ## Open questions / blockers
 - **Where do disabled nav items go on click?** Initially I'll prevent navigation entirely (`aria-disabled` + `pointer-events-none` on the link). If the user prefers a "coming soon" splash page route, we wire that in a later spec.

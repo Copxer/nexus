@@ -22,7 +22,7 @@ const initials = computed(() => {
 </script>
 
 <template>
-    <Dropdown align="left" width="48">
+    <Dropdown align="left" direction="up" width="48">
         <template #trigger>
             <button
                 type="button"

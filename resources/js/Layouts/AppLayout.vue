@@ -2,7 +2,7 @@
 import RightActivityRail from '@/Components/Activity/RightActivityRail.vue';
 import Sidebar from '@/Components/Sidebar/Sidebar.vue';
 import TopBar from '@/Components/TopBar/TopBar.vue';
-import { onBeforeUnmount, ref, watch } from 'vue';
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 const sidebarOpen = ref(false);
 const activityRailOpen = ref(false);
@@ -17,7 +17,21 @@ watch([sidebarOpen, activityRailOpen], ([s, a]) => {
     setBodyScroll(s || a);
 });
 
-onBeforeUnmount(() => setBodyScroll(false));
+// Close any open drawer on Escape — required for `role="dialog" aria-modal".
+const onKeydown = (event: KeyboardEvent) => {
+    if (event.key !== 'Escape') return;
+    if (sidebarOpen.value) {
+        sidebarOpen.value = false;
+    } else if (activityRailOpen.value) {
+        activityRailOpen.value = false;
+    }
+};
+
+onMounted(() => document.addEventListener('keydown', onKeydown));
+onBeforeUnmount(() => {
+    document.removeEventListener('keydown', onKeydown);
+    setBodyScroll(false);
+});
 </script>
 
 <template>
@@ -60,7 +74,7 @@ onBeforeUnmount(() => setBodyScroll(false));
                 aria-modal="true"
                 aria-label="Navigation"
             >
-                <Sidebar variant="drawer" />
+                <Sidebar variant="drawer" @close="sidebarOpen = false" />
             </div>
         </Transition>
 

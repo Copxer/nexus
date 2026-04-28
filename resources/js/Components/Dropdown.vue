@@ -4,11 +4,13 @@ import { computed, onMounted, onUnmounted, ref } from 'vue';
 const props = withDefaults(
     defineProps<{
         align?: 'left' | 'right';
+        direction?: 'down' | 'up';
         width?: '48';
         contentClasses?: string;
     }>(),
     {
         align: 'right',
+        direction: 'down',
         width: '48',
         contentClasses: 'py-1 bg-background-panel backdrop-blur-xl',
     },
@@ -30,13 +32,16 @@ const widthClass = computed(() => {
 });
 
 const alignmentClasses = computed(() => {
-    if (props.align === 'left') {
-        return 'ltr:origin-top-left rtl:origin-top-right start-0';
-    } else if (props.align === 'right') {
-        return 'ltr:origin-top-right rtl:origin-top-left end-0';
-    } else {
-        return 'origin-top';
-    }
+    const horiz =
+        props.align === 'left'
+            ? 'ltr:origin-top-left rtl:origin-top-right start-0'
+            : 'ltr:origin-top-right rtl:origin-top-left end-0';
+
+    // Direction `up` flips the panel above the trigger — used by the sidebar
+    // user card so the menu doesn't render below the viewport.
+    return props.direction === 'up'
+        ? `${horiz} bottom-full mb-2`
+        : `${horiz} top-full mt-2`;
 });
 
 const open = ref(false);
@@ -65,7 +70,7 @@ const open = ref(false);
         >
             <div
                 v-show="open"
-                class="absolute z-50 mt-2 rounded-md shadow-lg"
+                class="absolute z-50 rounded-md shadow-lg"
                 :class="[widthClass, alignmentClasses]"
                 style="display: none"
                 @click="open = false"
