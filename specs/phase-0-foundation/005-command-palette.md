@@ -1,12 +1,13 @@
 ---
 spec: command-palette
 phase: 0-foundation
-status: in-progress
+status: done
 owner: yoany
 created: 2026-04-27
 updated: 2026-04-27
 issue: https://github.com/Copxer/nexus/issues/9
 branch: spec/005-command-palette
+pr: https://github.com/Copxer/nexus/pull/10
 ---
 
 # 005 — CommandPalette (Cmd+K) shell
