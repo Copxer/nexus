@@ -3,34 +3,33 @@
 namespace App\Providers;
 
 use Illuminate\Support\Facades\Gate;
-use Laravel\Horizon\Horizon;
 use Laravel\Horizon\HorizonApplicationServiceProvider;
 
 class HorizonServiceProvider extends HorizonApplicationServiceProvider
 {
     /**
-     * Bootstrap any application services.
-     */
-    public function boot(): void
-    {
-        parent::boot();
-
-        // Horizon::routeSmsNotificationsTo('15556667777');
-        // Horizon::routeMailNotificationsTo('example@example.com');
-        // Horizon::routeSlackNotificationsTo('slack-webhook-url', '#channel');
-    }
-
-    /**
      * Register the Horizon gate.
      *
-     * This gate determines who can access Horizon in non-local environments.
+     * In local + testing environments any authenticated, email-verified
+     * user gets in — phase 0 is single-developer dev, an explicit allow-
+     * list is friction without value. In any other environment the
+     * gate falls back to an explicit allow-list, populated when the
+     * production deploy flow lands in phase 9.
      */
     protected function gate(): void
     {
         Gate::define('viewHorizon', function ($user = null) {
-            return in_array(optional($user)->email, [
-                //
-            ]);
+            if ($user === null) {
+                return false;
+            }
+
+            if (app()->environment('local', 'testing')) {
+                return $user->hasVerifiedEmail();
+            }
+
+            return in_array($user->email, [
+                // TODO(phase-9): populate this allow-list before deploying.
+            ], strict: true);
         });
     }
 }
