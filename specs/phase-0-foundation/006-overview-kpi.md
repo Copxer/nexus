@@ -102,6 +102,13 @@ Dated notes as work progresses.
     - **768 × 900 (tablet):** KPIs collapse to 3 cols × 2 rows. Stub widgets stack to single column.
     - **390 × 900 (mobile):** KPIs in 2 cols × 3 rows. All widgets stack. Hosts CPU/MEM bars and the gradient repo bars remain readable. **Found:** Uptime KPI's `99.98%` value + the `+0.01%` trend chip overflowed the column. **Fix:** changed the value cluster from `flex items-baseline gap-2` to `flex flex-wrap items-baseline gap-x-2 gap-y-1` so the trend chip drops below the value when crowded. Re-verified — chip now wraps cleanly on Hosts and Uptime cards at mobile width.
 - Pipeline: vue-tsc clean, Pint clean, `npm run build` green (Overview chunk = 17 KB / 5 KB gzipped, AppLayout chunk unchanged). 2 SmokeTest cases pass with 24 assertions.
+- Self-review with `superpowers:code-reviewer`. No blockers; 2 material findings + 2 nits addressed:
+    - **[material]** `KpiCard` rendered `tabindex="0" aria-disabled="true"` together for inert cards — WAI-ARIA contradicts that combination (announces a "dimmed" control with no available action). Fix: inert variant now renders as a plain `<div>` with neither `tabindex` nor `aria-disabled`. Interactive variant keeps the focus ring on `<a>`.
+    - **[material]** `Sparkline` used `Math.random()` for the gradient ID — fine for the current CSR-only mount but a hydration-mismatch hazard the day SSR ships. Fix: extracted `resources/js/lib/uniqueId.ts` (module-level monotonic counter) and used it in `Sparkline`. Note in the helper says swap to Vue 3.5+'s `useId()` once the project upgrades / SSR lands.
+    - **[nit]** Sparkline's `area` polygon used `(length-1) * (W/(length-1))` which simplifies to `VIEW_W`. Replaced with the constant.
+    - **[nit]** Three Visualization stubs reused the same `LineChart` icon. Switched to `Globe` (world map), `Activity` (resource utilization), `LineChart` (website performance), `Gauge` (system metrics), `Rocket` (deployment timeline) — five distinct icons.
+    - Skipped: flat-series midpoint rendering (cosmetic; phase 0 KPIs never have all-equal points), and a controller↔type drift fixture (acceptable mock-data cost).
+- Re-ran pipeline + a quick visual recheck after fixes — vue-tsc clean, Pint clean, build green, smoke tests still pass; the Visualizations row now shows five distinct icons.
 
 ## Decisions (locked 2026-04-27)
 - **Sparkline implementation — roll our own.** Pure-SVG polyline + faint area fill (~30 LOC), no dep. Charting library is a future phase decision when real charts ship.

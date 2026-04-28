@@ -51,18 +51,24 @@ const accentIconClass: Record<Accent, string> = {
 </script>
 
 <template>
+    <!-- Inert variant renders as a plain <div>: not in the tab order, no
+         aria-disabled (which would otherwise be announced as a "dimmed
+         control" by screen readers and confuse the user). The interactive
+         variant renders as an <a> with the focus ring + cursor. -->
     <component
         :is="isInert ? 'div' : 'a'"
         :href="!isInert ? href : undefined"
-        :aria-disabled="isInert ? 'true' : undefined"
-        :tabindex="isInert ? 0 : undefined"
         :title="
             isInert
                 ? `${label} detail view lands when the section ships`
                 : undefined
         "
-        class="glass-card group relative flex flex-col gap-4 p-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
-        :class="[isInert ? 'cursor-default' : 'cursor-pointer']"
+        class="glass-card group relative flex flex-col gap-4 p-4"
+        :class="[
+            isInert
+                ? 'cursor-default'
+                : 'cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60',
+        ]"
     >
         <!-- Top row: icon (with accent glow) + status pill -->
         <div class="flex items-start justify-between gap-3">

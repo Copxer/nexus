@@ -6,11 +6,14 @@ import AppLayout from '@/Layouts/AppLayout.vue';
 import type { DashboardPayload } from '@/types';
 import { Head } from '@inertiajs/vue3';
 import {
+    Activity,
     BarChart3,
     Bell,
     FolderKanban,
+    Gauge,
     GitBranch,
     GitPullRequest,
+    Globe,
     HeartPulse,
     LineChart,
     Rocket,
@@ -99,10 +102,10 @@ const stubServices = [
 ];
 
 const visualizationStubs = [
-    { label: 'World map', icon: LineChart, phase: 'Phase 8' },
-    { label: 'Resource utilization', icon: LineChart, phase: 'Phase 6' },
+    { label: 'World map', icon: Globe, phase: 'Phase 8' },
+    { label: 'Resource utilization', icon: Activity, phase: 'Phase 6' },
     { label: 'Website performance', icon: LineChart, phase: 'Phase 5' },
-    { label: 'System metrics', icon: BarChart3, phase: 'Phase 8' },
+    { label: 'System metrics', icon: Gauge, phase: 'Phase 8' },
     { label: 'Deployment timeline', icon: Rocket, phase: 'Phase 4' },
 ] as const;
 </script>

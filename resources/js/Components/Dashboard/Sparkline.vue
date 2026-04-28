@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { uniqueId } from '@/lib/uniqueId';
 import { computed } from 'vue';
 
 const props = withDefaults(
@@ -49,16 +50,13 @@ const polyline = computed(() => {
         .join(' ');
 });
 
-/** Closed polygon for the gradient fill — the line plus two corners + back to start. */
+/** Closed polygon for the gradient fill — line + bottom-right corner + bottom-left corner. */
 const area = computed(() => {
     if (!polyline.value) return '';
-    const last = (props.points.length - 1) * (VIEW_W / (props.points.length - 1));
-    return `${polyline.value} ${last.toFixed(2)},${VIEW_H} 0,${VIEW_H}`;
+    return `${polyline.value} ${VIEW_W},${VIEW_H} 0,${VIEW_H}`;
 });
 
-const gradientId = computed(
-    () => `sparkline-${props.accent}-${Math.random().toString(36).slice(2, 8)}`,
-);
+const gradientId = uniqueId(`sparkline-${props.accent}`);
 
 const stroke = computed(() => `rgb(${accentRgb[props.accent]})`);
 const fillStart = computed(() => `rgba(${accentRgb[props.accent]}, 0.28)`);
