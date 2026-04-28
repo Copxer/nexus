@@ -1,9 +1,14 @@
 <script setup lang="ts">
+import ActivityHeatmap from '@/Components/Activity/ActivityHeatmap.vue';
 import KpiCard from '@/Components/Dashboard/KpiCard.vue';
 import Sparkline from '@/Components/Dashboard/Sparkline.vue';
 import StatusBadge from '@/Components/Dashboard/StatusBadge.vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
-import type { DashboardPayload } from '@/types';
+import type {
+    ActivityEvent,
+    ActivityHeatmapPayload,
+    DashboardPayload,
+} from '@/types';
 import { Head } from '@inertiajs/vue3';
 import {
     Activity,
@@ -23,6 +28,8 @@ import {
 
 defineProps<{
     dashboard: DashboardPayload;
+    recentActivity: ActivityEvent[];
+    activityHeatmap: ActivityHeatmapPayload;
 }>();
 
 // ----- Hardcoded mock data for the populated stub widgets -----
@@ -113,7 +120,7 @@ const visualizationStubs = [
 <template>
     <Head title="Overview" />
 
-    <AppLayout>
+    <AppLayout :activity-events="recentActivity">
         <template #title>
             <div class="flex flex-col">
                 <span
@@ -444,6 +451,28 @@ const visualizationStubs = [
                     </footer>
                 </section>
 
+                <!-- Activity Heatmap — 7 days × 6 four-hour buckets per §8.11 -->
+                <section
+                    aria-label="Activity Heatmap"
+                    class="glass-card flex flex-col gap-4 p-5 lg:col-span-12"
+                >
+                    <header class="flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-2">
+                            <Activity
+                                class="h-4 w-4 text-accent-magenta"
+                                aria-hidden="true"
+                            />
+                            <h2 class="text-sm font-semibold text-text-primary">
+                                Activity Heatmap
+                            </h2>
+                        </div>
+                        <span class="font-mono text-[11px] text-text-muted">
+                            7 days · 4-hour buckets · mock
+                        </span>
+                    </header>
+                    <ActivityHeatmap :data="activityHeatmap" />
+                </section>
+
                 <!-- Catch-all placeholder for chart-heavy widgets that need
                      dedicated specs (map, charts, gauges, timeline). One
                      card to keep the page dense without sprawling. -->
@@ -488,7 +517,7 @@ const visualizationStubs = [
                     </div>
                     <footer class="text-[11px] text-text-muted">
                         Chart, map, and gauge widgets land with their owning
-                        phases. ActivityFeed + Heatmap render in spec 007.
+                        phases.
                     </footer>
                 </section>
             </div>

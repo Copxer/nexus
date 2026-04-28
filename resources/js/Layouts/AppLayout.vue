@@ -3,7 +3,22 @@ import RightActivityRail from '@/Components/Activity/RightActivityRail.vue';
 import CommandPalette from '@/Components/CommandPalette/CommandPalette.vue';
 import Sidebar from '@/Components/Sidebar/Sidebar.vue';
 import TopBar from '@/Components/TopBar/TopBar.vue';
+import type { ActivityEvent } from '@/types';
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
+
+withDefaults(
+    defineProps<{
+        /**
+         * Optional populated feed forwarded into both `<RightActivityRail>`
+         * instances (column + drawer). Pages that don't supply this prop get
+         * the rail's empty-state automatically.
+         */
+        activityEvents?: ActivityEvent[];
+    }>(),
+    {
+        activityEvents: () => [],
+    },
+);
 
 const sidebarOpen = ref(false);
 const activityRailOpen = ref(false);
@@ -129,7 +144,7 @@ onBeforeUnmount(() => {
 
         <!-- Persistent activity rail (≥ 2xl) -->
         <div class="relative z-30 hidden 2xl:flex">
-            <RightActivityRail variant="column" />
+            <RightActivityRail variant="column" :events="activityEvents" />
         </div>
 
         <!-- Activity rail drawer (md – 2xl) -->
@@ -165,6 +180,7 @@ onBeforeUnmount(() => {
             >
                 <RightActivityRail
                     variant="drawer"
+                    :events="activityEvents"
                     @close="activityRailOpen = false"
                 />
             </div>
