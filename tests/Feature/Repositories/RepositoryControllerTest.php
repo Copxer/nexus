@@ -2,6 +2,8 @@
 
 namespace Tests\Feature\Repositories;
 
+use App\Enums\GithubIssueState;
+use App\Models\GithubIssue;
 use App\Models\Project;
 use App\Models\Repository;
 use App\Models\User;
@@ -51,6 +53,56 @@ class RepositoryControllerTest extends TestCase
                     ->component('Repositories/Show')
                     ->where('repository.full_name', 'nexus-org/nexus-web')
                     ->where('canDelete', true)
+                    ->where('canSync', true)
+                    ->has('issues')
+                    ->has('issuesSync')
+            );
+    }
+
+    public function test_show_returns_issues_in_the_payload(): void
+    {
+        $user = $this->verifiedUser();
+        $project = Project::factory()->create(['owner_user_id' => $user->id]);
+        $repo = Repository::factory()->create([
+            'project_id' => $project->id,
+            'full_name' => 'nexus-org/nexus-web',
+        ]);
+        GithubIssue::factory()->create([
+            'repository_id' => $repo->id,
+            'number' => 42,
+            'title' => 'Login bug',
+            'state' => GithubIssueState::Open->value,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('repositories.show', $repo))
+            ->assertSuccessful()
+            ->assertInertia(
+                fn (AssertableInertia $page) => $page
+                    ->has('issues', 1)
+                    ->where('issues.0.number', 42)
+                    ->where('issues.0.title', 'Login bug')
+                    ->where('issues.0.state', 'open')
+            );
+    }
+
+    public function test_show_hides_run_sync_button_for_non_owner(): void
+    {
+        $owner = $this->verifiedUser();
+        $other = $this->verifiedUser();
+        $project = Project::factory()->create(['owner_user_id' => $owner->id]);
+        $repo = Repository::factory()->create([
+            'project_id' => $project->id,
+            'full_name' => 'nexus-org/nexus-web',
+        ]);
+
+        $this->actingAs($other)
+            ->get(route('repositories.show', $repo))
+            ->assertSuccessful()
+            ->assertInertia(
+                fn (AssertableInertia $page) => $page
+                    ->where('canSync', false)
+                    ->where('canDelete', false)
             );
     }
 

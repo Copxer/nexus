@@ -78,6 +78,11 @@ class SyncGitHubRepositoryJob implements ShouldQueue
                 'sync_status' => RepositorySyncStatus::Synced->value,
                 'last_synced_at' => now(),
             ])->save();
+
+            // Chain spec 015's issues sync. Independent statuses on the
+            // repo row mean a failure here would NOT roll back the
+            // metadata sync above — they're observed separately.
+            SyncRepositoryIssuesJob::dispatch($repository->id);
         } catch (GitHubApiException $e) {
             if ($e->isUnauthorized()) {
                 $this->expireConnection($connection);

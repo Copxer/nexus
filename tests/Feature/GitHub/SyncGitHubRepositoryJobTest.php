@@ -3,6 +3,7 @@
 namespace Tests\Feature\GitHub;
 
 use App\Domain\GitHub\Jobs\SyncGitHubRepositoryJob;
+use App\Domain\GitHub\Jobs\SyncRepositoryIssuesJob;
 use App\Enums\RepositorySyncStatus;
 use App\Models\GithubConnection;
 use App\Models\Project;
@@ -10,6 +11,7 @@ use App\Models\Repository;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class SyncGitHubRepositoryJobTest extends TestCase
@@ -157,5 +159,45 @@ class SyncGitHubRepositoryJobTest extends TestCase
         (new SyncGitHubRepositoryJob(999_999))->handle();
 
         $this->assertSame(0, Repository::query()->count());
+    }
+
+    public function test_handle_dispatches_issues_sync_on_happy_path(): void
+    {
+        Queue::fake();
+        $context = $this->setUpProjectWithConnection();
+
+        Http::fake([
+            'api.github.com/repos/octocat/hello-world' => Http::response([
+                'id' => 1234,
+                'default_branch' => 'main',
+                'visibility' => 'public',
+                'pushed_at' => '2026-04-29T00:00:00Z',
+                'html_url' => 'https://github.com/octocat/hello-world',
+            ]),
+        ]);
+
+        (new SyncGitHubRepositoryJob($context['repository']->id))->handle();
+
+        Queue::assertPushed(
+            SyncRepositoryIssuesJob::class,
+            fn (SyncRepositoryIssuesJob $job) => $job->repositoryId === $context['repository']->id,
+        );
+    }
+
+    public function test_handle_does_not_dispatch_issues_sync_on_failure(): void
+    {
+        Queue::fake();
+        $context = $this->setUpProjectWithConnection();
+
+        Http::fake([
+            'api.github.com/repos/octocat/hello-world' => Http::response(
+                ['message' => 'Boom'],
+                500,
+            ),
+        ]);
+
+        (new SyncGitHubRepositoryJob($context['repository']->id))->handle();
+
+        Queue::assertNotPushed(SyncRepositoryIssuesJob::class);
     }
 }

@@ -7,6 +7,7 @@ use Database\Factories\RepositoryFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Repository extends Model
 {
@@ -32,18 +33,22 @@ class Repository extends Model
         'last_pushed_at',
         'last_synced_at',
         'sync_status',
+        'issues_sync_status',
+        'issues_synced_at',
     ];
 
     protected function casts(): array
     {
         return [
             'sync_status' => RepositorySyncStatus::class,
+            'issues_sync_status' => RepositorySyncStatus::class,
             'stars_count' => 'integer',
             'forks_count' => 'integer',
             'open_issues_count' => 'integer',
             'open_prs_count' => 'integer',
             'last_pushed_at' => 'datetime',
             'last_synced_at' => 'datetime',
+            'issues_synced_at' => 'datetime',
         ];
     }
 
@@ -60,5 +65,10 @@ class Repository extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    public function issues(): HasMany
+    {
+        return $this->hasMany(GithubIssue::class);
     }
 }
