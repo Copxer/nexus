@@ -145,7 +145,9 @@ Caveats with quick tunnels (`cloudflared tunnel --url ...`):
 - HMR over `wss://*.trycloudflare.com` can drop intermittently — when it does, asset URLs are absolute so a manual refresh still serves the latest code. Named tunnels are more stable.
 - If port 5173 is already in use, set `VITE_DEV_SERVER_PORT=5174` (or any free port) in `.env` and point your second `cloudflared` at the same port.
 - The default Laravel `APP_URL`-derived `SESSION_DOMAIN`/`SANCTUM_STATEFUL_DOMAINS` won't include your tunnel hostname. If session-based requests start 419'ing through the tunnel, set `SESSION_DOMAIN=` (blank) and add the tunnel hostname to `SANCTUM_STATEFUL_DOMAINS`.
-- TLS terminates at the tunnel — `php artisan serve` only sees plain HTTP locally. `AppServiceProvider::boot()` calls `URL::forceScheme('https')` whenever `APP_URL` starts with `https://` so generated links don't trigger Mixed Content blocks. If you ever swap to a non-HTTPS tunnel, change `APP_URL` to `http://...` to disable the override.
+- TLS terminates at the tunnel — `php artisan serve` only sees plain HTTP locally. Two things tame this:
+    - `AppServiceProvider::boot()` calls `URL::forceScheme('https')` whenever `APP_URL` starts with `https://` so generated links don't trigger Mixed Content blocks. If you ever swap to a non-HTTPS tunnel, change `APP_URL` to `http://...` to disable the override.
+    - `bootstrap/app.php` trusts loopback proxies (`127.0.0.1`, `::1`), so cloudflared's `X-Forwarded-Proto: https` is honored. Without this, **signed URLs** (email verification, password reset) verify the signature against an `http://` URL while it was signed against `https://`, and every click 403's "Invalid signature." Loopback-only trust is safe in prod too — anything that can connect from loopback already has direct app access.
 - Reverb (websockets, port 8080) isn't covered by this setup. When real-time features become essential, expose Reverb via a third tunnel and update the `VITE_REVERB_*` block in `.env` to match.
 
 Local-only dev (no tunnel) is unaffected — leave `VITE_DEV_SERVER_URL` empty and Vite behaves exactly as before.
