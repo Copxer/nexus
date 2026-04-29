@@ -13,11 +13,6 @@ return Application::configure(basePath: dirname(__DIR__))
         channels: __DIR__.'/../routes/channels.php',
         health: '/up',
     )
-    // Spec 019 — registers the `/broadcasting/auth` endpoint so Echo's
-    // private-channel auth POST has somewhere to land. `withRouting(channels: …)`
-    // alone only loads the channel definitions; the auth route lives behind
-    // this call.
-    ->withBroadcasting(__DIR__.'/../routes/channels.php')
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->web(append: [
             HandleInertiaRequests::class,

@@ -1,6 +1,6 @@
 import type { ActivityEvent, PageProps } from '@/types';
 import { router, usePage } from '@inertiajs/vue3';
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { onBeforeUnmount, onMounted, ref } from 'vue';
 
 /**
  * Reactive activity-feed composable used by the AppLayout right rail
@@ -106,14 +106,6 @@ export function useActivityFeed(options: {
         teardown?.();
         unbindNavigate?.();
     });
-
-    // Defensive: if the seed is reactive (e.g. AppLayout's computed),
-    // pick up changes too. `events` becomes the union of "what the
-    // page just shipped" + "what realtime added since".
-    watch(
-        () => options.seed(),
-        () => reseed(),
-    );
 
     return { events, connected };
 }

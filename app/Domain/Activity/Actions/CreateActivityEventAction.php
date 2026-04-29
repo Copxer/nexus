@@ -6,7 +6,9 @@ use App\Enums\ActivitySeverity;
 use App\Events\ActivityEventCreated;
 use App\Models\ActivityEvent;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
+use Throwable;
 
 /**
  * Single entry point for inserting an `activity_events` row. All
@@ -69,7 +71,23 @@ class CreateActivityEventAction
         // its broadcast channel from the row's repository → project →
         // owner_user_id. System-emitted events (no repository) no-op the
         // broadcast.
-        ActivityEventCreated::dispatch($activityEvent);
+        //
+        // The dispatch is wrapped: `ShouldBroadcastNow` runs synchronously
+        // through the broadcaster, so a Reverb outage would otherwise throw
+        // out of the webhook handler and trigger a job retry — which would
+        // re-insert the row (we have no idempotency key). Broadcasts are
+        // best-effort; the page-load read in spec 018 covers the gap until
+        // the next event.
+        try {
+            ActivityEventCreated::dispatch($activityEvent);
+        } catch (Throwable $e) {
+            Log::warning('ActivityEventCreated broadcast failed', [
+                'activity_event_id' => $activityEvent->id,
+                'event_type' => $activityEvent->event_type,
+                'exception' => $e::class,
+                'message' => $e->getMessage(),
+            ]);
+        }
 
         return $activityEvent;
     }
