@@ -1,11 +1,12 @@
 ---
 spec: repository-import
 phase: 2-github
-status: in-progress
+status: done
 owner: yoany
 created: 2026-04-29
 updated: 2026-04-29
 issue: https://github.com/Copxer/nexus/issues/36
+pr: https://github.com/Copxer/nexus/pull/37
 branch: spec/014-repository-import
 ---
 
