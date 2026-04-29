@@ -21,6 +21,14 @@
         <env name="APP_ENV" value="testing"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
+        <!-- Route test-emitted log lines to the null channel so they don't
+             leak into storage/logs/laravel.log and surface inside `composer
+             run dev`'s Pail tail. Tests that need to assert on log output
+             can still use Log::shouldReceive(...) or Log::swap(new Logger).
+             Without this, the failure-path tests (e.g. ProcessGitHubWebhookJob's
+             "Synthetic boom" assertion) showed up as red ERROR banners in
+             the running dev terminal and looked like real bugs. -->
+        <env name="LOG_CHANNEL" value="null"/>
         <env name="BROADCAST_CONNECTION" value="null"/>
         <env name="CACHE_STORE" value="array"/>
         <env name="DB_CONNECTION" value="sqlite"/>
