@@ -25,6 +25,8 @@
         "@fontsource/inter": "^5.2.8",
         "@fontsource/jetbrains-mono": "^5.2.8",
         "axios": "^1.15.2",
-        "lucide-vue-next": "^1.0.0"
+        "laravel-echo": "^2.3.4",
+        "lucide-vue-next": "^1.0.0",
+        "pusher-js": "^8.5.0"
     }
 }

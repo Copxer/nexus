@@ -4,6 +4,9 @@ namespace App\Domain\GitHub\Jobs;
 
 use App\Domain\GitHub\WebhookHandlers\IssuesWebhookHandler;
 use App\Domain\GitHub\WebhookHandlers\PullRequestWebhookHandler;
+use App\Domain\GitHub\WebhookHandlers\PushWebhookHandler;
+use App\Domain\GitHub\WebhookHandlers\ReleaseWebhookHandler;
+use App\Domain\GitHub\WebhookHandlers\WorkflowRunWebhookHandler;
 use App\Enums\WebhookDeliveryStatus;
 use App\Models\WebhookDelivery;
 use Illuminate\Bus\Queueable;
@@ -87,6 +90,9 @@ class ProcessGitHubWebhookJob implements ShouldQueue
         $handler = match ($delivery->event) {
             'issues' => app(IssuesWebhookHandler::class),
             'pull_request' => app(PullRequestWebhookHandler::class),
+            'workflow_run' => app(WorkflowRunWebhookHandler::class),
+            'push' => app(PushWebhookHandler::class),
+            'release' => app(ReleaseWebhookHandler::class),
             default => null,
         };
 
