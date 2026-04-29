@@ -34,6 +34,16 @@ class GithubConnectionController extends Controller
         GitHubOAuthService $oauth,
         PersistGithubConnectionAction $persist,
     ): RedirectResponse {
+        // Check GitHub's error branch BEFORE consuming the session
+        // state — if the user denied or GitHub returned an error, we
+        // shouldn't burn the state token (so a retry can still validate).
+        if ($request->query('error')) {
+            return redirect()->route('settings.index')->with(
+                'error',
+                'GitHub connection cancelled or rejected: '.$request->query('error_description', $request->query('error')),
+            );
+        }
+
         $expectedState = $request->session()->pull('github_oauth_state');
         $providedState = $request->query('state');
 
@@ -45,13 +55,6 @@ class GithubConnectionController extends Controller
             return redirect()->route('settings.index')->with(
                 'error',
                 'GitHub connection rejected — state mismatch. Please try again.',
-            );
-        }
-
-        if ($request->query('error')) {
-            return redirect()->route('settings.index')->with(
-                'error',
-                'GitHub connection cancelled or rejected: '.$request->query('error_description', $request->query('error')),
             );
         }
 

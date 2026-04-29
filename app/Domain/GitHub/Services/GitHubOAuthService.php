@@ -61,6 +61,7 @@ class GitHubOAuthService
         try {
             $response = Http::asForm()
                 ->acceptJson()
+                ->withHeaders($this->defaultHeaders())
                 ->post(self::TOKEN_URL, [
                     'client_id' => $this->clientId(),
                     'client_secret' => $this->clientSecret(),
@@ -93,7 +94,7 @@ class GitHubOAuthService
         try {
             return Http::withToken($accessToken)
                 ->acceptJson()
-                ->withHeaders(['User-Agent' => 'Nexus-Control-Center'])
+                ->withHeaders($this->defaultHeaders())
                 ->get(self::USER_URL)
                 ->throw()
                 ->json();
@@ -103,6 +104,18 @@ class GitHubOAuthService
                 previous: $e,
             );
         }
+    }
+
+    /**
+     * Headers we send on every request to GitHub. The User-Agent is
+     * recommended on all GitHub API calls; the docs warn that GitHub has
+     * historically rate-limited or rejected UA-less callers.
+     *
+     * @return array<string, string>
+     */
+    private function defaultHeaders(): array
+    {
+        return ['User-Agent' => 'Nexus-Control-Center'];
     }
 
     private function clientId(): string

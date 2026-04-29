@@ -158,8 +158,8 @@ export function getCommands(): Command[] {
             label: 'Go to Settings',
             group: 'navigation',
             icon: SettingsIcon,
-            disabled: true,
-            soonLabel: 'Phase 1',
+            keywords: ['preferences', 'integrations'],
+            run: () => router.visit(route('settings.index')),
         },
 
         // ────── Actions ────── //
