@@ -158,8 +158,8 @@ export function getCommands(): Command[] {
             label: 'Go to Settings',
             group: 'navigation',
             icon: SettingsIcon,
-            disabled: true,
-            soonLabel: 'Phase 1',
+            keywords: ['preferences', 'integrations'],
+            run: () => router.visit(route('settings.index')),
         },
 
         // ────── Actions ────── //
@@ -184,8 +184,8 @@ export function getCommands(): Command[] {
             label: 'Connect GitHub',
             group: 'actions',
             icon: Plug,
-            disabled: true,
-            soonLabel: 'Phase 2',
+            keywords: ['oauth', 'integration'],
+            run: () => router.visit(route('integrations.github.connect')),
         },
         {
             id: 'run-sync',

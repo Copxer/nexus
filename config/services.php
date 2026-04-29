@@ -35,4 +35,17 @@ return [
         ],
     ],
 
+    'github' => [
+        'client_id' => env('GITHUB_CLIENT_ID'),
+        'client_secret' => env('GITHUB_CLIENT_SECRET'),
+        'redirect' => env(
+            'GITHUB_OAUTH_REDIRECT_URI',
+            env('APP_URL').'/integrations/github/callback',
+        ),
+        // Scopes requested at the OAuth handshake. Phase 2 needs only
+        // read access to public + private repository metadata + issues +
+        // PRs. Adjust when feature scope expands.
+        'scopes' => ['read:user', 'repo'],
+    ],
+
 ];
