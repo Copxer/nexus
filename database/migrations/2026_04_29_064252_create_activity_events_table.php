@@ -25,8 +25,10 @@ return new class extends Migration
             // resolve to a local User row — phase-1 doesn't have a
             // `github_username -> user_id` map (spec 013 stores the
             // current user's username on the connection, but the actor
-            // may be someone outside the team).
-            $table->string('actor_login')->nullable();
+            // may be someone outside the team). Capped at 64 chars to
+            // match GitHub's max-39 + headroom; signed payload could
+            // otherwise carry up to varchar 255 of garbage.
+            $table->string('actor_login', 64)->nullable();
 
             // Where the event came from. `github` for now; phase 4+
             // will add `nexus`, `monitoring`, `alerts`, etc.

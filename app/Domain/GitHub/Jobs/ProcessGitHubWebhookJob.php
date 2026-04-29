@@ -7,7 +7,6 @@ use App\Domain\GitHub\WebhookHandlers\PullRequestWebhookHandler;
 use App\Enums\WebhookDeliveryStatus;
 use App\Models\WebhookDelivery;
 use Illuminate\Bus\Queueable;
-use Illuminate\Container\Container;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -86,8 +85,8 @@ class ProcessGitHubWebhookJob implements ShouldQueue
     private function routeToHandler(WebhookDelivery $delivery): WebhookDeliveryStatus
     {
         $handler = match ($delivery->event) {
-            'issues' => Container::getInstance()->make(IssuesWebhookHandler::class),
-            'pull_request' => Container::getInstance()->make(PullRequestWebhookHandler::class),
+            'issues' => app(IssuesWebhookHandler::class),
+            'pull_request' => app(PullRequestWebhookHandler::class),
             default => null,
         };
 

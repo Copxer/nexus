@@ -130,24 +130,14 @@ class ProcessGitHubWebhookJobTest extends TestCase
 
     public function test_handler_exception_flips_to_failed_with_error_message(): void
     {
-        // Force an exception path: an `issues` event with a non-array
-        // `issue` block trips the normalizer and the handler returns
-        // Skipped — that's the polite path. Here we want the
-        // exception-caught path. Easiest reproduction: omit the
-        // `payload_json` array on the row so $delivery->payload_json
-        // is null and the handler's array spread blows up.
+        // Re-bind the issues handler to throw — exercises the job's
+        // catch path that flips status to `failed` and captures the
+        // exception message into `error_message`.
         $delivery = WebhookDelivery::factory()->create([
             'event' => 'issues',
             'action' => 'opened',
             'repository_full_name' => 'whoever/whatever',
             'status' => WebhookDeliveryStatus::Received->value,
-            // Force the JSON cast to be empty array, then we'll mutate
-            // raw to break it. Eloquent's `array` cast tolerates null;
-            // simpler: rely on missing repository to take the Skipped
-            // branch and assert that path instead. We test the actual
-            // exception-path via the job's `try { … } catch` by
-            // breaking the handler resolution itself — we'll override
-            // the container binding.
         ]);
 
         // Re-bind the handler to throw on `handle`.

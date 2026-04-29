@@ -64,6 +64,8 @@ class GitHubWebhookControllerTest extends TestCase
         ]);
 
         $response->assertStatus(401);
+        // Don't echo anything to a request we couldn't authenticate.
+        $this->assertSame('', $response->getContent());
         $this->assertSame(0, WebhookDelivery::query()->count());
         Queue::assertNotPushed(ProcessGitHubWebhookJob::class);
     }

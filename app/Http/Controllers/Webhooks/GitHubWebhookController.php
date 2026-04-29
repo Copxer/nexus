@@ -6,6 +6,7 @@ use App\Domain\GitHub\Actions\VerifyGitHubWebhookSignatureAction;
 use App\Domain\GitHub\Jobs\ProcessGitHubWebhookJob;
 use App\Enums\WebhookDeliveryStatus;
 use App\Models\WebhookDelivery;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 
@@ -34,7 +35,9 @@ class GitHubWebhookController
         $secret = (string) config('services.github.webhook_secret', '');
 
         if (! $verifier->execute($rawBody, $signature, $secret)) {
-            return response('Invalid signature', 401);
+            // Empty body on 401 — don't echo anything (not even a
+            // generic message) to a request we couldn't authenticate.
+            return response('', 401);
         }
 
         $deliveryId = (string) $request->header('X-GitHub-Delivery', '');
@@ -55,16 +58,25 @@ class GitHubWebhookController
 
         $payload = json_decode($rawBody, true) ?? [];
 
-        $delivery = WebhookDelivery::query()->create([
-            'github_delivery_id' => $deliveryId,
-            'event' => $event,
-            'action' => $payload['action'] ?? null,
-            'repository_full_name' => $payload['repository']['full_name'] ?? null,
-            'payload_json' => $payload,
-            'signature' => (string) $signature,
-            'status' => WebhookDeliveryStatus::Received->value,
-            'received_at' => now(),
-        ]);
+        try {
+            $delivery = WebhookDelivery::query()->create([
+                'github_delivery_id' => $deliveryId,
+                'event' => $event,
+                'action' => $payload['action'] ?? null,
+                'repository_full_name' => $payload['repository']['full_name'] ?? null,
+                'payload_json' => $payload,
+                'signature' => (string) $signature,
+                'status' => WebhookDeliveryStatus::Received->value,
+                'received_at' => now(),
+            ]);
+        } catch (UniqueConstraintViolationException) {
+            // Race window: between the lookup-by-delivery_id above and
+            // this insert, a concurrent retry may have raced us. The
+            // unique index is the source of truth — treat the loser as
+            // a duplicate and acknowledge 200, matching the idempotency
+            // contract.
+            return response('OK', 200);
+        }
 
         ProcessGitHubWebhookJob::dispatch($delivery->id);
 
