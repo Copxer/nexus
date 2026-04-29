@@ -12,6 +12,7 @@ import {
     GitBranch,
     GitPullRequest,
     Globe,
+    History,
     LayoutDashboard,
     Rocket,
     Server,
@@ -29,9 +30,11 @@ interface NavItem {
     soonLabel?: string;
 }
 
-// Order locked to roadmap §7.6. Only Overview is wired up this phase; the
-// rest carry a "Soon" pill until their owning spec lands. The phase pill text
-// helps tell readers which spec will activate each item.
+// Order locked to roadmap §7.6 (with Activity inserted between Alerts and
+// Settings as the 12th slot — spec 018). Only Overview, Projects,
+// Repositories, Issues & PRs, Activity, and Settings are wired this phase;
+// the rest carry a "Soon" pill until their owning spec lands. The phase
+// pill text helps readers see which spec will activate each item.
 const nav: NavItem[] = [
     { label: 'Overview', icon: LayoutDashboard, routeName: 'overview' },
     { label: 'Projects', icon: FolderKanban, routeName: 'projects.index' },
@@ -43,6 +46,7 @@ const nav: NavItem[] = [
     { label: 'Monitoring', icon: Globe, disabled: true, soonLabel: 'Phase 5' },
     { label: 'Analytics', icon: BarChart3, disabled: true, soonLabel: 'Phase 8' },
     { label: 'Alerts', icon: Bell, disabled: true, soonLabel: 'Phase 7' },
+    { label: 'Activity', icon: History, routeName: 'activity.index' },
     { label: 'Settings', icon: SettingsIcon, routeName: 'settings.index' },
 ];
 

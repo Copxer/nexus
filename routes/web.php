@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ActivityController;
 use App\Http\Controllers\GithubConnectionController;
 use App\Http\Controllers\GithubRepositoryImportController;
 use App\Http\Controllers\OverviewController;
@@ -70,6 +71,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Spec 016 — unified Work Items queue (issues + PRs).
     Route::get('/work-items', WorkItemController::class)->name('work-items.index');
+
+    // Spec 018 — dedicated activity feed page. Right-rail shares the
+    // same data via the activity.recent Inertia prop registered in
+    // HandleInertiaRequests::share(); this page just hosts the wider
+    // 100-event view + future filters.
+    Route::get('/activity', [ActivityController::class, 'index'])->name('activity.index');
 });
 
 // Spec 017 — GitHub webhooks (no auth/CSRF; signature-verified inside).

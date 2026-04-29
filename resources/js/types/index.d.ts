@@ -11,6 +11,18 @@ export type PageProps<
     auth: {
         user: User | null;
     };
+    flash?: {
+        status?: string | null;
+        error?: string | null;
+    };
+    /**
+     * Right-rail activity feed shared by `HandleInertiaRequests::share()`
+     * (spec 018). Authenticated pages get the latest events for the user's
+     * accessible scope; guests get an empty array.
+     */
+    activity?: {
+        recent: ActivityEvent[];
+    };
 };
 
 /**
