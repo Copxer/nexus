@@ -62,6 +62,19 @@ export interface DashboardPayload {
         sparkline: number[];
         status: DashboardStatus;
     };
+
+    /**
+     * Top Repositories slice rendered by the Overview widget. Computed
+     * from the `repositories` table; ordered by `stars_count desc`. The
+     * `commits` field is currently a `stars_count` proxy — phase-2's
+     * GitHub sync replaces it with real commit data. Empty array
+     * triggers the widget's empty state.
+     */
+    topRepositories: Array<{
+        name: string;
+        commits: number;
+        share: number;
+    }>;
 }
 
 /**

@@ -36,13 +36,15 @@ class SmokeTest extends TestCase
                     ->has('dashboard', fn (AssertableInertia $dashboard) => $dashboard
                         ->has('projects.active')
                         ->has('projects.sparkline')
-                        ->where('projects.status', 'success')
+                        // No seeded data in this test → projects.status is 'muted'.
+                        ->where('projects.status', 'muted')
                         ->has('deployments.successful_24h')
                         ->has('services.running')
                         ->has('hosts.online')
                         ->has('alerts.active')
                         ->where('alerts.status', 'danger')
                         ->has('uptime.overall')
+                        ->has('topRepositories')
                     )
             );
     }
