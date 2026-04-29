@@ -36,7 +36,7 @@ Status legend: ⬜ not started · 🟡 in progress · 🟢 done · 🔴 blocked
 | # | Phase | Status | Notes |
 |---|-------|--------|-------|
 | 0 | Foundation (auth, layout, static overview) | 🟢 | 9/9 specs done (001–009). Phase complete. |
-| 1 | Projects & Repositories | 🟡 | 1/3 specs done (010). Next: 011 Repositories. |
+| 1 | Projects & Repositories | 🟡 | 2/3 specs done (010–011). Next: 012 Wire Overview to DB. |
 | 2 | GitHub Integration MVP | ⬜ | — |
 | 3 | GitHub Webhooks & Activity Feed | ⬜ | — |
 | 4 | Deployments & CI/CD | ⬜ | — |

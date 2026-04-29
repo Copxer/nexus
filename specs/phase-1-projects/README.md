@@ -11,7 +11,7 @@ Add real project and repository records to Nexus. Replace the mock dashboard dat
 | # | Task | Status |
 |---|------|--------|
 | 010 | Projects (model + migration + factory + policy + CRUD pages + sidebar/palette activation) | 🟢 |
-| 011 | Repositories (model + migration + manual link + index/show pages + sidebar/palette activation) | ⬜ |
+| 011 | Repositories (model + migration + manual link + index/show pages + sidebar/palette activation) | 🟢 |
 | 012 | Wire Overview KPIs and Top Repositories widget to the database | ⬜ |
 
 ## Acceptance criteria (phase-level)
