@@ -4,7 +4,9 @@ import CommandPalette from '@/Components/CommandPalette/CommandPalette.vue';
 import Sidebar from '@/Components/Sidebar/Sidebar.vue';
 import TopBar from '@/Components/TopBar/TopBar.vue';
 import type { ActivityEvent } from '@/types';
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { router, usePage } from '@inertiajs/vue3';
+import { AlertTriangle, CheckCircle2, X } from 'lucide-vue-next';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 withDefaults(
     defineProps<{
@@ -23,6 +25,31 @@ withDefaults(
 const sidebarOpen = ref(false);
 const activityRailOpen = ref(false);
 const paletteOpen = ref(false);
+
+// Surface controller `->with('status'|'error', …)` flashes as a top
+// banner. Pulled from the shared Inertia prop set in
+// HandleInertiaRequests::share(). We snapshot to local refs on each
+// page navigation so dismissing the banner via the X is sticky for the
+// current page (and the next nav clears it, regardless).
+const page = usePage();
+const flashStatus = ref<string | null>(null);
+const flashError = ref<string | null>(null);
+
+const syncFlash = () => {
+    const flash = (page.props.flash ?? {}) as {
+        status?: string | null;
+        error?: string | null;
+    };
+    flashStatus.value = flash.status ?? null;
+    flashError.value = flash.error ?? null;
+};
+
+syncFlash();
+router.on('navigate', syncFlash);
+
+const hasFlash = computed(
+    () => flashStatus.value !== null || flashError.value !== null,
+);
 
 // Lock body scroll while a drawer or the palette is open. Reset on unmount
 // in case the user navigates away mid-overlay.
@@ -134,6 +161,54 @@ onBeforeUnmount(() => {
                     <slot name="title" />
                 </template>
             </TopBar>
+
+            <!-- Flash banner — surfaces controller `with('status'|'error')`
+                 messages so OAuth callbacks, sync triggers, and link
+                 actions don't fail silently. -->
+            <div
+                v-if="hasFlash"
+                class="px-4 pt-3 sm:px-6 lg:px-8"
+                role="status"
+                aria-live="polite"
+            >
+                <div
+                    v-if="flashError"
+                    class="flex items-start gap-3 rounded-lg border border-status-danger/40 bg-status-danger/10 p-3 text-sm text-status-danger"
+                >
+                    <AlertTriangle
+                        class="mt-0.5 h-4 w-4 shrink-0"
+                        aria-hidden="true"
+                    />
+                    <p class="flex-1 leading-snug">{{ flashError }}</p>
+                    <button
+                        type="button"
+                        class="rounded p-0.5 text-status-danger/70 transition hover:text-status-danger focus:outline-none focus-visible:ring-2 focus-visible:ring-status-danger/60"
+                        aria-label="Dismiss error"
+                        @click="flashError = null"
+                    >
+                        <X class="h-4 w-4" aria-hidden="true" />
+                    </button>
+                </div>
+                <div
+                    v-if="flashStatus"
+                    class="mt-2 flex items-start gap-3 rounded-lg border border-status-success/40 bg-status-success/10 p-3 text-sm text-status-success"
+                    :class="{ 'mt-0': !flashError }"
+                >
+                    <CheckCircle2
+                        class="mt-0.5 h-4 w-4 shrink-0"
+                        aria-hidden="true"
+                    />
+                    <p class="flex-1 leading-snug">{{ flashStatus }}</p>
+                    <button
+                        type="button"
+                        class="rounded p-0.5 text-status-success/70 transition hover:text-status-success focus:outline-none focus-visible:ring-2 focus-visible:ring-status-success/60"
+                        aria-label="Dismiss notification"
+                        @click="flashStatus = null"
+                    >
+                        <X class="h-4 w-4" aria-hidden="true" />
+                    </button>
+                </div>
+            </div>
 
             <main class="flex min-w-0 flex-1">
                 <div class="min-w-0 flex-1 overflow-x-hidden">
