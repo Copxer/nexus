@@ -6,6 +6,7 @@ use App\Http\Controllers\OverviewController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\RepositoryController;
+use App\Http\Controllers\RepositoryIssuesSyncController;
 use App\Http\Controllers\SettingsController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -44,6 +45,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('projects.repositories.import.index');
     Route::post('/projects/{project}/repositories/import', [GithubRepositoryImportController::class, 'store'])
         ->name('projects.repositories.import.store');
+
+    // Spec 015 — manual "Run sync" button on the Repository Issues tab.
+    Route::post('/repositories/{repository}/issues/sync', RepositoryIssuesSyncController::class)
+        ->where('repository', '[\w.-]+/[\w.-]+')
+        ->name('repositories.issues.sync');
 });
 
 Route::middleware('auth')->group(function () {

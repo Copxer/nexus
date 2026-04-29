@@ -6,6 +6,7 @@ use App\Domain\GitHub\Exceptions\GitHubApiException;
 use App\Models\GithubConnection;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\RequestException;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 
 /**
@@ -79,6 +80,51 @@ class GitHubClient
             throw GitHubApiException::fromTransport(
                 $e,
                 "GitHub /repos/{$fullName} failed",
+            );
+        }
+    }
+
+    /**
+     * GET /repos/{owner}/{name}/issues — issues + (annoyingly) PRs.
+     * The caller filters PRs out via `NormalizeGitHubIssueAction`.
+     *
+     * `state=all` because we want closed issues mirrored locally too.
+     * `since` is sent on follow-up syncs so we only pull what's been
+     * touched since the last successful sync.
+     */
+    public function listIssues(
+        string $fullName,
+        ?Carbon $since = null,
+        int $perPage = self::DEFAULT_PER_PAGE,
+    ): array {
+        $query = [
+            'state' => 'all',
+            'sort' => 'updated',
+            'direction' => 'desc',
+            'per_page' => max(1, min($perPage, 100)),
+            'page' => 1,
+        ];
+
+        if ($since !== null) {
+            $query['since'] = $since->toIso8601String();
+        }
+
+        try {
+            $response = $this->request()
+                ->get(self::BASE_URL."/repos/{$fullName}/issues", $query);
+
+            if ($response->failed()) {
+                throw GitHubApiException::fromResponse(
+                    $response,
+                    "GitHub /repos/{$fullName}/issues failed",
+                );
+            }
+
+            return (array) $response->json();
+        } catch (RequestException $e) {
+            throw GitHubApiException::fromTransport(
+                $e,
+                "GitHub /repos/{$fullName}/issues failed",
             );
         }
     }

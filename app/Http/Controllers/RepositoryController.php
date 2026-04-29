@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\GitHub\Queries\IssuesForRepositoryQuery;
 use App\Domain\Repositories\Actions\LinkRepositoryToProjectAction;
 use App\Http\Requests\Repositories\LinkRepositoryRequest;
 use App\Models\Repository;
@@ -30,8 +31,11 @@ class RepositoryController extends Controller
         ]);
     }
 
-    public function show(Request $request, Repository $repository): Response
-    {
+    public function show(
+        Request $request,
+        Repository $repository,
+        IssuesForRepositoryQuery $issuesQuery,
+    ): Response {
         $this->authorize('view', $repository);
 
         $repository->loadMissing('project:id,slug,name,color,icon,owner_user_id');
@@ -39,6 +43,15 @@ class RepositoryController extends Controller
         return Inertia::render('Repositories/Show', [
             'repository' => $this->transform($repository),
             'canDelete' => $request->user()?->can('delete', $repository) ?? false,
+            // Spec 015 — issues live on the Repository show page's
+            // Issues tab. `canSync` gates the manual "Run sync" button
+            // to project owners, mirroring the picker's policy.
+            'canSync' => $request->user()?->can('update', $repository->project) ?? false,
+            'issues' => $issuesQuery->execute($repository),
+            'issuesSync' => [
+                'status' => $repository->issues_sync_status?->value,
+                'synced_at' => $repository->issues_synced_at?->diffForHumans(),
+            ],
         ]);
     }
 

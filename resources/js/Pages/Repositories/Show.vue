@@ -5,15 +5,19 @@ import AppLayout from '@/Layouts/AppLayout.vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import {
     ChevronLeft,
+    CircleDot,
     ExternalLink,
     FolderKanban,
     GitBranch,
     GitFork,
     GitPullRequest,
+    LayoutGrid,
     MessageSquare,
+    RefreshCcw,
     Star,
     Trash2,
 } from 'lucide-vue-next';
+import { computed, ref } from 'vue';
 
 interface RepositoryShape {
     id: number;
@@ -41,10 +45,31 @@ interface RepositoryShape {
     } | null;
 }
 
+interface IssueRow {
+    id: number;
+    number: number;
+    title: string;
+    state: 'open' | 'closed' | string | null;
+    author_login: string | null;
+    comments_count: number;
+    updated_at_github: string | null;
+    html_url: string;
+}
+
+interface IssuesSyncShape {
+    status: string | null;
+    synced_at: string | null;
+}
+
 const props = defineProps<{
     repository: RepositoryShape;
     canDelete: boolean;
+    canSync: boolean;
+    issues: IssueRow[];
+    issuesSync: IssuesSyncShape;
 }>();
+
+const tab = ref<'overview' | 'issues'>('overview');
 
 const syncStatusTone = (status: string | null) =>
     (
@@ -55,6 +80,9 @@ const syncStatusTone = (status: string | null) =>
             failed: 'danger',
         }) as const
     )[status ?? ''] ?? 'muted';
+
+const issueStateTone = (state: string | null) =>
+    state === 'open' ? 'info' : 'muted';
 
 const projectAccentClass = (color: string | null) =>
     (
@@ -68,6 +96,9 @@ const projectAccentClass = (color: string | null) =>
         }) as const
     )[color ?? ''] ?? 'text-text-muted';
 
+const issuesCount = computed(() => props.issues.length);
+const isSyncing = computed(() => props.issuesSync.status === 'syncing');
+
 const confirmDelete = () => {
     if (!props.canDelete) return;
     if (
@@ -78,6 +109,15 @@ const confirmDelete = () => {
         return;
     }
     router.delete(route('repositories.destroy', props.repository.full_name));
+};
+
+const runIssuesSync = () => {
+    if (!props.canSync) return;
+    router.post(
+        route('repositories.issues.sync', props.repository.full_name),
+        {},
+        { preserveScroll: true },
+    );
 };
 </script>
 
@@ -220,101 +260,255 @@ const confirmDelete = () => {
                 </dl>
             </header>
 
-            <!-- Counts -->
-            <section
-                aria-label="Activity counts"
-                class="grid grid-cols-2 gap-4 md:grid-cols-4"
+            <!-- Tabs -->
+            <nav
+                aria-label="Repository tabs"
+                class="flex flex-wrap items-center gap-2"
             >
-                <div class="glass-card flex flex-col gap-2 p-5">
-                    <div class="flex items-center gap-2 text-text-muted">
-                        <Star class="h-4 w-4 text-accent-cyan" aria-hidden="true" />
-                        <span class="font-mono text-[10px] uppercase tracking-[0.18em]">
-                            Stars
-                        </span>
-                    </div>
-                    <span class="font-display text-2xl font-semibold tabular-nums text-text-primary">
-                        {{ repository.stars_count }}
-                    </span>
-                </div>
-                <div class="glass-card flex flex-col gap-2 p-5">
-                    <div class="flex items-center gap-2 text-text-muted">
-                        <GitFork class="h-4 w-4 text-accent-purple" aria-hidden="true" />
-                        <span class="font-mono text-[10px] uppercase tracking-[0.18em]">
-                            Forks
-                        </span>
-                    </div>
-                    <span class="font-display text-2xl font-semibold tabular-nums text-text-primary">
-                        {{ repository.forks_count }}
-                    </span>
-                </div>
-                <div class="glass-card flex flex-col gap-2 p-5">
-                    <div class="flex items-center gap-2 text-text-muted">
-                        <MessageSquare class="h-4 w-4 text-accent-magenta" aria-hidden="true" />
-                        <span class="font-mono text-[10px] uppercase tracking-[0.18em]">
-                            Open issues
-                        </span>
-                    </div>
-                    <span class="font-display text-2xl font-semibold tabular-nums text-text-primary">
-                        {{ repository.open_issues_count }}
-                    </span>
-                </div>
-                <div class="glass-card flex flex-col gap-2 p-5">
-                    <div class="flex items-center gap-2 text-text-muted">
-                        <GitPullRequest class="h-4 w-4 text-accent-blue" aria-hidden="true" />
-                        <span class="font-mono text-[10px] uppercase tracking-[0.18em]">
-                            Open PRs
-                        </span>
-                    </div>
-                    <span class="font-display text-2xl font-semibold tabular-nums text-text-primary">
-                        {{ repository.open_prs_count }}
-                    </span>
-                </div>
-            </section>
-
-            <!-- Sync timestamps -->
-            <section class="glass-card p-6 sm:p-8">
-                <h3 class="text-sm font-semibold text-text-primary">
-                    Sync activity
-                </h3>
-                <p class="mt-2 text-sm text-text-secondary">
-                    GitHub auto-sync arrives with phase 2. Until then these
-                    timestamps reflect manual links and the seed data.
-                </p>
-                <dl
-                    class="mt-6 grid grid-cols-2 gap-4 text-sm md:grid-cols-3"
+                <button
+                    type="button"
+                    :class="[
+                        'inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] transition focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60',
+                        tab === 'overview'
+                            ? 'border-accent-cyan/60 bg-accent-cyan/15 text-accent-cyan'
+                            : 'border-border-subtle bg-background-panel-hover text-text-secondary hover:text-text-primary',
+                    ]"
+                    @click="tab = 'overview'"
                 >
-                    <div class="flex flex-col gap-1">
-                        <dt
-                            class="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted"
-                        >
-                            Visibility
-                        </dt>
-                        <dd class="text-text-secondary">
-                            {{ repository.visibility }}
-                        </dd>
+                    <LayoutGrid class="h-3.5 w-3.5" aria-hidden="true" />
+                    Overview
+                </button>
+                <button
+                    type="button"
+                    :class="[
+                        'inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] transition focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60',
+                        tab === 'issues'
+                            ? 'border-accent-cyan/60 bg-accent-cyan/15 text-accent-cyan'
+                            : 'border-border-subtle bg-background-panel-hover text-text-secondary hover:text-text-primary',
+                    ]"
+                    @click="tab = 'issues'"
+                >
+                    <CircleDot class="h-3.5 w-3.5" aria-hidden="true" />
+                    Issues
+                    <span
+                        v-if="issuesCount > 0"
+                        class="rounded-full border border-current/40 px-1.5 py-0.5 text-[10px] font-mono"
+                    >
+                        {{ issuesCount }}
+                    </span>
+                </button>
+            </nav>
+
+            <!-- Overview panel -->
+            <template v-if="tab === 'overview'">
+                <section
+                    aria-label="Activity counts"
+                    class="grid grid-cols-2 gap-4 md:grid-cols-4"
+                >
+                    <div class="glass-card flex flex-col gap-2 p-5">
+                        <div class="flex items-center gap-2 text-text-muted">
+                            <Star class="h-4 w-4 text-accent-cyan" aria-hidden="true" />
+                            <span class="font-mono text-[10px] uppercase tracking-[0.18em]">
+                                Stars
+                            </span>
+                        </div>
+                        <span class="font-display text-2xl font-semibold tabular-nums text-text-primary">
+                            {{ repository.stars_count }}
+                        </span>
                     </div>
-                    <div class="flex flex-col gap-1">
-                        <dt
-                            class="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted"
-                        >
-                            Last pushed
-                        </dt>
-                        <dd class="text-text-secondary">
-                            {{ repository.last_pushed_at ?? '—' }}
-                        </dd>
+                    <div class="glass-card flex flex-col gap-2 p-5">
+                        <div class="flex items-center gap-2 text-text-muted">
+                            <GitFork class="h-4 w-4 text-accent-purple" aria-hidden="true" />
+                            <span class="font-mono text-[10px] uppercase tracking-[0.18em]">
+                                Forks
+                            </span>
+                        </div>
+                        <span class="font-display text-2xl font-semibold tabular-nums text-text-primary">
+                            {{ repository.forks_count }}
+                        </span>
                     </div>
-                    <div class="flex flex-col gap-1">
-                        <dt
-                            class="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted"
-                        >
-                            Last synced
-                        </dt>
-                        <dd class="text-text-secondary">
-                            {{ repository.last_synced_at ?? '—' }}
-                        </dd>
+                    <div class="glass-card flex flex-col gap-2 p-5">
+                        <div class="flex items-center gap-2 text-text-muted">
+                            <MessageSquare class="h-4 w-4 text-accent-magenta" aria-hidden="true" />
+                            <span class="font-mono text-[10px] uppercase tracking-[0.18em]">
+                                Open issues
+                            </span>
+                        </div>
+                        <span class="font-display text-2xl font-semibold tabular-nums text-text-primary">
+                            {{ repository.open_issues_count }}
+                        </span>
                     </div>
-                </dl>
-            </section>
+                    <div class="glass-card flex flex-col gap-2 p-5">
+                        <div class="flex items-center gap-2 text-text-muted">
+                            <GitPullRequest class="h-4 w-4 text-accent-blue" aria-hidden="true" />
+                            <span class="font-mono text-[10px] uppercase tracking-[0.18em]">
+                                Open PRs
+                            </span>
+                        </div>
+                        <span class="font-display text-2xl font-semibold tabular-nums text-text-primary">
+                            {{ repository.open_prs_count }}
+                        </span>
+                    </div>
+                </section>
+
+                <section class="glass-card p-6 sm:p-8">
+                    <h3 class="text-sm font-semibold text-text-primary">
+                        Sync activity
+                    </h3>
+                    <p class="mt-2 text-sm text-text-secondary">
+                        Repository metadata refreshes via spec 014's sync job
+                        on import and on demand. Spec 015 adds the issues
+                        mirror — see the Issues tab.
+                    </p>
+                    <dl
+                        class="mt-6 grid grid-cols-2 gap-4 text-sm md:grid-cols-3"
+                    >
+                        <div class="flex flex-col gap-1">
+                            <dt
+                                class="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted"
+                            >
+                                Visibility
+                            </dt>
+                            <dd class="text-text-secondary">
+                                {{ repository.visibility }}
+                            </dd>
+                        </div>
+                        <div class="flex flex-col gap-1">
+                            <dt
+                                class="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted"
+                            >
+                                Last pushed
+                            </dt>
+                            <dd class="text-text-secondary">
+                                {{ repository.last_pushed_at ?? '—' }}
+                            </dd>
+                        </div>
+                        <div class="flex flex-col gap-1">
+                            <dt
+                                class="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted"
+                            >
+                                Last synced
+                            </dt>
+                            <dd class="text-text-secondary">
+                                {{ repository.last_synced_at ?? '—' }}
+                            </dd>
+                        </div>
+                    </dl>
+                </section>
+            </template>
+
+            <!-- Issues panel -->
+            <template v-else>
+                <section aria-label="Issues" class="glass-card p-6 sm:p-8">
+                    <header
+                        class="flex flex-wrap items-center justify-between gap-3 border-b border-border-subtle pb-4"
+                    >
+                        <div class="flex items-center gap-3">
+                            <h3 class="text-sm font-semibold text-text-primary">
+                                Issues mirror
+                            </h3>
+                            <StatusBadge
+                                v-if="issuesSync.status"
+                                :tone="syncStatusTone(issuesSync.status)"
+                            >
+                                {{ issuesSync.status }}
+                            </StatusBadge>
+                            <span
+                                v-if="issuesSync.synced_at"
+                                class="text-xs text-text-muted"
+                            >
+                                Last sync
+                                <span class="font-mono text-text-secondary">{{ issuesSync.synced_at }}</span>
+                            </span>
+                        </div>
+                        <button
+                            v-if="canSync"
+                            type="button"
+                            class="inline-flex items-center gap-2 rounded-lg border border-accent-cyan/40 bg-accent-cyan/15 px-3 py-2 text-sm font-semibold text-accent-cyan transition hover:border-accent-cyan/60 disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
+                            :disabled="isSyncing"
+                            @click="runIssuesSync"
+                        >
+                            <RefreshCcw class="h-4 w-4" aria-hidden="true" />
+                            {{ isSyncing ? 'Syncing…' : 'Run sync' }}
+                        </button>
+                    </header>
+
+                    <ul
+                        v-if="issues.length > 0"
+                        class="mt-2 divide-y divide-border-subtle"
+                    >
+                        <li
+                            v-for="issue in issues"
+                            :key="issue.id"
+                            class="flex flex-col gap-2 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+                        >
+                            <div class="flex min-w-0 items-start gap-3">
+                                <CircleDot
+                                    class="mt-1 h-4 w-4 shrink-0"
+                                    :class="
+                                        issue.state === 'open'
+                                            ? 'text-accent-cyan'
+                                            : 'text-text-muted'
+                                    "
+                                    aria-hidden="true"
+                                />
+                                <div class="flex min-w-0 flex-col gap-1">
+                                    <a
+                                        :href="issue.html_url"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        class="truncate text-sm font-semibold text-text-primary transition hover:text-accent-cyan"
+                                    >
+                                        <span class="font-mono text-text-muted">#{{ issue.number }}</span>
+                                        {{ issue.title }}
+                                    </a>
+                                    <p class="text-xs text-text-muted">
+                                        <span v-if="issue.author_login">
+                                            <span class="font-mono text-text-secondary">@{{ issue.author_login }}</span>
+                                            ·
+                                        </span>
+                                        Updated {{ issue.updated_at_github ?? '—' }}
+                                    </p>
+                                </div>
+                            </div>
+                            <div
+                                class="flex flex-shrink-0 items-center gap-3 text-xs text-text-muted"
+                            >
+                                <StatusBadge :tone="issueStateTone(issue.state)">
+                                    {{ issue.state }}
+                                </StatusBadge>
+                                <span class="inline-flex items-center gap-1">
+                                    <MessageSquare class="h-3.5 w-3.5" aria-hidden="true" />
+                                    {{ issue.comments_count }}
+                                </span>
+                                <a
+                                    :href="issue.html_url"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    class="text-text-muted transition hover:text-accent-cyan"
+                                    :aria-label="`Open issue #${issue.number} on GitHub`"
+                                >
+                                    <ExternalLink class="h-4 w-4" aria-hidden="true" />
+                                </a>
+                            </div>
+                        </li>
+                    </ul>
+
+                    <p
+                        v-else
+                        class="mt-6 rounded-lg border border-dashed border-border-subtle bg-background-panel-hover/30 p-4 text-sm text-text-muted"
+                    >
+                        <span v-if="issuesSync.status === 'pending'">
+                            Issues haven't been synced yet.
+                        </span>
+                        <span v-else-if="issuesSync.status === 'failed'">
+                            The last issues sync failed.
+                        </span>
+                        <span v-else>No issues mirrored for this repository.</span>
+                        <span v-if="canSync"> Click <span class="font-mono">Run sync</span> to fetch from GitHub.</span>
+                    </p>
+                </section>
+            </template>
         </div>
     </AppLayout>
 </template>
