@@ -37,7 +37,7 @@ Status legend: ⬜ not started · 🟡 in progress · 🟢 done · 🔴 blocked
 |---|-------|--------|-------|
 | 0 | Foundation (auth, layout, static overview) | 🟢 | 9/9 specs done (001–009). Phase complete. |
 | 1 | Projects & Repositories | 🟢 | 3/3 specs done (010–012). Phase complete. |
-| 2 | GitHub Integration MVP | 🟡 | 2/4 specs done (013, 014). Next: 015 Issues sync. |
+| 2 | GitHub Integration MVP | 🟡 | 3/4 specs done (013, 014, 015). Next: 016 Pull requests + Work Items page. |
 | 3 | GitHub Webhooks & Activity Feed | ⬜ | — |
 | 4 | Deployments & CI/CD | ⬜ | — |
 | 5 | Website Monitoring | ⬜ | — |
