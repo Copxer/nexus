@@ -113,17 +113,24 @@ class GetOverviewDashboardQuery
         return $rows
             ->map(fn (Repository $repo) => [
                 'name' => $repo->full_name,
-                'commits' => (int) $repo->stars_count,
-                'share' => round((int) $repo->stars_count / $maxStars, 3),
+                'commits' => $repo->stars_count,
+                'share' => round($repo->stars_count / $maxStars, 3),
             ])
             ->all();
     }
 
     /**
-     * Zero-padded daily creation counts over the past `$days` (chronological).
+     * Zero-padded daily creation counts over the past `$days` (chronological,
+     * oldest at index 0, today at the last index).
      *
      * Generic enough to power both the Projects and Hosts sparklines —
      * the only other dashboard surfaces today that need real time-series.
+     *
+     * **Timezone assumption.** Day boundaries use `now()->startOfDay()` in
+     * the configured app timezone, while `DATE(created_at)` slices the raw
+     * column value (UTC). This matches today's `config('app.timezone') = 'UTC'`
+     * setup; revisit if/when the app moves to a non-UTC timezone — buckets
+     * would otherwise drift by a day at the day-boundary edge.
      *
      * @param  class-string<Model>  $modelClass
      * @return array<int, int>

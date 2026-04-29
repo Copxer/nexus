@@ -76,17 +76,54 @@ class GetOverviewDashboardQueryTest extends TestCase
         );
     }
 
+    public function test_sparkline_lands_today_at_the_last_index(): void
+    {
+        $owner = User::factory()->create();
+        Project::factory()->create([
+            'owner_user_id' => $owner->id,
+            'created_at' => now(),
+        ]);
+
+        $sparkline = (new GetOverviewDashboardQuery)
+            ->handle()['dashboard']['projects']['sparkline'];
+
+        // 12 days, oldest at index 0, today at index 11. The newly created
+        // project should land in the final bucket and only there.
+        $this->assertSame(1, $sparkline[11]);
+        $this->assertSame(0, array_sum(array_slice($sparkline, 0, 11)));
+    }
+
+    public function test_sparkline_lands_oldest_day_at_index_zero(): void
+    {
+        $owner = User::factory()->create();
+        Project::factory()->create([
+            'owner_user_id' => $owner->id,
+            'created_at' => now()->startOfDay()->subDays(11),
+        ]);
+
+        $sparkline = (new GetOverviewDashboardQuery)
+            ->handle()['dashboard']['projects']['sparkline'];
+
+        // A row stamped exactly 11 days ago lands at the start of the
+        // 12-day window (index 0).
+        $this->assertSame(1, $sparkline[0]);
+        $this->assertSame(0, array_sum(array_slice($sparkline, 1)));
+    }
+
     public function test_top_repositories_orders_by_stars_desc_and_caps_at_default_limit(): void
     {
         $owner = User::factory()->create();
         $project = Project::factory()->create(['owner_user_id' => $owner->id]);
 
         // 6 repos with descending star counts; only the top 4 should land.
+        // Pin `last_pushed_at` so the secondary ordering tie-breaker is
+        // deterministic if any factory defaults later collide.
         foreach ([900, 700, 500, 300, 100, 50] as $i => $stars) {
             Repository::factory()->create([
                 'project_id' => $project->id,
                 'full_name' => "owner/repo-{$i}",
                 'stars_count' => $stars,
+                'last_pushed_at' => now()->subMinutes($i),
             ]);
         }
 
