@@ -127,6 +127,9 @@ const isIssuesSyncing = computed(() => props.issuesSync.status === 'syncing');
 const isPullRequestsSyncing = computed(
     () => props.pullRequestsSync.status === 'syncing',
 );
+const isRepositorySyncing = computed(
+    () => props.repository.sync_status === 'syncing',
+);
 
 const confirmDelete = () => {
     if (!props.canDelete) return;
@@ -153,6 +156,15 @@ const runPullRequestsSync = () => {
     if (!props.canSync) return;
     router.post(
         route('repositories.pulls.sync', props.repository.full_name),
+        {},
+        { preserveScroll: true },
+    );
+};
+
+const runRepositorySync = () => {
+    if (!props.canSync) return;
+    router.post(
+        route('repositories.sync', props.repository.full_name),
         {},
         { preserveScroll: true },
     );
@@ -217,6 +229,20 @@ const runPullRequestsSync = () => {
                             <ExternalLink class="h-4 w-4" aria-hidden="true" />
                             View on GitHub
                         </a>
+                        <button
+                            v-if="canSync"
+                            type="button"
+                            :disabled="isRepositorySyncing"
+                            class="inline-flex items-center gap-2 rounded-lg border border-accent-cyan/40 bg-accent-cyan/10 px-3 py-2 text-sm font-semibold text-accent-cyan transition hover:bg-accent-cyan/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60 disabled:cursor-not-allowed disabled:opacity-50"
+                            @click="runRepositorySync"
+                        >
+                            <RefreshCcw
+                                class="h-4 w-4"
+                                :class="{ 'animate-spin': isRepositorySyncing }"
+                                aria-hidden="true"
+                            />
+                            {{ isRepositorySyncing ? 'Syncing…' : 'Run sync' }}
+                        </button>
                         <button
                             v-if="canDelete"
                             type="button"

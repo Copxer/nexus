@@ -8,6 +8,7 @@ use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\RepositoryController;
 use App\Http\Controllers\RepositoryIssuesSyncController;
 use App\Http\Controllers\RepositoryPullRequestsSyncController;
+use App\Http\Controllers\RepositorySyncController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\Webhooks\GitHubWebhookController;
 use App\Http\Controllers\WorkItemController;
@@ -48,6 +49,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('projects.repositories.import.index');
     Route::post('/projects/{project}/repositories/import', [GithubRepositoryImportController::class, 'store'])
         ->name('projects.repositories.import.store');
+
+    // Manual "Run sync" button on the Repository show-page header.
+    // Re-dispatches the parent SyncGitHubRepositoryJob, which refreshes
+    // metadata (default branch, language, stars, push timestamps) and
+    // cascades into the issues + PR sync jobs below.
+    Route::post('/repositories/{repository}/sync', RepositorySyncController::class)
+        ->where('repository', '[\w.-]+/[\w.-]+')
+        ->name('repositories.sync');
 
     // Spec 015 — manual "Run sync" button on the Repository Issues tab.
     Route::post('/repositories/{repository}/issues/sync', RepositoryIssuesSyncController::class)
