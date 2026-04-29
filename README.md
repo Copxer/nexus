@@ -155,13 +155,14 @@ Caveats with quick tunnels (`cloudflared tunnel --url ...`):
     cloudflared tunnel --url http://localhost:8080
     # → https://<random>.trycloudflare.com   (call this URL_C)
     ```
-    Then in `.env`:
+    Then in `.env` — **only the `VITE_REVERB_*` (browser-side) keys change**; leave the server-side `REVERB_*` keys on their localhost defaults because the Laravel process still talks to Reverb on the same machine:
     ```env
+    # Browser → Reverb (over the tunnel)
     VITE_REVERB_HOST=URL_C.trycloudflare.com
     VITE_REVERB_SCHEME=https
     VITE_REVERB_PORT=443
     ```
-    Restart `composer run dev`. The `[vite] tunnel mode active` banner already prints the resolved env. Without this, the rail's "Live updates offline" pill lights up and the page falls back to load-time freshness only — page-load reads still surface the latest events. Named tunnels make this triple substantially less painful.
+    Restart `composer run dev` and make sure `php artisan reverb:start` is running too — `composer dev` doesn't start it, so use `composer dev:horizon` or run it in another terminal. The `[vite] tunnel mode active` banner prints the resolved env at boot. To verify it's wired end-to-end, open `URL_A/activity` and trigger a webhook event (or push a commit to a synced repo) — the row should prepend instantly. If it doesn't, the rail and `/activity` page show a "Live updates offline" pill and page-load reads still surface the latest events. Named tunnels make this triple substantially less painful.
 
 Local-only dev (no tunnel) is unaffected — leave `VITE_DEV_SERVER_URL` empty and Vite behaves exactly as before.
 
