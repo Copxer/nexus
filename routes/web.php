@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\GithubConnectionController;
+use App\Http\Controllers\GithubRepositoryImportController;
 use App\Http\Controllers\OverviewController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProjectController;
@@ -37,6 +38,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('integrations.github.callback');
     Route::delete('/integrations/github', [GithubConnectionController::class, 'destroy'])
         ->name('integrations.github.disconnect');
+
+    // Project-scoped GitHub repository import flow (spec 014).
+    Route::get('/projects/{project}/repositories/import', [GithubRepositoryImportController::class, 'index'])
+        ->name('projects.repositories.import.index');
+    Route::post('/projects/{project}/repositories/import', [GithubRepositoryImportController::class, 'store'])
+        ->name('projects.repositories.import.store');
 });
 
 Route::middleware('auth')->group(function () {
