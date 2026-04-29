@@ -46,6 +46,11 @@ return [
         // read access to public + private repository metadata + issues +
         // PRs. Adjust when feature scope expands.
         'scopes' => ['read:user', 'repo'],
+        // Shared secret configured on the GitHub App webhook. Used to
+        // verify `X-Hub-Signature-256` on incoming deliveries (spec 017).
+        // Empty string fails closed — no signed request is ever accepted
+        // without this set.
+        'webhook_secret' => env('GITHUB_WEBHOOK_SECRET', ''),
     ],
 
 ];

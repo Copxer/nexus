@@ -9,6 +9,7 @@ use App\Http\Controllers\RepositoryController;
 use App\Http\Controllers\RepositoryIssuesSyncController;
 use App\Http\Controllers\RepositoryPullRequestsSyncController;
 use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\Webhooks\GitHubWebhookController;
 use App\Http\Controllers\WorkItemController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -61,6 +62,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Spec 016 — unified Work Items queue (issues + PRs).
     Route::get('/work-items', WorkItemController::class)->name('work-items.index');
 });
+
+// Spec 017 — GitHub webhooks (no auth/CSRF; signature-verified inside).
+Route::post('/webhooks/github', GitHubWebhookController::class)
+    ->name('webhooks.github');
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');

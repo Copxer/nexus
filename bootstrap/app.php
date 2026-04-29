@@ -19,7 +19,14 @@ return Application::configure(basePath: dirname(__DIR__))
             AddLinkHeadersForPreloadedAssets::class,
         ]);
 
-        //
+        // GitHub webhooks don't carry session cookies / CSRF tokens —
+        // they're authenticated via `X-Hub-Signature-256` (verified in
+        // GitHubWebhookController). Excluding here prevents Laravel from
+        // 419'ing the unauthenticated POST before our signature check
+        // runs.
+        $middleware->preventRequestForgery(except: [
+            'webhooks/github',
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
