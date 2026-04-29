@@ -86,8 +86,8 @@ export function getCommands(): Command[] {
             label: 'Go to Projects',
             group: 'navigation',
             icon: FolderKanban,
-            disabled: true,
-            soonLabel: 'Phase 1',
+            keywords: ['list', 'manage'],
+            run: () => router.visit(route('projects.index')),
         },
         {
             id: 'go-repositories',
@@ -176,8 +176,8 @@ export function getCommands(): Command[] {
             label: 'Create project',
             group: 'actions',
             icon: Plus,
-            disabled: true,
-            soonLabel: 'Phase 1',
+            keywords: ['new', 'add'],
+            run: () => router.visit(route('projects.create')),
         },
         {
             id: 'connect-github',

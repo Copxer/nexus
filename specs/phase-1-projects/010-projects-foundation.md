@@ -163,6 +163,22 @@ Dated notes as work progresses.
 - Spec drafted; scope confirmed (6 decisions locked: 3-char alpha slug suffix, token-aligned colors, curated 12 icons, all 7 tabs, skip soft deletes, seed 4).
 - Opened issue [#24](https://github.com/Copxer/nexus/issues/24) and branch `spec/010-projects-foundation` off `main`.
 - Created `specs/phase-1-projects/README.md` and `specs/phase-1-projects/010-projects-foundation.md` to start Phase 1.
+- Implemented:
+    - **Migration + enums + model + factory.** `projects` table with all §8.2 fields. `App\Enums\ProjectStatus` and `ProjectPriority` (string-backed; both expose a `badgeTone()` for the dashboard). `App\Models\Project` with slug auto-gen on `creating` (3-char `Str::random` suffix on collision), `owner` belongsTo, enum casts. Factory exercises every enum value and uses a curated name pool.
+    - **Policy + provider.** `App\Policies\ProjectPolicy` (owner-only `update`/`delete`; `viewAny`/`view`/`create` open to verified users). Registered via `Gate::policy()` in `AppServiceProvider::boot()`. The base `Controller` class gained `AuthorizesRequests` trait (Laravel 11+ no longer ships it by default).
+    - **Form requests + controller + routes.** `Store/UpdateProjectRequest` validate enum membership + length + token-restricted color and icon. `ProjectController` resourceful 7 actions; `index` eager-loads `owner` + orders by `last_activity_at desc`; `transform()` shapes the JSON for all three pages (Index/Show/Edit). `routes/web.php` adds `Route::resource('projects')` under `auth+verified`.
+    - **Vue pages.** `Index` (responsive 1/2/3-col card grid + empty state), `Create` and `Edit` share `Pages/Projects/Partials/ProjectForm.vue` (token-aligned color swatches, 12-icon picker, status/priority radio pills, name/description/environment text inputs), `Show` (header + 7-tab nav with Overview + Settings active, the other 5 rendering phase-pending placeholders pointing to their owning specs/phases).
+    - **Sidebar + palette activation.** Projects nav item drops "Soon" + sets `routeName: 'projects.index'`. Sidebar's `isActive` now also matches `projects.*` so child routes (Show/Edit) keep the nav lit. Palette's `go-projects` and `create-project` lose their `disabled` flag and gain real `run` handlers.
+    - **Icon registry.** New `resources/js/lib/projectIcons.ts` whitelists the 12 curated lucide icons + a `projectIcon(name)` resolver. Keeps the bundle tree-shakeable (vs `import * as LucideIcons`).
+    - **Seeder.** `ProjectSeeder` drops 4 sample projects (Customer Portal v3 / Billing API / Edge Cache Pilot / Legacy Reporting Suite) with varied statuses + priorities, owned by the first existing user. Note: `DatabaseSeeder` uses `WithoutModelEvents` which disables the `creating` slug hook, so the seeder sets `slug` explicitly via `Str::slug` — robust regardless of how the seeder is invoked.
+    - **PHP feature tests.** Three test files: `ProjectControllerTest` (7 cases — index, create, store, show, edit, update, destroy), `ProjectPolicyTest` (4 cases — non-owner blocked, owner allowed, verified can view, unverified blocked), `ProjectModelTest` (3 cases — slug auto-gen, collision suffix, fallback when name has no slug chars).
+- Manual UX walk in Playwright Chrome (1440×900):
+    - `/projects` index renders all 4 seeded cards with status + priority badges, owner avatars, last-activity stamps. Sidebar `Projects` nav lit cyan.
+    - `/projects/create` renders the form with all 4 picker types working. Filled out a "Spec 010 Demo" project (Critical priority, magenta color, Rocket icon).
+    - Submitted → redirected to `/projects/spec-010-demo` with the slug auto-generated.
+    - Show page: header with magenta-glowing Rocket icon, ACTIVE/CRITICAL badges, owner + "0 seconds ago" activity, 7-tab nav. Overview tab body shows Environment / Health score / Slug. Repositories tab renders the "Coming up later — populates with real data when spec 011 ships." placeholder.
+    - Cmd+K palette → "Create project" filters cleanly with cyan highlight, no "Soon" pill. Pressed Enter → navigated to `/projects/create`.
+- Pipeline: Pint clean, vue-tsc clean, `npm run build` green. **20 tests pass with 134 assertions** (7 new controller + 4 policy + 3 model + 6 existing smoke/heartbeat/horizon-access).
 
 ## Decisions (locked 2026-04-28)
 - **Slug strategy — 3-char alpha suffix.** `Str::slug($name)` plus a 3-char alpha suffix on collision (e.g. `customer-portal-v3-a4f`). Distinguishable, doesn't leak project count.
