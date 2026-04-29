@@ -20,6 +20,10 @@ interface GithubConnectionShape {
     expires_at: string | null;
     is_token_valid: boolean;
     scopes: string[];
+    recent_repositories: {
+        count: number;
+        last_synced_at: string | null;
+    };
 }
 
 const props = defineProps<{
@@ -240,6 +244,25 @@ const disconnect = () => {
                         </dd>
                     </div>
                 </dl>
+
+                <!-- Repository sync indicator (spec 014). Only renders
+                     once at least one repo is linked under the user's
+                     projects — keeps the card honest pre-import. -->
+                <p
+                    v-if="github !== null && github.recent_repositories.count > 0"
+                    class="rounded-lg border border-border-subtle bg-background-panel-hover/40 p-4 text-xs text-text-muted"
+                >
+                    <span class="font-mono text-text-secondary">
+                        {{ github.recent_repositories.count }}
+                    </span>
+                    {{ github.recent_repositories.count === 1 ? 'repository' : 'repositories' }}
+                    linked across your projects.
+                    <span v-if="github.recent_repositories.last_synced_at">
+                        Last sync
+                        <span class="font-mono text-text-secondary">
+                            {{ github.recent_repositories.last_synced_at }}</span>.
+                    </span>
+                </p>
 
                 <!-- Disconnected helper text + roadmap pointer -->
                 <p

@@ -64,6 +64,7 @@ class ProjectController extends Controller
             'project' => $this->transform($project),
             'canUpdate' => $request->user()?->can('update', $project) ?? false,
             'canDelete' => $request->user()?->can('delete', $project) ?? false,
+            'hasGithubConnection' => $request->user()?->githubConnection !== null,
             'repositories' => $project->repositories->map(fn ($repo) => [
                 'id' => $repo->id,
                 'owner' => $repo->owner,

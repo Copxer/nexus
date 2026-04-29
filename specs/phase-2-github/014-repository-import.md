@@ -126,6 +126,8 @@ Dated notes as work progresses.
 ### 2026-04-29
 - Spec drafted; scope confirmed (7 decisions locked: GitHubClient takes GithubConnection, single-page pagination cap, per-row Import, full sync-status lifecycle, Queue::fake + direct handler test, single typed exception, on-401 clear token + flag expired).
 - Opened issue [#36](https://github.com/Copxer/nexus/issues/36) and branch `spec/014-repository-import` off `main`.
+- Implementation complete: `GitHubApiException`, `GitHubClient`, `SyncGitHubRepositoryJob`, `ImportRepositoryAction`, `GithubRepositoryImportController` + routes, `Pages/Repositories/Import.vue`, Project Show CTA, Settings indicator. 4 feature test files, 88 tests + 395 assertions green. Pint/vue-tsc/build clean.
+- Manual UX walk via Playwright: Project Show Repositories tab renders the new "Import from GitHub" CTA next to the manual link form; Settings card surfaces "9 repositories linked across your projects. Last sync 13 minutes ago." with the seeded fake connection.
 
 ## Decisions (locked 2026-04-29)
 - **GitHubClient takes a `GithubConnection`.** Explicit, easy to mock, fail-fast.

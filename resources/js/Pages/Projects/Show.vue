@@ -63,6 +63,7 @@ const props = defineProps<{
     canUpdate: boolean;
     canDelete: boolean;
     repositories: RepositoryRow[];
+    hasGithubConnection: boolean;
 }>();
 
 const linkForm = useForm({
@@ -382,35 +383,72 @@ const confirmDelete = () => {
                 aria-label="Repositories"
                 class="flex flex-col gap-4"
             >
-                <!-- Manual link form (project owner only) -->
-                <form
-                    v-if="canUpdate"
-                    class="glass-card flex flex-col gap-3 p-5 sm:flex-row sm:items-end"
-                    @submit.prevent="linkRepository"
-                >
-                    <div class="flex-1">
-                        <InputLabel
-                            for="repository-input"
-                            value="Link a GitHub repository"
-                        />
-                        <TextInput
-                            id="repository-input"
-                            v-model="linkForm.repository"
-                            type="text"
-                            class="mt-1 block w-full"
-                            placeholder="https://github.com/owner/name  or  owner/name"
-                            autocomplete="off"
-                        />
-                        <InputError
-                            class="mt-2"
-                            :message="linkForm.errors.repository"
-                        />
-                    </div>
-                    <PrimaryButton :disabled="linkForm.processing">
-                        <Plus class="me-1 h-4 w-4" aria-hidden="true" />
-                        Link repository
-                    </PrimaryButton>
-                </form>
+                <!-- Manual link form (project owner only) + Import-from-GitHub
+                     CTA when the user has a connection wired up. -->
+                <div v-if="canUpdate" class="flex flex-col gap-3">
+                    <Link
+                        v-if="hasGithubConnection"
+                        :href="route('projects.repositories.import.index', project.slug)"
+                        class="glass-card flex items-center justify-between gap-4 p-5 transition hover:border-accent-cyan/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
+                    >
+                        <div class="flex items-center gap-3">
+                            <span
+                                class="flex h-10 w-10 items-center justify-center rounded-xl border border-border-subtle bg-background-panel-hover"
+                            >
+                                <GitBranch
+                                    class="h-5 w-5 text-accent-purple"
+                                    aria-hidden="true"
+                                />
+                            </span>
+                            <div>
+                                <p class="text-sm font-semibold text-text-primary">
+                                    Import from GitHub
+                                </p>
+                                <p class="text-[11px] text-text-muted">
+                                    Pick from the repositories your connected
+                                    GitHub account can see.
+                                </p>
+                            </div>
+                        </div>
+                        <span
+                            class="inline-flex items-center gap-1 text-xs font-semibold text-accent-cyan"
+                        >
+                            Browse
+                            <ChevronLeft
+                                class="h-3.5 w-3.5 rotate-180"
+                                aria-hidden="true"
+                            />
+                        </span>
+                    </Link>
+
+                    <form
+                        class="glass-card flex flex-col gap-3 p-5 sm:flex-row sm:items-end"
+                        @submit.prevent="linkRepository"
+                    >
+                        <div class="flex-1">
+                            <InputLabel
+                                for="repository-input"
+                                value="Link a GitHub repository manually"
+                            />
+                            <TextInput
+                                id="repository-input"
+                                v-model="linkForm.repository"
+                                type="text"
+                                class="mt-1 block w-full"
+                                placeholder="https://github.com/owner/name  or  owner/name"
+                                autocomplete="off"
+                            />
+                            <InputError
+                                class="mt-2"
+                                :message="linkForm.errors.repository"
+                            />
+                        </div>
+                        <PrimaryButton :disabled="linkForm.processing">
+                            <Plus class="me-1 h-4 w-4" aria-hidden="true" />
+                            Link repository
+                        </PrimaryButton>
+                    </form>
+                </div>
 
                 <!-- Linked repositories list -->
                 <div
