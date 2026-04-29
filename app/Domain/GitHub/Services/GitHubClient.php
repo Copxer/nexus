@@ -130,6 +130,44 @@ class GitHubClient
     }
 
     /**
+     * GET /repos/{owner}/{name}/pulls — pull requests only (separate
+     * endpoint from `/issues`, which fans in PRs as a side-effect).
+     *
+     * `state=all` so closed + merged PRs land locally too. GitHub's
+     * `/pulls` endpoint does NOT support `?since=`, so unlike
+     * `listIssues` we always full-fetch the most-recently-updated 100.
+     */
+    public function listPullRequests(
+        string $fullName,
+        int $perPage = self::DEFAULT_PER_PAGE,
+    ): array {
+        try {
+            $response = $this->request()
+                ->get(self::BASE_URL."/repos/{$fullName}/pulls", [
+                    'state' => 'all',
+                    'sort' => 'updated',
+                    'direction' => 'desc',
+                    'per_page' => max(1, min($perPage, 100)),
+                    'page' => 1,
+                ]);
+
+            if ($response->failed()) {
+                throw GitHubApiException::fromResponse(
+                    $response,
+                    "GitHub /repos/{$fullName}/pulls failed",
+                );
+            }
+
+            return (array) $response->json();
+        } catch (RequestException $e) {
+            throw GitHubApiException::fromTransport(
+                $e,
+                "GitHub /repos/{$fullName}/pulls failed",
+            );
+        }
+    }
+
+    /**
      * Shared HTTP client config — auth + pinned API version + UA.
      * Note: we don't call `->throw()` on the PendingRequest; the
      * callers check `$response->failed()` and route the failure into

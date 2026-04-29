@@ -7,7 +7,9 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\RepositoryController;
 use App\Http\Controllers\RepositoryIssuesSyncController;
+use App\Http\Controllers\RepositoryPullRequestsSyncController;
 use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\WorkItemController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -50,6 +52,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/repositories/{repository}/issues/sync', RepositoryIssuesSyncController::class)
         ->where('repository', '[\w.-]+/[\w.-]+')
         ->name('repositories.issues.sync');
+
+    // Spec 016 — manual "Run sync" button on the Repository PRs tab.
+    Route::post('/repositories/{repository}/pulls/sync', RepositoryPullRequestsSyncController::class)
+        ->where('repository', '[\w.-]+/[\w.-]+')
+        ->name('repositories.pulls.sync');
+
+    // Spec 016 — unified Work Items queue (issues + PRs).
+    Route::get('/work-items', WorkItemController::class)->name('work-items.index');
 });
 
 Route::middleware('auth')->group(function () {

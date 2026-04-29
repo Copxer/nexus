@@ -3,7 +3,9 @@
 namespace Tests\Feature\Repositories;
 
 use App\Enums\GithubIssueState;
+use App\Enums\GithubPullRequestState;
 use App\Models\GithubIssue;
+use App\Models\GithubPullRequest;
 use App\Models\Project;
 use App\Models\Repository;
 use App\Models\User;
@@ -83,6 +85,39 @@ class RepositoryControllerTest extends TestCase
                     ->where('issues.0.number', 42)
                     ->where('issues.0.title', 'Login bug')
                     ->where('issues.0.state', 'open')
+            );
+    }
+
+    public function test_show_returns_pull_requests_in_the_payload(): void
+    {
+        $user = $this->verifiedUser();
+        $project = Project::factory()->create(['owner_user_id' => $user->id]);
+        $repo = Repository::factory()->create([
+            'project_id' => $project->id,
+            'full_name' => 'nexus-org/nexus-web',
+        ]);
+        GithubPullRequest::factory()->create([
+            'repository_id' => $repo->id,
+            'number' => 7,
+            'title' => 'Refactor auth',
+            'state' => GithubPullRequestState::Open->value,
+            'base_branch' => 'main',
+            'head_branch' => 'topic/auth',
+            'merged' => false,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('repositories.show', $repo))
+            ->assertSuccessful()
+            ->assertInertia(
+                fn (AssertableInertia $page) => $page
+                    ->has('pullRequests', 1)
+                    ->where('pullRequests.0.number', 7)
+                    ->where('pullRequests.0.title', 'Refactor auth')
+                    ->where('pullRequests.0.state', 'open')
+                    ->where('pullRequests.0.base_branch', 'main')
+                    ->where('pullRequests.0.head_branch', 'topic/auth')
+                    ->has('pullRequestsSync')
             );
     }
 
