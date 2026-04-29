@@ -21,7 +21,7 @@ Status legend: ⬜ not started · 🟡 in progress · 🟢 done · 🔴 blocked
 | 0 | Foundation (auth, layout, static overview) | 🟢 | 9/9 specs done. |
 | 1 | Projects & Repositories | 🟢 | 3/3 specs done. |
 | 2 | GitHub Integration MVP | 🟢 | 4/4 specs done — connection, repository import + sync, issues sync, PRs + unified Work Items page. |
-| 3 | GitHub Webhooks & Activity Feed | 🟡 | 2/3 specs done (017, 018). Next: 019 real-time broadcasting via Reverb. |
+| 3 | GitHub Webhooks & Activity Feed | 🟢 | 3/3 specs done (017–019). Phase complete. |
 | 4 | Deployments & CI/CD | ⬜ | — |
 | 5 | Website Monitoring | ⬜ | — |
 | 6 | Docker Host Agent MVP | ⬜ | — |
@@ -44,9 +44,10 @@ After Phase 2:
 - Manual "Run sync" buttons everywhere a sync job exists.
 - Controller flash messages (`->with('status'|'error', …)`) render as a dismissable top banner in `AppLayout`, so failed actions (OAuth callbacks, sync triggers) surface to the user instead of failing silently. Silent OAuth callback branches also `Log::warning` for postmortem.
 
-After Phase 3 (in progress):
+After Phase 3 (complete):
 - Spec 017 (done) — GitHub webhook ingestion endpoint at `POST /webhooks/github`. Verifies `X-Hub-Signature-256` (HMAC-SHA-256, timing-safe), stores deliveries idempotently, dispatches an async job, routes to per-event handlers. `issues` and `pull_request` events update the local mirrors and create `activity_events` rows.
-- Spec 018 (done) — Activity Feed UI. `RecentActivityForUserQuery` powers a shared `activity.recent` Inertia prop registered in `HandleInertiaRequests::share()`, so every authenticated page lights up the right rail with the latest events without per-controller plumbing. New `/activity` page (linked from the sidebar between Alerts and Settings) shows up to 100 events. Page-load fresh — real-time broadcasting via Reverb is spec 019.
+- Spec 018 (done) — Activity Feed UI. `RecentActivityForUserQuery` powers a shared `activity.recent` Inertia prop registered in `HandleInertiaRequests::share()`, so every authenticated page lights up the right rail with the latest events without per-controller plumbing. New `/activity` page (linked from the sidebar between Alerts and Settings) shows up to 100 events.
+- Spec 019 (done) — Real-time broadcasting via Reverb. `CreateActivityEventAction` dispatches `ActivityEventCreated` (a `ShouldBroadcastNow` event on a private `users.{id}.activity` channel) every time a row lands. Echo + Pusher are wired in `bootstrap.ts`; the `useActivityFeed` composable (`resources/js/lib/`) seeds from the shared prop and prepends broadcast events into the rail and the `/activity` page in real time. Three new webhook handlers (`workflow_run`, `push`, `release`) extend the spec-017 ingestion: workflow runs surface as `workflow.{succeeded,failed}`, releases as `release.published`, and pushes silently update `repositories.last_pushed_at` (no activity row — too noisy). When the websocket isn't connected the rail and the activity page show a small "Live updates offline" pill; page-load reads still surface the latest data.
 
 ## Local development
 
@@ -149,7 +150,18 @@ Caveats with quick tunnels (`cloudflared tunnel --url ...`):
 - TLS terminates at the tunnel — `php artisan serve` only sees plain HTTP locally. Two things tame this:
     - `AppServiceProvider::boot()` calls `URL::forceScheme('https')` whenever `APP_URL` starts with `https://` so generated links don't trigger Mixed Content blocks. If you ever swap to a non-HTTPS tunnel, change `APP_URL` to `http://...` to disable the override.
     - `bootstrap/app.php` trusts loopback proxies (`127.0.0.1`, `::1`), so cloudflared's `X-Forwarded-Proto: https` is honored. Without this, **signed URLs** (email verification, password reset) verify the signature against an `http://` URL while it was signed against `https://`, and every click 403's "Invalid signature." Loopback-only trust is safe in prod too — anything that can connect from loopback already has direct app access.
-- Reverb (websockets, port 8080) isn't covered by this setup. When real-time features become essential, expose Reverb via a third tunnel and update the `VITE_REVERB_*` block in `.env` to match.
+- Reverb (websockets, port 8080) is wired by spec 019 — set up a **third tunnel** when you want the activity feed to update without page refresh:
+    ```bash
+    cloudflared tunnel --url http://localhost:8080
+    # → https://<random>.trycloudflare.com   (call this URL_C)
+    ```
+    Then in `.env`:
+    ```env
+    VITE_REVERB_HOST=URL_C.trycloudflare.com
+    VITE_REVERB_SCHEME=https
+    VITE_REVERB_PORT=443
+    ```
+    Restart `composer run dev`. The `[vite] tunnel mode active` banner already prints the resolved env. Without this, the rail's "Live updates offline" pill lights up and the page falls back to load-time freshness only — page-load reads still surface the latest events. Named tunnels make this triple substantially less painful.
 
 Local-only dev (no tunnel) is unaffected — leave `VITE_DEV_SERVER_URL` empty and Vite behaves exactly as before.
 

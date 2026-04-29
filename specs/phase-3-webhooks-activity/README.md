@@ -11,13 +11,13 @@ Make GitHub updates near real-time. After this phase, importing a repo wires a G
 |---|------|--------|
 | 017 | GitHub webhook ingestion + activity events (receiver, signature verification, delivery storage, `issues` + `pull_request` handlers, `activity_events` table + `CreateActivityEventAction`) | 🟢 |
 | 018 | Activity Feed UI (replace AppLayout right-rail mock with real activity, `ActivityFeed.vue` + `ActivityFeedItem.vue`, page-load fresh) | 🟢 |
-| 019 | Real-time broadcasting via Reverb (Echo wiring, `ActivityEventCreated` broadcast, extend handler set to `workflow_run`/`push`/`release`) | ⬜ |
+| 019 | Real-time broadcasting via Reverb (Echo wiring, `ActivityEventCreated` broadcast, extend handler set to `workflow_run`/`push`/`release`) | 🟢 |
 
 ## Acceptance criteria (phase-level)
-- [ ] GitHub webhook endpoint at `POST /webhooks/github` accepts signed payloads.
-- [ ] Invalid `X-Hub-Signature-256` signatures are rejected with 401 and never stored.
-- [ ] Duplicate deliveries (same `X-GitHub-Delivery` header) are detected and not double-processed.
-- [ ] Issue and PR webhook events update the local `github_issues` / `github_pull_requests` rows and create matching `activity_events`.
-- [ ] Activity Feed UI surfaces real events on the AppLayout right-rail (and on a dedicated activity page if 018 ships one).
-- [ ] UI updates in real time when new events land — no manual refresh needed.
-- [ ] No real GitHub credentials in CI; tests use signed fixture payloads + `Queue::fake()`.
+- [x] GitHub webhook endpoint at `POST /webhooks/github` accepts signed payloads.
+- [x] Invalid `X-Hub-Signature-256` signatures are rejected with 401 and never stored.
+- [x] Duplicate deliveries (same `X-GitHub-Delivery` header) are detected and not double-processed.
+- [x] Issue and PR webhook events update the local `github_issues` / `github_pull_requests` rows and create matching `activity_events`.
+- [x] Activity Feed UI surfaces real events on the AppLayout right-rail and on the dedicated `/activity` page.
+- [x] UI updates in real time when new events land — no manual refresh needed (`useActivityFeed` composable + `ActivityEventCreated` broadcast).
+- [x] No real GitHub credentials in CI; tests use signed fixture payloads + `Queue::fake()` / `Event::fake()`.

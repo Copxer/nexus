@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import ActivityFeed from '@/Components/Activity/ActivityFeed.vue';
 import type { ActivityEvent } from '@/types';
-import { Activity, Filter, X } from 'lucide-vue-next';
+import { Activity, Filter, WifiOff, X } from 'lucide-vue-next';
 
 const props = withDefaults(
     defineProps<{
@@ -16,10 +16,19 @@ const props = withDefaults(
          * etc.) get the empty-state automatically.
          */
         events?: ActivityEvent[];
+        /**
+         * Reverb websocket connection state (spec 019). When `false` the
+         * header shows a small "offline" pill so the user knows the page
+         * is page-load-fresh-only and won't auto-update. When `null`
+         * (default) realtime isn't being attempted on this page and the
+         * pill stays hidden.
+         */
+        realtimeConnected?: boolean | null;
     }>(),
     {
         variant: 'column',
         events: () => [],
+        realtimeConnected: null,
     },
 );
 
@@ -48,6 +57,14 @@ const hasEvents = () => props.events.length > 0;
                 >
                     Activity
                 </h2>
+                <span
+                    v-if="realtimeConnected === false"
+                    class="inline-flex items-center gap-1 rounded-full border border-status-warning/40 bg-status-warning/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.18em] text-status-warning"
+                    title="Live updates offline. Refresh the page to see the latest events."
+                >
+                    <WifiOff class="h-3 w-3" aria-hidden="true" />
+                    Offline
+                </span>
             </div>
             <div class="flex items-center gap-1">
                 <button

@@ -3,6 +3,7 @@ import RightActivityRail from '@/Components/Activity/RightActivityRail.vue';
 import CommandPalette from '@/Components/CommandPalette/CommandPalette.vue';
 import Sidebar from '@/Components/Sidebar/Sidebar.vue';
 import TopBar from '@/Components/TopBar/TopBar.vue';
+import { useActivityFeed } from '@/lib/useActivityFeed';
 import type { ActivityEvent, PageProps } from '@/types';
 import { router, usePage } from '@inertiajs/vue3';
 import { AlertTriangle, CheckCircle2, X } from 'lucide-vue-next';
@@ -47,14 +48,19 @@ router.on('navigate', syncFlash);
 // Activity feed sourcing: an **explicit** prop (including an explicit
 // empty array, to force the empty-state) wins. When the prop is absent
 // entirely, fall back to the shared `activity.recent` Inertia prop
-// populated by `HandleInertiaRequests::share()`. Reactive on every
-// navigation so a fresh page sees fresh events without flickering.
-const resolvedActivityEvents = computed<ActivityEvent[]>(() => {
+// populated by `HandleInertiaRequests::share()`. The composable seeds
+// from this on mount + navigation, then prepends Reverb broadcasts on
+// top so the rail updates in real time without losing page-load
+// freshness as the source of truth.
+const seedActivityEvents = (): ActivityEvent[] => {
     if (props.activityEvents !== undefined) {
         return props.activityEvents;
     }
     return page.props.activity?.recent ?? [];
-});
+};
+
+const { events: resolvedActivityEvents, connected: activityRealtimeConnected } =
+    useActivityFeed({ seed: seedActivityEvents, limit: 20 });
 
 const hasFlash = computed(
     () => flashStatus.value !== null || flashError.value !== null,
@@ -228,7 +234,11 @@ onBeforeUnmount(() => {
 
         <!-- Persistent activity rail (≥ 2xl) -->
         <div class="relative z-30 hidden 2xl:flex">
-            <RightActivityRail variant="column" :events="resolvedActivityEvents" />
+            <RightActivityRail
+                variant="column"
+                :events="resolvedActivityEvents"
+                :realtime-connected="activityRealtimeConnected"
+            />
         </div>
 
         <!-- Activity rail drawer (md – 2xl) -->
@@ -265,6 +275,7 @@ onBeforeUnmount(() => {
                 <RightActivityRail
                     variant="drawer"
                     :events="resolvedActivityEvents"
+                    :realtime-connected="activityRealtimeConnected"
                     @close="activityRailOpen = false"
                 />
             </div>

@@ -3,6 +3,7 @@
 namespace App\Domain\Activity\Actions;
 
 use App\Enums\ActivitySeverity;
+use App\Events\ActivityEventCreated;
 use App\Models\ActivityEvent;
 use Illuminate\Support\Carbon;
 use InvalidArgumentException;
@@ -52,7 +53,7 @@ class CreateActivityEventAction
             $severity = $severity->value;
         }
 
-        return ActivityEvent::query()->create([
+        $activityEvent = ActivityEvent::query()->create([
             'repository_id' => $attrs['repository_id'] ?? null,
             'actor_login' => $attrs['actor_login'] ?? null,
             'source' => $attrs['source'] ?? 'github',
@@ -63,5 +64,13 @@ class CreateActivityEventAction
             'metadata' => $attrs['metadata'] ?? [],
             'occurred_at' => $occurredAt,
         ]);
+
+        // Spec 019 — fan out to subscribers via Reverb. The event resolves
+        // its broadcast channel from the row's repository → project →
+        // owner_user_id. System-emitted events (no repository) no-op the
+        // broadcast.
+        ActivityEventCreated::dispatch($activityEvent);
+
+        return $activityEvent;
     }
 }
