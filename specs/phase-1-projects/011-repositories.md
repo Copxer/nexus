@@ -1,12 +1,13 @@
 ---
 spec: repositories
 phase: 1-projects
-status: in-progress
+status: done
 owner: yoany
 created: 2026-04-28
 updated: 2026-04-28
 issue: https://github.com/Copxer/nexus/issues/27
 branch: spec/011-repositories
+pr: https://github.com/Copxer/nexus/pull/28
 ---
 
 # 011 — Repositories (model + manual link + index/show + sidebar/palette activation)
