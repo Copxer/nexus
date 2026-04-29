@@ -1,12 +1,13 @@
 ---
 spec: github-app-connection
 phase: 2-github
-status: in-progress
+status: done
 owner: yoany
 created: 2026-04-29
 updated: 2026-04-29
 issue: https://github.com/Copxer/nexus/issues/33
 branch: spec/013-github-app-connection
+pr: https://github.com/Copxer/nexus/pull/34
 ---
 
 # 013 — GitHub App connection (OAuth flow, encrypted token storage, Settings/Integrations panel)
