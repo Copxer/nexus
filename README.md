@@ -113,6 +113,45 @@ GitHub validates the OAuth callback host **exactly**. If your `GITHUB_OAUTH_REDI
 
 Spec 017's webhook ingestion needs GitHub to be able to reach your dev server. Point an ngrok (or Cloudflare Tunnel) tunnel at port 8000 and set the GitHub App's Webhook URL to `https://<your-tunnel>/webhooks/github`. The `X-Hub-Signature-256` header is verified against `GITHUB_WEBHOOK_SECRET` — if that doesn't match the value configured on the App, every delivery 401's and never lands in the database.
 
+### Browsing the dev UI through a Cloudflare tunnel
+
+Sometimes you want to browse the running app from a public URL — to demo the dashboard, hit it from another device, or run an OAuth callback that GitHub can reach. `composer run dev` boots two long-running HTTP servers — Laravel on `:8000` and Vite on `:5173` — and the browser needs to talk to **both**. Tunneling only port 8000 will load the HTML but every Vite asset (`@vite/client`, `app.ts`, …) will 404 / CORS-fail because the page tries to fetch them from `localhost:5173`.
+
+Set up two cloudflared tunnels and point Vite at its public URL:
+
+```bash
+# Terminal 1 — Laravel
+cloudflared tunnel --url http://localhost:8000
+# → https://<random>.trycloudflare.com   (call this URL_A)
+
+# Terminal 2 — Vite
+cloudflared tunnel --url http://localhost:5173
+# → https://<random>.trycloudflare.com   (call this URL_B)
+```
+
+Then update `.env`:
+
+```env
+APP_URL=https://URL_A.trycloudflare.com
+VITE_DEV_SERVER_URL=https://URL_B.trycloudflare.com
+```
+
+…and **restart `composer run dev`**. Vite reads `VITE_DEV_SERVER_URL` once at boot; `vite.config.js` flips into tunnel mode when it's set — binds `0.0.0.0`, locks port 5173, allows cross-origin requests, and emits asset URLs at the public host so the browser can fetch them through the tunnel. You'll see a `[vite] tunnel mode active — origin=…` line in the `composer run dev` output (prefixed `vite:`); if it's missing, Vite didn't pick up `VITE_DEV_SERVER_URL` and you'll see CORS / 403 errors in the browser.
+
+Caveats with quick tunnels (`cloudflared tunnel --url ...`):
+
+- The tunnel URL changes on every run. Re-edit `.env` and restart `composer run dev` each time.
+- The OAuth callback URL configured in your GitHub App **must** match the new `APP_URL`. Update the GitHub App settings every time the Laravel tunnel URL changes — or use a [named tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-apps) bound to a stable hostname so the URL stays put.
+- HMR over `wss://*.trycloudflare.com` can drop intermittently — when it does, asset URLs are absolute so a manual refresh still serves the latest code. Named tunnels are more stable.
+- If port 5173 is already in use, set `VITE_DEV_SERVER_PORT=5174` (or any free port) in `.env` and point your second `cloudflared` at the same port.
+- The default Laravel `APP_URL`-derived `SESSION_DOMAIN`/`SANCTUM_STATEFUL_DOMAINS` won't include your tunnel hostname. If session-based requests start 419'ing through the tunnel, set `SESSION_DOMAIN=` (blank) and add the tunnel hostname to `SANCTUM_STATEFUL_DOMAINS`.
+- TLS terminates at the tunnel — `php artisan serve` only sees plain HTTP locally. Two things tame this:
+    - `AppServiceProvider::boot()` calls `URL::forceScheme('https')` whenever `APP_URL` starts with `https://` so generated links don't trigger Mixed Content blocks. If you ever swap to a non-HTTPS tunnel, change `APP_URL` to `http://...` to disable the override.
+    - `bootstrap/app.php` trusts loopback proxies (`127.0.0.1`, `::1`), so cloudflared's `X-Forwarded-Proto: https` is honored. Without this, **signed URLs** (email verification, password reset) verify the signature against an `http://` URL while it was signed against `https://`, and every click 403's "Invalid signature." Loopback-only trust is safe in prod too — anything that can connect from loopback already has direct app access.
+- Reverb (websockets, port 8080) isn't covered by this setup. When real-time features become essential, expose Reverb via a third tunnel and update the `VITE_REVERB_*` block in `.env` to match.
+
+Local-only dev (no tunnel) is unaffected — leave `VITE_DEV_SERVER_URL` empty and Vite behaves exactly as before.
+
 ## Tests + linting
 
 ```bash

@@ -27,6 +27,19 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->preventRequestForgery(except: [
             'webhooks/github',
         ]);
+
+        // Trust loopback proxies. Required for cloudflared / ngrok dev
+        // tunnels — they terminate TLS and forward plain HTTP from
+        // 127.0.0.1 with `X-Forwarded-Proto: https`. Without this,
+        // signed URLs (email verification, password reset) verify the
+        // signature against the request's http:// URL while it was
+        // signed against https://, and every click 403's "Invalid
+        // signature." Loopback-only is safe in prod too — anything that
+        // can connect from loopback already has direct app access.
+        $middleware->trustProxies(at: [
+            '127.0.0.1',
+            '::1',
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
