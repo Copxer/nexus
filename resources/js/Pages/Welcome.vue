@@ -118,14 +118,15 @@ const accentClasses: Record<Capability['accent'], { dot: string; ring: string }>
                     aria-label="Nexus home"
                     class="flex items-center gap-3"
                 >
+                    <!-- Compact mark below `sm` so the wordmark + action
+                         buttons don't crowd phone-width viewports. -->
                     <ApplicationLogo
-                        class="h-10 w-10 fill-current text-accent-cyan drop-shadow-[0_0_18px_rgba(34,211,238,0.55)]"
+                        variant="mark"
+                        class="block h-9 drop-shadow-[0_0_18px_rgba(34,211,238,0.55)] sm:hidden"
                     />
-                    <span
-                        class="text-sm font-semibold uppercase tracking-[0.32em] text-text-secondary"
-                    >
-                        Nexus
-                    </span>
+                    <ApplicationLogo
+                        class="hidden h-10 drop-shadow-[0_0_18px_rgba(34,211,238,0.55)] sm:block"
+                    />
                 </Link>
 
                 <nav v-if="canLogin" class="flex items-center gap-2">

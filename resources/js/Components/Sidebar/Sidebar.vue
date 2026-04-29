@@ -92,13 +92,8 @@ defineEmits<{
                 class="flex items-center gap-3 rounded-lg px-2 py-1 transition hover:bg-background-panel-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
             >
                 <ApplicationLogo
-                    class="h-8 w-8 fill-current text-accent-cyan drop-shadow-[0_0_14px_rgba(34,211,238,0.55)]"
+                    class="h-8 drop-shadow-[0_0_14px_rgba(34,211,238,0.55)]"
                 />
-                <span
-                    class="text-sm font-semibold uppercase tracking-[0.32em] text-text-secondary"
-                >
-                    Nexus
-                </span>
             </Link>
             <button
                 v-if="variant === 'drawer'"
