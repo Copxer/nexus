@@ -43,7 +43,7 @@ const nav: NavItem[] = [
     { label: 'Monitoring', icon: Globe, disabled: true, soonLabel: 'Phase 5' },
     { label: 'Analytics', icon: BarChart3, disabled: true, soonLabel: 'Phase 8' },
     { label: 'Alerts', icon: Bell, disabled: true, soonLabel: 'Phase 7' },
-    { label: 'Settings', icon: SettingsIcon, disabled: true, soonLabel: 'Phase 1' },
+    { label: 'Settings', icon: SettingsIcon, routeName: 'settings.index' },
 ];
 
 // Match the route exactly OR any sibling under the same resource family

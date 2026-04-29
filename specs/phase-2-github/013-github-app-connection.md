@@ -149,6 +149,24 @@ Dated notes as work progresses.
 - Spec drafted; scope confirmed (6 decisions locked: GitHub App + user-to-server OAuth, per-user connection, encrypted token cast, Settings + palette entry points, explicit Reconnect on expiry, Http::fake() only in CI).
 - Opened issue [#33](https://github.com/Copxer/nexus/issues/33) and branch `spec/013-github-app-connection` off `main`.
 - Created `specs/phase-2-github/README.md` and `specs/phase-2-github/013-github-app-connection.md` to start Phase 2.
+- Implemented:
+    - **Migration + model.** `github_connections` table with `user_id` unique FK + GitHub user id/login + encrypted `access_token`/`refresh_token` + expiries + scopes + `connected_at`. `App\Models\GithubConnection` uses Laravel's `'encrypted'` cast on the two token columns plus `$hidden` on them as a defense-in-depth so they don't sneak into Inertia props or `toArray()` output. `User::githubConnection()` hasOne added.
+    - **Service + action.** `App\Domain\GitHub\Services\GitHubOAuthService` exposes `redirectUrl(state)`, `exchangeCode(code)`, `fetchUser(token)` — all HTTP traffic flows through Laravel's `Http` facade so tests use `Http::fake()`. `PersistGithubConnectionAction::execute(user, tokenPayload, userPayload)` is idempotent on re-connect (`updateOrCreate` keyed on `user_id`); converts GitHub's `expires_in` seconds to absolute timestamps; parses the CSV `scope` field into a JSON array.
+    - **Controller + routes.** `GithubConnectionController::{redirect, callback, destroy}` — `redirect` mints a 40-char `Str::random` state and stashes it in the session; `callback` `pull`s the state, hash-equals checks it (constant-time), exchanges the code via the service, fetches the user, persists via the action, redirects to `/settings` with a flash. `destroy` deletes the row. The callback also handles the `?error=…&error_description=…` shape GitHub returns when the user denies.
+    - **Settings.** New `SettingsController::__invoke` returns `Inertia::render('Settings/Index', ['github' => …])` with the connection trimmed to a UI-safe shape (never includes the token). `Pages/Settings/Index.vue` renders an Integrations card with three states (disconnected → "Connect GitHub" CTA, connected → metadata strip with `@username` / connected_at / token expiry / scopes pills + Disconnect, expired → "Reconnect" CTA).
+    - **Sidebar + palette.** Sidebar `Settings` drops `disabled` + uses `routeName: 'settings.index'`. Palette `connect-github` loses `disabled`/`soonLabel` and gains `router.visit(route('integrations.github.connect'))`.
+    - **`config/services.php`** gains a `github` block reading `client_id`/`client_secret`/`redirect`/`scopes` from env. `.env.example` adds `GITHUB_OAUTH_REDIRECT_URI` (the existing `GITHUB_CLIENT_ID`/`GITHUB_CLIENT_SECRET`/`GITHUB_WEBHOOK_SECRET` were already there).
+    - **PHP feature tests** — 4 new files, 16 new cases:
+        - `GitHubOAuthServiceTest` (5) — redirect URL contains client_id/state/scopes/redirect_uri; `exchangeCode` returns the decoded payload from `Http::fake`; rejects GitHub error payloads; `fetchUser` parses the profile; throws on 401.
+        - `GithubConnectionControllerTest` (5) — `redirect` 302's to GitHub with state in session; `callback` rejects mismatched state; happy-path persists; `?error=` query string surfaces as a flash; `destroy` removes the row.
+        - `PersistGithubConnectionActionTest` (3) — first-time create; re-running updates the existing row in place (tokens encrypted at rest, verified via raw `DB::table()` read); copes with payloads missing optional fields.
+        - `SettingsControllerTest` (3) — disconnected state, connected state, response body never contains plaintext tokens.
+- Manual UX walk in Playwright Chrome (1440×900):
+    - `/settings` disconnected: "GitHub" card, muted "DISCONNECTED" badge, "Connect GitHub" CTA, helper text pointing at specs 014–016. Sidebar `Settings` lit (no longer "Soon").
+    - After stubbing a fake `GithubConnection` in tinker: card shows green "CONNECTED" badge, `@octocat` with external-link icon, "6 seconds ago" / "7 hours from now" / scopes pills (read:user / repo). "Disconnect" red button visible.
+    - Disconnect → confirmation dialog → page reverts to disconnected state.
+    - The Connect-GitHub redirect route is verified auth-guarded by curl (302 → /login when unauthenticated). The actual redirect to `https://github.com/login/oauth/authorize?...` is covered by `GithubConnectionControllerTest::test_redirect_sends_user_to_github_with_state_in_session`.
+- Pipeline: Pint clean, vue-tsc clean, `npm run build` green. **67 tests pass with 320 assertions** (16 new GitHub + Settings + 51 pre-existing).
 
 ## Decisions (locked 2026-04-29)
 - **GitHub App with user-to-server OAuth.** Modern, fine-grained permissions, unblocks future org installations. (vs classic OAuth App.)
