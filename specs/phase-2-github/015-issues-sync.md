@@ -1,11 +1,12 @@
 ---
 spec: issues-sync
 phase: 2-github
-status: in-progress
+status: done
 owner: yoany
 created: 2026-04-29
 updated: 2026-04-29
 issue: https://github.com/Copxer/nexus/issues/39
+pr: https://github.com/Copxer/nexus/pull/40
 branch: spec/015-issues-sync
 ---
 
