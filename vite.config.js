@@ -68,13 +68,27 @@ export default defineConfig(({ mode }) => {
                       // breaks silently — better to fail loudly so the dev sets
                       // VITE_DEV_SERVER_PORT or frees the default port.
                       strictPort: true,
-                      // Permissive in tunnel mode by design: cloudflared rewrites
-                      // the Host header to `localhost:<port>`, so a strict list
-                      // would lock localhost out and break the forwarded request.
-                      // The security boundary is `cors.origin` below — only
-                      // browsers visiting the configured public origins can
-                      // actually consume Vite's responses.
-                      allowedHosts: true,
+                      // Explicit allow-list. `allowedHosts: true` ought to work
+                      // but doesn't reliably propagate in rolldown-vite (the
+                      // `vite ^8` flavour this project uses), so we list
+                      // everything Vite might see in tunnel mode:
+                      //   - the tunnel's public hostname (preserved by
+                      //     cloudflared on forward),
+                      //   - `.trycloudflare.com` subdomain wildcard so a fresh
+                      //     quick-tunnel URL works without a restart,
+                      //   - `localhost` / `127.0.0.1` for direct local hits and
+                      //     for any forwarder that does rewrite Host.
+                      // The security boundary stays `cors.origin` below — only
+                      // browsers from the configured public origins can
+                      // actually consume the responses.
+                      allowedHosts: [
+                          tunnel.hostname,
+                          '.trycloudflare.com',
+                          'localhost',
+                          '127.0.0.1',
+                          `localhost:${localPort}`,
+                          `127.0.0.1:${localPort}`,
+                      ],
                       // Force every asset URL injected into Blade to use the
                       // public host instead of `[::1]:5173` / `localhost:5173`.
                       origin: tunnel.origin,
