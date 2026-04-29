@@ -119,13 +119,8 @@ const accentClasses: Record<Capability['accent'], { dot: string; ring: string }>
                     class="flex items-center gap-3"
                 >
                     <ApplicationLogo
-                        class="h-10 w-10 fill-current text-accent-cyan drop-shadow-[0_0_18px_rgba(34,211,238,0.55)]"
+                        class="h-10 drop-shadow-[0_0_18px_rgba(34,211,238,0.55)]"
                     />
-                    <span
-                        class="text-sm font-semibold uppercase tracking-[0.32em] text-text-secondary"
-                    >
-                        Nexus
-                    </span>
                 </Link>
 
                 <nav v-if="canLogin" class="flex items-center gap-2">
