@@ -136,7 +136,7 @@ APP_URL=https://URL_A.trycloudflare.com
 VITE_DEV_SERVER_URL=https://URL_B.trycloudflare.com
 ```
 
-…and **restart `composer run dev`**. Vite reads `VITE_DEV_SERVER_URL` once at boot; `vite.config.js` flips into tunnel mode when it's set — binds `0.0.0.0`, locks port 5173, allows cross-origin requests, and emits asset URLs at the public host so the browser can fetch them through the tunnel.
+…and **restart `composer run dev`**. Vite reads `VITE_DEV_SERVER_URL` once at boot; `vite.config.js` flips into tunnel mode when it's set — binds `0.0.0.0`, locks port 5173, allows cross-origin requests, and emits asset URLs at the public host so the browser can fetch them through the tunnel. You'll see a `[vite] tunnel mode active — origin=…` line in the `composer run dev` output (prefixed `vite:`); if it's missing, Vite didn't pick up `VITE_DEV_SERVER_URL` and you'll see CORS / 403 errors in the browser.
 
 Caveats with quick tunnels (`cloudflared tunnel --url ...`):
 

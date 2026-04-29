@@ -51,34 +51,48 @@ export default defineConfig(({ mode }) => {
             }),
         ],
         server: tunnel
-            ? {
-                  // Bind every interface so the cloudflared sidecar can reach Vite.
-                  host: '0.0.0.0',
-                  port: localPort,
-                  // Lock the port. If Vite drifts (5174 etc.) the tunnel breaks
-                  // silently — better to fail loudly so the dev sets
-                  // VITE_DEV_SERVER_PORT or frees 5173.
-                  strictPort: true,
-                  // Allow inbound requests carrying the tunnel's Host header.
-                  // Vite 5+ rejects unknown hosts by default with "Blocked
-                  // request" — the most common gotcha for this setup.
-                  allowedHosts: [tunnel.hostname],
-                  // Force every asset URL injected into Blade to use the public
-                  // host instead of `[::1]:5173` / `localhost:5173`.
-                  origin: tunnel.origin,
-                  // Cross-origin asset loads from the Laravel-side tunnel.
-                  // Tightened to APP_URL + the tunnel itself; a missing APP_URL
-                  // falls back to `true` so a fresh clone still boots.
-                  cors:
-                      corsOrigins.length > 0
-                          ? { origin: corsOrigins }
-                          : true,
-                  hmr: {
-                      host: tunnel.hostname,
-                      protocol: tunnel.protocol === 'https:' ? 'wss' : 'ws',
-                      clientPort: tunnel.protocol === 'https:' ? 443 : 80,
-                  },
-              }
+            ? (() => {
+                  // Loud startup log so tunnel-mode activation is visible inside
+                  // the `composer run dev` concurrently output (prefixed `vite:`).
+                  console.info(
+                      `[vite] tunnel mode active — origin=${tunnel.origin}, port=${localPort}, cors=${
+                          corsOrigins.length > 0 ? corsOrigins.join(',') : 'any'
+                      }`,
+                  );
+
+                  return {
+                      // Bind every interface so the cloudflared sidecar can reach Vite.
+                      host: '0.0.0.0',
+                      port: localPort,
+                      // Lock the port. If Vite drifts (5174 etc.) the tunnel
+                      // breaks silently — better to fail loudly so the dev sets
+                      // VITE_DEV_SERVER_PORT or frees the default port.
+                      strictPort: true,
+                      // Permissive in tunnel mode by design: cloudflared rewrites
+                      // the Host header to `localhost:<port>`, so a strict list
+                      // would lock localhost out and break the forwarded request.
+                      // The security boundary is `cors.origin` below — only
+                      // browsers visiting the configured public origins can
+                      // actually consume Vite's responses.
+                      allowedHosts: true,
+                      // Force every asset URL injected into Blade to use the
+                      // public host instead of `[::1]:5173` / `localhost:5173`.
+                      origin: tunnel.origin,
+                      // Cross-origin asset loads from the Laravel-side tunnel.
+                      // Tightened to APP_URL + the tunnel itself; a missing
+                      // APP_URL falls back to `true` so a fresh clone still
+                      // boots.
+                      cors:
+                          corsOrigins.length > 0
+                              ? { origin: corsOrigins }
+                              : true,
+                      hmr: {
+                          host: tunnel.hostname,
+                          protocol: tunnel.protocol === 'https:' ? 'wss' : 'ws',
+                          clientPort: tunnel.protocol === 'https:' ? 443 : 80,
+                      },
+                  };
+              })()
             : undefined,
     };
 });
