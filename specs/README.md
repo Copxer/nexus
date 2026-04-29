@@ -38,7 +38,7 @@ Status legend: ⬜ not started · 🟡 in progress · 🟢 done · 🔴 blocked
 | 0 | Foundation (auth, layout, static overview) | 🟢 | 9/9 specs done (001–009). Phase complete. |
 | 1 | Projects & Repositories | 🟢 | 3/3 specs done (010–012). Phase complete. |
 | 2 | GitHub Integration MVP | 🟢 | 4/4 specs done (013–016). Phase complete. |
-| 3 | GitHub Webhooks & Activity Feed | 🟡 | 1/3 specs done (017). Next: 018 Activity Feed UI. |
+| 3 | GitHub Webhooks & Activity Feed | 🟡 | 2/3 specs done (017, 018). Next: 019 real-time broadcasting via Reverb. |
 | 4 | Deployments & CI/CD | ⬜ | — |
 | 5 | Website Monitoring | ⬜ | — |
 | 6 | Docker Host Agent MVP | ⬜ | — |

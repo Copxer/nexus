@@ -8,12 +8,16 @@ import { router, usePage } from '@inertiajs/vue3';
 import { AlertTriangle, CheckCircle2, X } from 'lucide-vue-next';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
-withDefaults(
+const props = withDefaults(
     defineProps<{
         /**
          * Optional populated feed forwarded into both `<RightActivityRail>`
-         * instances (column + drawer). Pages that don't supply this prop get
-         * the rail's empty-state automatically.
+         * instances (column + drawer). When omitted (the common case),
+         * AppLayout falls back to the shared `activity.recent` Inertia prop
+         * registered in `HandleInertiaRequests::share()` (spec 018), so any
+         * authenticated page automatically lights up the rail without
+         * explicit pass-through. Pages that need a different feed (e.g. a
+         * project-scoped slice) can still pass their own array and override.
          */
         activityEvents?: ActivityEvent[];
     }>(),
@@ -46,6 +50,18 @@ const syncFlash = () => {
 
 syncFlash();
 router.on('navigate', syncFlash);
+
+// Activity feed sourcing: explicit prop wins when a page passed one;
+// otherwise read the shared `activity.recent` Inertia prop populated by
+// `HandleInertiaRequests::share()`. Reactive on every navigation so a
+// fresh page sees fresh events without the rail flickering.
+const resolvedActivityEvents = computed<ActivityEvent[]>(() => {
+    if (props.activityEvents.length > 0) {
+        return props.activityEvents;
+    }
+    const shared = (page.props.activity as { recent?: ActivityEvent[] } | undefined)?.recent;
+    return shared ?? [];
+});
 
 const hasFlash = computed(
     () => flashStatus.value !== null || flashError.value !== null,
@@ -219,7 +235,7 @@ onBeforeUnmount(() => {
 
         <!-- Persistent activity rail (≥ 2xl) -->
         <div class="relative z-30 hidden 2xl:flex">
-            <RightActivityRail variant="column" :events="activityEvents" />
+            <RightActivityRail variant="column" :events="resolvedActivityEvents" />
         </div>
 
         <!-- Activity rail drawer (md – 2xl) -->
@@ -255,7 +271,7 @@ onBeforeUnmount(() => {
             >
                 <RightActivityRail
                     variant="drawer"
-                    :events="activityEvents"
+                    :events="resolvedActivityEvents"
                     @close="activityRailOpen = false"
                 />
             </div>

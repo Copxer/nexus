@@ -21,7 +21,7 @@ Status legend: ⬜ not started · 🟡 in progress · 🟢 done · 🔴 blocked
 | 0 | Foundation (auth, layout, static overview) | 🟢 | 9/9 specs done. |
 | 1 | Projects & Repositories | 🟢 | 3/3 specs done. |
 | 2 | GitHub Integration MVP | 🟢 | 4/4 specs done — connection, repository import + sync, issues sync, PRs + unified Work Items page. |
-| 3 | GitHub Webhooks & Activity Feed | 🟡 | 1/3 specs done (017). Next: 018 Activity Feed UI. |
+| 3 | GitHub Webhooks & Activity Feed | 🟡 | 2/3 specs done (017, 018). Next: 019 real-time broadcasting via Reverb. |
 | 4 | Deployments & CI/CD | ⬜ | — |
 | 5 | Website Monitoring | ⬜ | — |
 | 6 | Docker Host Agent MVP | ⬜ | — |
@@ -45,7 +45,8 @@ After Phase 2:
 - Controller flash messages (`->with('status'|'error', …)`) render as a dismissable top banner in `AppLayout`, so failed actions (OAuth callbacks, sync triggers) surface to the user instead of failing silently. Silent OAuth callback branches also `Log::warning` for postmortem.
 
 After Phase 3 (in progress):
-- Spec 017 (done) — GitHub webhook ingestion endpoint at `POST /webhooks/github`. Verifies `X-Hub-Signature-256` (HMAC-SHA-256, timing-safe), stores deliveries idempotently, dispatches an async job, routes to per-event handlers. `issues` and `pull_request` events update the local mirrors and create `activity_events` rows. Backend only — UI for the activity feed lands in spec 018.
+- Spec 017 (done) — GitHub webhook ingestion endpoint at `POST /webhooks/github`. Verifies `X-Hub-Signature-256` (HMAC-SHA-256, timing-safe), stores deliveries idempotently, dispatches an async job, routes to per-event handlers. `issues` and `pull_request` events update the local mirrors and create `activity_events` rows.
+- Spec 018 (done) — Activity Feed UI. `RecentActivityForUserQuery` powers a shared `activity.recent` Inertia prop registered in `HandleInertiaRequests::share()`, so every authenticated page lights up the right rail with the latest events without per-controller plumbing. New `/activity` page (linked from the sidebar between Alerts and Settings) shows up to 100 events. Page-load fresh — real-time broadcasting via Reverb is spec 019.
 
 ## Local development
 
