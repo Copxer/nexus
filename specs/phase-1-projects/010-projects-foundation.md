@@ -1,12 +1,13 @@
 ---
 spec: projects-foundation
 phase: 1-projects
-status: in-progress
+status: done
 owner: yoany
 created: 2026-04-28
 updated: 2026-04-28
 issue: https://github.com/Copxer/nexus/issues/24
 branch: spec/010-projects-foundation
+pr: https://github.com/Copxer/nexus/pull/25
 ---
 
 # 010 — Projects (model + CRUD pages + sidebar/palette activation)
