@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Domain\GitHub\Jobs\SyncGitHubRepositoryJob;
+use App\Enums\RepositorySyncStatus;
 use App\Models\Repository;
 use Illuminate\Http\RedirectResponse;
 
@@ -16,6 +17,11 @@ use Illuminate\Http\RedirectResponse;
  * `RepositoryPullRequestsSyncController` shape introduced in specs 015 + 016
  * — the button is the parent-level sibling of those two.
  *
+ * Flips `sync_status` to `syncing` synchronously before queuing the job. The
+ * `back()` re-render therefore re-fetches the row and the show-page button
+ * paints disabled + spinner immediately, debouncing rapid double-clicks
+ * without needing `ShouldBeUnique` on the job.
+ *
  * Authorization: `ProjectPolicy::update` — only the project owner can
  * trigger a re-sync, matching the existing tab-level controllers.
  */
@@ -25,6 +31,10 @@ class RepositorySyncController extends Controller
     {
         $repository->loadMissing('project');
         $this->authorize('update', $repository->project);
+
+        $repository->update([
+            'sync_status' => RepositorySyncStatus::Syncing->value,
+        ]);
 
         SyncGitHubRepositoryJob::dispatch($repository->id);
 

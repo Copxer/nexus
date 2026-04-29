@@ -30,10 +30,37 @@ class RepositorySyncControllerTest extends TestCase
             ->assertRedirect(route('repositories.show', $repository->full_name))
             ->assertSessionHas('status');
 
+        // Status flipped synchronously before the job ran — the next render
+        // will paint the button disabled and stop double-click spam.
+        $this->assertSame(
+            'syncing',
+            $repository->fresh()->sync_status->value,
+        );
+
         Queue::assertPushed(
             SyncGitHubRepositoryJob::class,
             fn (SyncGitHubRepositoryJob $job) => $job->repositoryId === $repository->id,
         );
+    }
+
+    public function test_already_synced_repository_can_be_re_synced(): void
+    {
+        Queue::fake();
+        $owner = User::factory()->create(['email_verified_at' => now()]);
+        $project = Project::factory()->create(['owner_user_id' => $owner->id]);
+        $repository = Repository::factory()->create([
+            'project_id' => $project->id,
+            'full_name' => 'octocat/hello-world',
+            'sync_status' => 'synced',
+        ]);
+
+        $this->actingAs($owner)
+            ->from(route('repositories.show', $repository->full_name))
+            ->post(route('repositories.sync', $repository->full_name))
+            ->assertRedirect(route('repositories.show', $repository->full_name));
+
+        $this->assertSame('syncing', $repository->fresh()->sync_status->value);
+        Queue::assertPushed(SyncGitHubRepositoryJob::class);
     }
 
     public function test_non_owner_is_forbidden(): void

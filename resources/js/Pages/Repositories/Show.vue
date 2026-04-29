@@ -233,7 +233,7 @@ const runRepositorySync = () => {
                             v-if="canSync"
                             type="button"
                             :disabled="isRepositorySyncing"
-                            class="inline-flex items-center gap-2 rounded-lg border border-accent-cyan/40 bg-accent-cyan/10 px-3 py-2 text-sm font-semibold text-accent-cyan transition hover:bg-accent-cyan/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60 disabled:cursor-not-allowed disabled:opacity-50"
+                            class="inline-flex items-center gap-2 rounded-lg border border-accent-cyan/40 bg-accent-cyan/15 px-3 py-2 text-sm font-semibold text-accent-cyan transition hover:border-accent-cyan/60 disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
                             @click="runRepositorySync"
                         >
                             <RefreshCcw
