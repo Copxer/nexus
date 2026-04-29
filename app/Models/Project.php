@@ -42,6 +42,11 @@ class Project extends Model
      * Auto-generate the slug on create. If the natural slug collides we
      * append a 3-char alpha suffix — distinguishable yet compact, and
      * doesn't leak the project count the way a sequential counter would.
+     *
+     * TODO(multi-team): The check-then-insert is TOCTOU-vulnerable under
+     * concurrent inserts; the unique index would 500 the second request.
+     * Acceptable while phase-1 is single-user dev. When we go multi-tenant,
+     * wrap this in a transactional retry loop or a generated-column slug.
      */
     protected static function booted(): void
     {

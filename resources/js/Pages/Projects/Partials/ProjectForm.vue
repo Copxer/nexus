@@ -5,7 +5,7 @@ import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import { projectIconNames, projectIconRegistry } from '@/lib/projectIcons';
-import { Link, useForm } from '@inertiajs/vue3';
+import { router, useForm } from '@inertiajs/vue3';
 import { computed } from 'vue';
 
 interface OptionPill {
@@ -265,14 +265,16 @@ const submit = () => {
             <InputError class="mt-2" :message="form.errors.icon" />
         </fieldset>
 
-        <!-- Actions -->
+        <!-- Actions. Cancel uses router.visit() rather than wrapping a
+             button inside a Link — the latter renders <a><button>, which
+             is invalid HTML and confuses screen readers. -->
         <div class="flex items-center gap-3">
             <PrimaryButton :disabled="form.processing">
                 {{ submitLabel }}
             </PrimaryButton>
-            <Link :href="cancelTo">
-                <SecondaryButton type="button">Cancel</SecondaryButton>
-            </Link>
+            <SecondaryButton type="button" @click="router.visit(cancelTo)">
+                Cancel
+            </SecondaryButton>
         </div>
     </form>
 </template>

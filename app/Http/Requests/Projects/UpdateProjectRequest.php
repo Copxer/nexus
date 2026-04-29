@@ -4,6 +4,7 @@ namespace App\Http\Requests\Projects;
 
 use App\Enums\ProjectPriority;
 use App\Enums\ProjectStatus;
+use App\Support\ProjectPalette;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
@@ -30,12 +31,8 @@ class UpdateProjectRequest extends FormRequest
             'status' => ['required', new Enum(ProjectStatus::class)],
             'priority' => ['required', new Enum(ProjectPriority::class)],
             'environment' => ['nullable', 'string', 'max:64'],
-            'color' => ['nullable', Rule::in(['cyan', 'blue', 'purple', 'magenta', 'success', 'warning'])],
-            'icon' => ['nullable', Rule::in([
-                'FolderKanban', 'Rocket', 'GitBranch', 'Server',
-                'Globe', 'BarChart3', 'Bell', 'Activity',
-                'HeartPulse', 'Cpu', 'Database', 'Cloud',
-            ])],
+            'color' => ['nullable', Rule::in(ProjectPalette::COLORS)],
+            'icon' => ['nullable', Rule::in(ProjectPalette::ICONS)],
         ];
     }
 }

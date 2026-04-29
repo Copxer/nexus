@@ -7,7 +7,9 @@ use App\Enums\ProjectStatus;
 use App\Http\Requests\Projects\StoreProjectRequest;
 use App\Http\Requests\Projects\UpdateProjectRequest;
 use App\Models\Project;
+use App\Support\ProjectPalette;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -51,7 +53,7 @@ class ProjectController extends Controller
             ->with('status', 'Project created.');
     }
 
-    public function show(Project $project): Response
+    public function show(Request $request, Project $project): Response
     {
         $this->authorize('view', $project);
 
@@ -59,8 +61,8 @@ class ProjectController extends Controller
 
         return Inertia::render('Projects/Show', [
             'project' => $this->transform($project),
-            'canUpdate' => request()->user()?->can('update', $project) ?? false,
-            'canDelete' => request()->user()?->can('delete', $project) ?? false,
+            'canUpdate' => $request->user()?->can('update', $project) ?? false,
+            'canDelete' => $request->user()?->can('delete', $project) ?? false,
         ]);
     }
 
@@ -157,13 +159,8 @@ class ProjectController extends Controller
                 'tone' => $p->badgeTone(),
             ], ProjectPriority::cases()),
 
-            'colors' => ['cyan', 'blue', 'purple', 'magenta', 'success', 'warning'],
-
-            'icons' => [
-                'FolderKanban', 'Rocket', 'GitBranch', 'Server',
-                'Globe', 'BarChart3', 'Bell', 'Activity',
-                'HeartPulse', 'Cpu', 'Database', 'Cloud',
-            ],
+            'colors' => ProjectPalette::COLORS,
+            'icons' => ProjectPalette::ICONS,
         ];
     }
 }
