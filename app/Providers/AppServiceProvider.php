@@ -7,6 +7,7 @@ use App\Models\Repository;
 use App\Policies\ProjectPolicy;
 use App\Policies\RepositoryPolicy;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\ServiceProvider;
 
@@ -29,5 +30,15 @@ class AppServiceProvider extends ServiceProvider
 
         Gate::policy(Project::class, ProjectPolicy::class);
         Gate::policy(Repository::class, RepositoryPolicy::class);
+
+        // Force https URL generation when APP_URL is https. Required for
+        // Cloudflare/ngrok tunnels: TLS terminates at the tunnel and
+        // `php artisan serve` only sees plain HTTP locally, so without
+        // this override Laravel emits `http://` URLs that the browser
+        // then blocks as Mixed Content. Honors APP_URL only — local-only
+        // dev (http://localhost APP_URL) is unaffected.
+        if (str_starts_with((string) config('app.url'), 'https://')) {
+            URL::forceScheme('https');
+        }
     }
 }

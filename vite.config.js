@@ -70,25 +70,6 @@ export default defineConfig(({ mode }) => {
         );
     }
 
-    // Diagnostic plugin — runs after every other plugin's `config()` hook,
-    // dumps the resolved server.allowedHosts that Vite will actually use.
-    // Lets us tell (in a single restart) whether our array survived the merge
-    // pass or got swallowed by a downstream plugin / Vite resolver.
-    const diagnose = {
-        name: 'nexus-tunnel-diagnostic',
-        enforce: 'post',
-        configResolved(resolved) {
-            if (tunnel) {
-                console.info(
-                    `[vite] resolved server.allowedHosts=${JSON.stringify(resolved.server.allowedHosts)}`,
-                );
-                console.info(
-                    `[vite] resolved server.origin=${resolved.server.origin}`,
-                );
-            }
-        },
-    };
-
     return {
         plugins: [
             laravel({
@@ -103,7 +84,6 @@ export default defineConfig(({ mode }) => {
                     },
                 },
             }),
-            diagnose,
         ],
         server: tunnel
             ? {
