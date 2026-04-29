@@ -71,13 +71,6 @@ const priorityToneMap = {
     low: 'muted',
 } as const;
 
-const stubRepos = [
-    { name: 'nexus-web', commits: 124, share: 0.92 },
-    { name: 'nexus-api', commits: 98, share: 0.74 },
-    { name: 'infra-as-code', commits: 56, share: 0.42 },
-    { name: 'nexus-mail', commits: 31, share: 0.23 },
-];
-
 const stubHosts = [
     { name: 'prod-web-01', region: 'us-east', cpu: 0.42, mem: 0.61, status: 'success' as const },
     { name: 'prod-api-02', region: 'us-east', cpu: 0.78, mem: 0.83, status: 'warning' as const },
@@ -293,14 +286,17 @@ const visualizationStubs = [
                             </h2>
                         </div>
                         <span class="hidden font-mono text-[11px] text-text-muted sm:inline">
-                            7d · mock
+                            By stars · live
                         </span>
                     </header>
                     <!-- At < sm we stack name+commits over a full-width bar
                          so the bar isn't squeezed to nothing on small phones. -->
-                    <ul class="flex flex-col gap-3 sm:gap-3">
+                    <ul
+                        v-if="dashboard.topRepositories.length > 0"
+                        class="flex flex-col gap-3 sm:gap-3"
+                    >
                         <li
-                            v-for="repo in stubRepos"
+                            v-for="repo in dashboard.topRepositories"
                             :key="repo.name"
                             class="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3"
                         >
@@ -308,14 +304,14 @@ const visualizationStubs = [
                                 class="flex items-baseline justify-between gap-3 sm:contents"
                             >
                                 <span
-                                    class="truncate font-mono text-xs text-text-secondary sm:w-32 sm:shrink-0"
+                                    class="truncate font-mono text-xs text-text-secondary sm:w-40 sm:shrink-0"
                                 >
                                     {{ repo.name }}
                                 </span>
                                 <span
                                     class="shrink-0 text-right font-mono text-[11px] tabular-nums text-text-muted sm:order-2 sm:w-20"
                                 >
-                                    {{ repo.commits }} commits
+                                    {{ repo.commits }} stars
                                 </span>
                             </div>
                             <div
@@ -330,9 +326,12 @@ const visualizationStubs = [
                             </div>
                         </li>
                     </ul>
-                    <footer class="text-[11px] text-text-muted">
-                        Full widget lands with phase 1 — Repositories.
-                    </footer>
+                    <p
+                        v-else
+                        class="rounded-lg border border-dashed border-border-subtle bg-background-panel-hover/30 p-4 text-center text-xs text-text-muted"
+                    >
+                        Link a repository on a project to populate this.
+                    </p>
                 </section>
 
                 <!-- Container Hosts -->
