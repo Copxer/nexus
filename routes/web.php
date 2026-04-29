@@ -3,6 +3,7 @@
 use App\Http\Controllers\OverviewController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\RepositoryController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -19,6 +20,12 @@ Route::get('/overview', OverviewController::class)
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::resource('projects', ProjectController::class);
+
+    // Two-segment route key (`owner/name`) — the regex `where()` lets
+    // Laravel's binder accept the slash inside a single route param.
+    Route::resource('repositories', RepositoryController::class)
+        ->only(['index', 'show', 'store', 'destroy'])
+        ->where(['repository' => '[\w.-]+/[\w.-]+']);
 });
 
 Route::middleware('auth')->group(function () {

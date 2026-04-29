@@ -94,8 +94,8 @@ export function getCommands(): Command[] {
             label: 'Go to Repositories',
             group: 'navigation',
             icon: GitBranch,
-            disabled: true,
-            soonLabel: 'Phase 1',
+            keywords: ['repos', 'github'],
+            run: () => router.visit(route('repositories.index')),
         },
         {
             id: 'go-issues-prs',

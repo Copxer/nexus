@@ -1,0 +1,146 @@
+<?php
+
+namespace Tests\Feature\Repositories;
+
+use App\Models\Project;
+use App\Models\Repository;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia;
+use Tests\TestCase;
+
+class RepositoryControllerTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private function verifiedUser(): User
+    {
+        return User::factory()->create(['email_verified_at' => now()]);
+    }
+
+    public function test_index_lists_all_repositories(): void
+    {
+        $user = $this->verifiedUser();
+        $project = Project::factory()->create(['owner_user_id' => $user->id]);
+        Repository::factory()->count(3)->create(['project_id' => $project->id]);
+
+        $this->actingAs($user)
+            ->get(route('repositories.index'))
+            ->assertSuccessful()
+            ->assertInertia(
+                fn (AssertableInertia $page) => $page
+                    ->component('Repositories/Index')
+                    ->has('repositories', 3)
+            );
+    }
+
+    public function test_show_renders_a_repository_for_a_verified_user(): void
+    {
+        $user = $this->verifiedUser();
+        $project = Project::factory()->create(['owner_user_id' => $user->id]);
+        $repo = Repository::factory()->create([
+            'project_id' => $project->id,
+            'full_name' => 'nexus-org/nexus-web',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('repositories.show', $repo))
+            ->assertSuccessful()
+            ->assertInertia(
+                fn (AssertableInertia $page) => $page
+                    ->component('Repositories/Show')
+                    ->where('repository.full_name', 'nexus-org/nexus-web')
+                    ->where('canDelete', true)
+            );
+    }
+
+    public function test_store_links_via_a_full_github_url(): void
+    {
+        $user = $this->verifiedUser();
+        $project = Project::factory()->create(['owner_user_id' => $user->id]);
+
+        $response = $this->actingAs($user)->post(route('repositories.store'), [
+            'project_id' => $project->id,
+            'repository' => 'https://github.com/nexus-org/nexus-api',
+        ]);
+
+        $response->assertRedirect(route('projects.show', $project));
+        $this->assertDatabaseHas('repositories', [
+            'project_id' => $project->id,
+            'full_name' => 'nexus-org/nexus-api',
+            'sync_status' => 'pending',
+        ]);
+    }
+
+    public function test_store_links_via_owner_slash_name(): void
+    {
+        $user = $this->verifiedUser();
+        $project = Project::factory()->create(['owner_user_id' => $user->id]);
+
+        $this->actingAs($user)->post(route('repositories.store'), [
+            'project_id' => $project->id,
+            'repository' => 'nexus-labs/edge-cache',
+        ]);
+
+        $this->assertDatabaseHas('repositories', [
+            'project_id' => $project->id,
+            'full_name' => 'nexus-labs/edge-cache',
+        ]);
+    }
+
+    public function test_store_rejects_garbage_input(): void
+    {
+        $user = $this->verifiedUser();
+        $project = Project::factory()->create(['owner_user_id' => $user->id]);
+
+        $this->actingAs($user)
+            ->from(route('projects.show', $project))
+            ->post(route('repositories.store'), [
+                'project_id' => $project->id,
+                'repository' => 'not a repo',
+            ])
+            ->assertSessionHasErrors('repository');
+
+        $this->assertSame(0, Repository::query()->count());
+    }
+
+    public function test_store_blocks_linking_an_already_taken_full_name(): void
+    {
+        $user = $this->verifiedUser();
+        $a = Project::factory()->create(['owner_user_id' => $user->id]);
+        $b = Project::factory()->create(['owner_user_id' => $user->id]);
+        Repository::factory()->create([
+            'project_id' => $a->id,
+            'full_name' => 'nexus-org/nexus-web',
+        ]);
+
+        $response = $this->actingAs($user)
+            ->from(route('projects.show', $b))
+            ->post(route('repositories.store'), [
+                'project_id' => $b->id,
+                'repository' => 'nexus-org/nexus-web',
+            ]);
+
+        $response->assertSessionHasErrors('repository');
+        // Still only one row exists with this full_name.
+        $this->assertSame(
+            1,
+            Repository::query()
+                ->where('full_name', 'nexus-org/nexus-web')
+                ->count(),
+        );
+    }
+
+    public function test_destroy_unlinks_for_project_owner(): void
+    {
+        $user = $this->verifiedUser();
+        $project = Project::factory()->create(['owner_user_id' => $user->id]);
+        $repo = Repository::factory()->create(['project_id' => $project->id]);
+
+        $this->actingAs($user)
+            ->delete(route('repositories.destroy', $repo))
+            ->assertRedirect(route('projects.show', $project));
+
+        $this->assertNull(Repository::query()->find($repo->id));
+    }
+}
