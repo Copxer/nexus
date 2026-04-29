@@ -20,7 +20,7 @@ import { Link } from '@inertiajs/vue3';
         <div class="relative">
             <Link href="/" class="flex flex-col items-center gap-3">
                 <ApplicationLogo
-                    class="h-8 drop-shadow-[0_0_18px_rgba(34,211,238,0.55)]"
+                    class="h-12 drop-shadow-[0_0_18px_rgba(34,211,238,0.55)]"
                 />
                 <span class="text-[11px] font-semibold uppercase tracking-[0.32em] text-text-muted">
                     Engineering Command Center
