@@ -9,7 +9,7 @@ Make GitHub updates near real-time. After this phase, importing a repo wires a G
 
 | # | Task | Status |
 |---|------|--------|
-| 017 | GitHub webhook ingestion + activity events (receiver, signature verification, delivery storage, `issues` + `pull_request` handlers, `activity_events` table + `CreateActivityEventAction`) | ⬜ |
+| 017 | GitHub webhook ingestion + activity events (receiver, signature verification, delivery storage, `issues` + `pull_request` handlers, `activity_events` table + `CreateActivityEventAction`) | 🟢 |
 | 018 | Activity Feed UI (replace AppLayout right-rail mock with real activity, `ActivityFeed.vue` + `ActivityFeedItem.vue`, page-load fresh) | ⬜ |
 | 019 | Real-time broadcasting via Reverb (Echo wiring, `ActivityEventCreated` broadcast, extend handler set to `workflow_run`/`push`/`release`) | ⬜ |
 

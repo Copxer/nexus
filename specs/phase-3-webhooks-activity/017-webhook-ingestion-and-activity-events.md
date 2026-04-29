@@ -1,11 +1,12 @@
 ---
 spec: webhook-ingestion-and-activity-events
 phase: 3-webhooks-activity
-status: in-progress
+status: done
 owner: yoany
 created: 2026-04-29
 updated: 2026-04-29
 issue: https://github.com/Copxer/nexus/issues/45
+pr: https://github.com/Copxer/nexus/pull/46
 branch: spec/017-webhook-ingestion-and-activity-events
 ---
 

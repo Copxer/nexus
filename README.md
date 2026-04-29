@@ -21,7 +21,7 @@ Status legend: ⬜ not started · 🟡 in progress · 🟢 done · 🔴 blocked
 | 0 | Foundation (auth, layout, static overview) | 🟢 | 9/9 specs done. |
 | 1 | Projects & Repositories | 🟢 | 3/3 specs done. |
 | 2 | GitHub Integration MVP | 🟢 | 4/4 specs done — connection, repository import + sync, issues sync, PRs + unified Work Items page. |
-| 3 | GitHub Webhooks & Activity Feed | 🟡 | 0/3 specs merged. 017 webhooks + activity events in PR review; 018 Activity Feed UI + 019 Reverb broadcasting next. |
+| 3 | GitHub Webhooks & Activity Feed | 🟡 | 1/3 specs done (017). Next: 018 Activity Feed UI. |
 | 4 | Deployments & CI/CD | ⬜ | — |
 | 5 | Website Monitoring | ⬜ | — |
 | 6 | Docker Host Agent MVP | ⬜ | — |
@@ -44,8 +44,8 @@ After Phase 2:
 - Manual "Run sync" buttons everywhere a sync job exists.
 - Controller flash messages (`->with('status'|'error', …)`) render as a dismissable top banner in `AppLayout`, so failed actions (OAuth callbacks, sync triggers) surface to the user instead of failing silently. Silent OAuth callback branches also `Log::warning` for postmortem.
 
-After Phase 3 (in flight at PR #46 — not yet merged):
-- Spec 017 — GitHub webhook ingestion endpoint at `POST /webhooks/github`. Verifies `X-Hub-Signature-256` (HMAC-SHA-256, timing-safe), stores deliveries idempotently, dispatches an async job, routes to per-event handlers. `issues` and `pull_request` events update the local mirrors and create `activity_events` rows. Backend only — UI for the activity feed lands in spec 018.
+After Phase 3 (in progress):
+- Spec 017 (done) — GitHub webhook ingestion endpoint at `POST /webhooks/github`. Verifies `X-Hub-Signature-256` (HMAC-SHA-256, timing-safe), stores deliveries idempotently, dispatches an async job, routes to per-event handlers. `issues` and `pull_request` events update the local mirrors and create `activity_events` rows. Backend only — UI for the activity feed lands in spec 018.
 
 ## Local development
 
