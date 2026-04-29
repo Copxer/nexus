@@ -58,11 +58,26 @@ class ProjectController extends Controller
         $this->authorize('view', $project);
 
         $project->loadMissing('owner:id,name,email');
+        $project->loadMissing(['repositories' => fn ($q) => $q->latest('last_pushed_at')->latest()]);
 
         return Inertia::render('Projects/Show', [
             'project' => $this->transform($project),
             'canUpdate' => $request->user()?->can('update', $project) ?? false,
             'canDelete' => $request->user()?->can('delete', $project) ?? false,
+            'repositories' => $project->repositories->map(fn ($repo) => [
+                'id' => $repo->id,
+                'owner' => $repo->owner,
+                'name' => $repo->name,
+                'full_name' => $repo->full_name,
+                'html_url' => $repo->html_url,
+                'default_branch' => $repo->default_branch,
+                'visibility' => $repo->visibility,
+                'language' => $repo->language,
+                'open_issues_count' => $repo->open_issues_count,
+                'open_prs_count' => $repo->open_prs_count,
+                'last_pushed_at' => $repo->last_pushed_at?->diffForHumans(),
+                'sync_status' => $repo->sync_status?->value,
+            ])->all(),
         ]);
     }
 
