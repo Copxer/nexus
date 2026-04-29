@@ -142,6 +142,9 @@ Caveats with quick tunnels (`cloudflared tunnel --url ...`):
 
 - The tunnel URL changes on every run. Re-edit `.env` and restart `composer run dev` each time.
 - The OAuth callback URL configured in your GitHub App **must** match the new `APP_URL`. Update the GitHub App settings every time the Laravel tunnel URL changes — or use a [named tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-apps) bound to a stable hostname so the URL stays put.
+- HMR over `wss://*.trycloudflare.com` can drop intermittently — when it does, asset URLs are absolute so a manual refresh still serves the latest code. Named tunnels are more stable.
+- If port 5173 is already in use, set `VITE_DEV_SERVER_PORT=5174` (or any free port) in `.env` and point your second `cloudflared` at the same port.
+- The default Laravel `APP_URL`-derived `SESSION_DOMAIN`/`SANCTUM_STATEFUL_DOMAINS` won't include your tunnel hostname. If session-based requests start 419'ing through the tunnel, set `SESSION_DOMAIN=` (blank) and add the tunnel hostname to `SANCTUM_STATEFUL_DOMAINS`.
 - Reverb (websockets, port 8080) isn't covered by this setup. When real-time features become essential, expose Reverb via a third tunnel and update the `VITE_REVERB_*` block in `.env` to match.
 
 Local-only dev (no tunnel) is unaffected — leave `VITE_DEV_SERVER_URL` empty and Vite behaves exactly as before.
