@@ -110,6 +110,33 @@ class SyncGitHubRepositoryJobTest extends TestCase
         $this->assertTrue($connection->isAccessTokenValid());
     }
 
+    public function test_handle_preserves_last_synced_at_on_failure(): void
+    {
+        // `last_synced_at` is the contract Settings surfaces as
+        // "Last sync N min ago" — a failed run must NOT bump it,
+        // otherwise a repo that's never synced successfully would
+        // misleadingly read as recently synced.
+        $context = $this->setUpProjectWithConnection();
+        $priorSync = now()->subHours(3);
+        $context['repository']->forceFill(['last_synced_at' => $priorSync])->save();
+
+        Http::fake([
+            'api.github.com/repos/octocat/hello-world' => Http::response(
+                ['message' => 'Server error'],
+                500,
+            ),
+        ]);
+
+        (new SyncGitHubRepositoryJob($context['repository']->id))->handle();
+
+        $repo = $context['repository']->fresh();
+        $this->assertSame(RepositorySyncStatus::Failed, $repo->sync_status);
+        $this->assertEquals(
+            $priorSync->toIso8601String(),
+            $repo->last_synced_at->toIso8601String(),
+        );
+    }
+
     public function test_handle_marks_failed_when_owner_has_no_connection(): void
     {
         $owner = User::factory()->create();

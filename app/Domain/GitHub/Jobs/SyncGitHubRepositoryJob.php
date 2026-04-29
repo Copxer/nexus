@@ -146,17 +146,21 @@ class SyncGitHubRepositoryJob implements ShouldQueue
     }
 
     /**
-     * Flip the row to `failed`. Failure reason is logged at the call
-     * site (see the catches above) — spec 014's schema doesn't carry
-     * a `sync_error` column yet. A future spec that surfaces error
-     * messages on the Repository page will add the column + thread the
-     * reason through here.
+     * Flip the row to `failed`. We deliberately do NOT update
+     * `last_synced_at` — that column means "last successful sync" and
+     * is what the Settings card surfaces as "Last sync N min ago". A
+     * failed run keeps the previous successful timestamp (or null if
+     * never synced).
+     *
+     * Failure reason is logged at the call site (see the catches above)
+     * — spec 014's schema doesn't carry a `sync_error` column yet. A
+     * future spec that surfaces error messages on the Repository page
+     * will add the column + thread the reason through here.
      */
     private function markFailed(Repository $repository): void
     {
         $repository->forceFill([
             'sync_status' => RepositorySyncStatus::Failed->value,
-            'last_synced_at' => now(),
         ])->save();
     }
 

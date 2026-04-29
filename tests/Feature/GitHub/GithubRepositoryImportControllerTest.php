@@ -150,6 +150,27 @@ class GithubRepositoryImportControllerTest extends TestCase
         Queue::assertPushed(SyncGitHubRepositoryJob::class);
     }
 
+    public function test_store_rejects_repo_already_linked_to_another_project(): void
+    {
+        $context = $this->ownerWithConnection();
+        $otherProject = Project::factory()->create([
+            'owner_user_id' => $context['user']->id,
+        ]);
+        Repository::factory()->create([
+            'project_id' => $otherProject->id,
+            'full_name' => 'octocat/hello-world',
+        ]);
+
+        $this->actingAs($context['user'])
+            ->from(route('projects.show', $context['project']))
+            ->post(
+                route('projects.repositories.import.store', $context['project']),
+                ['full_name' => 'octocat/hello-world'],
+            )
+            ->assertRedirect(route('projects.show', $context['project']))
+            ->assertSessionHasErrors('full_name');
+    }
+
     public function test_store_rejects_garbage_full_name(): void
     {
         $context = $this->ownerWithConnection();

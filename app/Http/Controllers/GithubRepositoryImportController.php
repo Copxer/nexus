@@ -7,6 +7,7 @@ use App\Domain\GitHub\Exceptions\GitHubApiException;
 use App\Domain\GitHub\Services\GitHubClient;
 use App\Models\Project;
 use App\Models\Repository;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -102,7 +103,18 @@ class GithubRepositoryImportController extends Controller
             ],
         ]);
 
-        $repository = $import->execute($project, $validated['full_name']);
+        try {
+            $repository = $import->execute($project, $validated['full_name']);
+        } catch (UniqueConstraintViolationException) {
+            // The picker hides already-linked-elsewhere rows, but the
+            // `repositories.full_name` column is globally unique, so a
+            // forged POST or a concurrent click in two tabs can still
+            // race here. Surface the same friendly error spec 011's
+            // manual-link controller uses.
+            return back()->withErrors([
+                'full_name' => 'That repository is already linked to another project.',
+            ]);
+        }
 
         return redirect()
             ->route('projects.show', $project)
