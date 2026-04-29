@@ -1,58 +1,160 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Nexus Control Center
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+A futuristic engineering operations dashboard. Pulls projects, GitHub repositories, issues, pull requests, deployments, monitoring, alerts, and infrastructure health into one place.
 
-## About Laravel
+Source of truth for product scope: [`nexus_control_center_roadmap.md`](nexus_control_center_roadmap.md).
+Visual target: [`specs/visual-reference.md`](specs/visual-reference.md).
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Stack
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+- **Backend** — Laravel 13 (PHP 8.4+), Eloquent, Horizon, Reverb (websockets), domain-driven layout under `app/Domain/{BoundedContext}/{Actions|Jobs|Queries|Services|...}`.
+- **Frontend** — Vue 3 + Inertia v2 + TypeScript + Tailwind CSS. Single-page navigation; no API client layer (Inertia handles it).
+- **Tests** — PHPUnit feature tests with `RefreshDatabase`, `Http::fake()`, `Queue::fake()`. CI runs Pint + `php artisan test` + `npm run build`.
+- **Infrastructure** — SQLite for dev, MySQL/PostgreSQL for prod. Redis for queues + cache. GitHub App for OAuth + webhooks.
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## Phase status
 
-## Learning Laravel
+Status legend: ⬜ not started · 🟡 in progress · 🟢 done · 🔴 blocked
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+| # | Phase | Status | Notes |
+|---|-------|--------|-------|
+| 0 | Foundation (auth, layout, static overview) | 🟢 | 9/9 specs done. |
+| 1 | Projects & Repositories | 🟢 | 3/3 specs done. |
+| 2 | GitHub Integration MVP | 🟢 | 4/4 specs done — connection, repository import + sync, issues sync, PRs + unified Work Items page. |
+| 3 | GitHub Webhooks & Activity Feed | 🟡 | 0/3 specs merged. 017 webhooks + activity events in PR review; 018 Activity Feed UI + 019 Reverb broadcasting next. |
+| 4 | Deployments & CI/CD | ⬜ | — |
+| 5 | Website Monitoring | ⬜ | — |
+| 6 | Docker Host Agent MVP | ⬜ | — |
+| 7 | Alerts Engine | ⬜ | — |
+| 8 | Analytics & Health Scores | ⬜ | — |
+| 9 | Polish & Production Readiness | ⬜ | — |
+| 10 | Future Innovation | ⬜ | — |
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+Detailed per-spec status lives in [`specs/README.md`](specs/README.md). Each spec is one GitHub issue + one branch + one PR — see [`.claude/skills/nexus-spec-workflow`](.claude/skills/nexus-spec-workflow) for the workflow.
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+## What works today
 
-## Agentic Development
+After Phase 2:
+- Sign in, register, verify email.
+- Create projects with color/icon. Manually link a GitHub repository or import via the connected GitHub account.
+- Imported repos auto-sync metadata (description, branches, language, stars/forks, last push) and mirror their issues + pull requests into local tables.
+- Per-Repository tabs for Overview / Issues / Pull Requests with state badges, branch names, comment counts, and external links to GitHub.
+- A unified `/work-items` queue across all your imported repos, filterable by kind / state / repository / free-text search.
+- Settings page surfaces the GitHub connection (encrypted token storage, scope display, Reconnect CTA when expired) and a per-user "N repositories linked, last sync …" indicator.
+- Manual "Run sync" buttons everywhere a sync job exists.
+- Controller flash messages (`->with('status'|'error', …)`) render as a dismissable top banner in `AppLayout`, so failed actions (OAuth callbacks, sync triggers) surface to the user instead of failing silently. Silent OAuth callback branches also `Log::warning` for postmortem.
 
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+After Phase 3 (in flight at PR #46 — not yet merged):
+- Spec 017 — GitHub webhook ingestion endpoint at `POST /webhooks/github`. Verifies `X-Hub-Signature-256` (HMAC-SHA-256, timing-safe), stores deliveries idempotently, dispatches an async job, routes to per-event handlers. `issues` and `pull_request` events update the local mirrors and create `activity_events` rows. Backend only — UI for the activity feed lands in spec 018.
+
+## Local development
 
 ```bash
-composer require laravel/boost --dev
+# 1. Install backend + frontend deps
+composer install
+npm install
 
-php artisan boost:install
+# 2. Set up the env + key + db + storage
+cp .env.example .env
+php artisan key:generate
+touch database/database.sqlite
+php artisan migrate --seed
+php artisan storage:link
+
+# 3. Run the dev stack (Laravel + Vite + queue worker + scheduler)
+composer dev
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+`composer dev` runs Laravel, Vite, the queue worker, and the scheduler in parallel via concurrently. For real-time/websocket testing, use `composer dev:horizon` (also runs Reverb + Horizon).
 
-## Contributing
+### GitHub App setup
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+Phase 2's repository sync and Phase 3's webhooks both need a GitHub-side app registered against your account/org. Without `GITHUB_CLIENT_ID` set, the "Connect GitHub" button on `/settings` redirects to GitHub with an empty `client_id` and **GitHub itself returns a 404** — that's the canonical "I tried to connect and got a 404" symptom.
 
-## Code of Conduct
+#### 1. Register the app on GitHub
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+Two options — either works for spec 013's OAuth flow:
 
-## Security Vulnerabilities
+- **GitHub OAuth App** (simpler — fine until you start spec 017's webhooks): https://github.com/settings/developers → "New OAuth App".
+- **GitHub App** (use this if you also want Phase 3 webhooks; one app covers both flows): https://github.com/settings/apps → "New GitHub App".
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+Settings either way:
 
-## License
+| Field | Value |
+|-------|-------|
+| Application / GitHub App name | `Nexus Control Center (dev)` (any name; per-developer) |
+| Homepage URL | `http://localhost:8000` |
+| Authorization callback URL | `http://localhost:8000/integrations/github/callback` |
+| Webhook URL *(GitHub App only, optional pre-Phase-3)* | `https://<ngrok>.ngrok.io/webhooks/github` |
+| Webhook secret *(GitHub App only)* | a random string — must match `GITHUB_WEBHOOK_SECRET` in `.env` |
+| Permissions *(GitHub App only)* | Repository: read for `Metadata`, `Issues`, `Pull requests`. Account: read for `Email addresses` (optional). |
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+#### 2. Copy credentials into `.env`
+
+```
+GITHUB_CLIENT_ID=Iv1.xxxxxxxxxxxxxxxx
+GITHUB_CLIENT_SECRET=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+GITHUB_OAUTH_REDIRECT_URI=http://localhost:8000/integrations/github/callback
+GITHUB_WEBHOOK_SECRET=                # set this when you start spec 017
+```
+
+If you previously had Laravel running, restart it so config picks up the new env:
+
+```bash
+php artisan config:clear
+php artisan serve
+```
+
+#### 3. Use `localhost`, not `127.0.0.1`
+
+GitHub validates the OAuth callback host **exactly**. If your `GITHUB_OAUTH_REDIRECT_URI` says `localhost` but you browse via `http://127.0.0.1:8000`, the OAuth handshake will fail. Pick one and stick with it across the env value, the GitHub App's callback URL, and the URL you use in your browser.
+
+#### Phase 3 webhook tunneling
+
+Spec 017's webhook ingestion needs GitHub to be able to reach your dev server. Point an ngrok (or Cloudflare Tunnel) tunnel at port 8000 and set the GitHub App's Webhook URL to `https://<your-tunnel>/webhooks/github`. The `X-Hub-Signature-256` header is verified against `GITHUB_WEBHOOK_SECRET` — if that doesn't match the value configured on the App, every delivery 401's and never lands in the database.
+
+## Tests + linting
+
+```bash
+php artisan test                  # PHP feature + unit tests
+./vendor/bin/pint                 # PHP formatter (CI gate)
+npm run build                     # vue-tsc + Vite production build (CI gate)
+```
+
+CI workflow: [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+
+## Workflow conventions
+
+- Branches: `spec/NNN-<slug>` for spec branches, `chore/<slug>` / `fix/<slug>` for everything else. Direct push to `main` is blocked by branch protection.
+- One spec → one issue → one branch → one PR. Tasks within a spec live as checklists in the spec markdown, not as separate issues.
+- Squash-merge into `main`. Each spec lands as one commit.
+- Bookkeeping (flipping spec status to `done`, updating phase trackers) ships as a small follow-up `chore:` PR after the feature merges.
+
+Full workflow: [`.claude/skills/nexus-spec-workflow/SKILL.md`](.claude/skills/nexus-spec-workflow/SKILL.md).
+
+## Repository layout
+
+```
+app/
+    Domain/                 — bounded contexts (GitHub, Repositories, Activity, …)
+        {Context}/
+            Actions/        — invokable use-cases
+            Jobs/           — ShouldQueue background work
+            Services/       — external API wrappers
+            WebhookHandlers/— per-event handlers (spec 017+)
+            Queries/        — read-side query classes
+            Exceptions/
+    Enums/                  — string-backed PHP enums (status, severity, …)
+    Http/Controllers/
+    Http/Controllers/Webhooks/
+    Models/
+resources/js/
+    Pages/                  — Inertia page components (Overview, Projects, Repositories, WorkItems, Settings)
+    Components/             — shared UI (Sidebar, StatusBadge, ActivityFeed once spec 018 lands)
+    Layouts/AppLayout.vue   — primary chrome (sidebar + topbar + right rail)
+specs/
+    README.md               — phase tracker + per-spec links
+    phase-N-<slug>/         — one folder per phase
+        README.md           — phase summary + task list
+        NNN-<slug>.md       — individual spec
+```
