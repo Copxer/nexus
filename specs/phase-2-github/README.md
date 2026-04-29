@@ -14,7 +14,7 @@ This phase is **read-only against GitHub**. Webhooks and near-real-time updates 
 | 013 | GitHub App connection (OAuth flow, encrypted token storage, Settings/Integrations panel) | 🟢 |
 | 014 | Repository import (list available repos, user picks which to import, `SyncGitHubRepositoryJob` populates metadata) | 🟢 |
 | 015 | Issues sync (database + sync job + Repository Issues tab) | 🟢 |
-| 016 | Pull requests sync + unified Work Items page (both filters + "Run sync" buttons) | ⬜ |
+| 016 | Pull requests sync + unified Work Items page (both filters + "Run sync" buttons) | 🟢 |
 
 ## Acceptance criteria (phase-level)
 - [ ] User can connect a GitHub account and see their connection status.
