@@ -18,10 +18,17 @@ withDefaults(
 </script>
 
 <template>
+    <!-- No `h-*` utility on the root: callers control height via the
+         class they pass (`h-8`, `h-10`, etc.) and Vue's attribute
+         inheritance merges that class onto the <img>. If we set
+         `h-full` here it'd collide with the caller's `h-8` (same
+         specificity, so cascade order decides — `h-full` was winning,
+         making the image render at native size). `w-auto` preserves
+         the wordmark/mark aspect ratio off the caller's height. -->
     <img
         :src="variant === 'mark' ? '/nexus-logo-small.png' : '/nexus-logo.png'"
         alt="Nexus"
-        class="block h-full w-auto select-none"
+        class="block w-auto select-none"
         draggable="false"
     />
 </template>

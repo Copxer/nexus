@@ -120,17 +120,13 @@ const accentClasses: Record<Capability['accent'], { dot: string; ring: string }>
                 >
                     <!-- Compact mark below `sm` so the wordmark + action
                          buttons don't crowd phone-width viewports. -->
-                    <span class="block h-9 sm:hidden">
-                        <ApplicationLogo
-                            variant="mark"
-                            class="drop-shadow-[0_0_18px_rgba(34,211,238,0.55)]"
-                        />
-                    </span>
-                    <span class="hidden h-10 sm:block">
-                        <ApplicationLogo
-                            class="drop-shadow-[0_0_18px_rgba(34,211,238,0.55)]"
-                        />
-                    </span>
+                    <ApplicationLogo
+                        variant="mark"
+                        class="block h-9 drop-shadow-[0_0_18px_rgba(34,211,238,0.55)] sm:hidden"
+                    />
+                    <ApplicationLogo
+                        class="hidden h-10 drop-shadow-[0_0_18px_rgba(34,211,238,0.55)] sm:block"
+                    />
                 </Link>
 
                 <nav v-if="canLogin" class="flex items-center gap-2">
