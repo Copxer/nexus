@@ -12,7 +12,7 @@ Add real project and repository records to Nexus. Replace the mock dashboard dat
 |---|------|--------|
 | 010 | Projects (model + migration + factory + policy + CRUD pages + sidebar/palette activation) | 🟢 |
 | 011 | Repositories (model + migration + manual link + index/show pages + sidebar/palette activation) | 🟢 |
-| 012 | Wire Overview KPIs and Top Repositories widget to the database | ⬜ |
+| 012 | Wire Overview KPIs and Top Repositories widget to the database | 🟢 |
 
 ## Acceptance criteria (phase-level)
 - [ ] User can create, edit, and delete a project from the UI (`/projects` index, create form, detail page).
