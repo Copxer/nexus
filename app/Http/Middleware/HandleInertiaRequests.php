@@ -34,6 +34,14 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $request->user(),
             ],
+            // Surfaces `->with('status', …)` and `->with('error', …)`
+            // flashes from controllers (e.g. the OAuth callback) so the
+            // page layout can render a banner. Without this, controllers
+            // that flash silently look broken to the user.
+            'flash' => [
+                'status' => fn () => $request->session()->get('status'),
+                'error' => fn () => $request->session()->get('error'),
+            ],
         ];
     }
 }
