@@ -1,12 +1,13 @@
 ---
 spec: overview-to-db
 phase: 1-projects
-status: in-progress
+status: done
 owner: yoany
 created: 2026-04-28
 updated: 2026-04-28
 issue: https://github.com/Copxer/nexus/issues/30
 branch: spec/012-overview-to-db
+pr: https://github.com/Copxer/nexus/pull/31
 ---
 
 # 012 — Wire Overview KPIs and Top Repositories widget to the database
