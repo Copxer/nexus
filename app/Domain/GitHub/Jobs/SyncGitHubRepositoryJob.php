@@ -106,21 +106,45 @@ class SyncGitHubRepositoryJob implements ShouldQueue
             $this->markFailed($repository);
         }
 
-        // Chain spec 015's issues sync. Dispatch lives outside the
-        // try/catch above so a transient queue failure here doesn't
-        // flip a freshly-synced repo back to `failed` — issues sync
-        // has its own independent status on the repo row.
+        // Chain spec 015's issues sync and spec 016's PRs sync. Both
+        // dispatches sit outside the try/catch above so a transient
+        // queue failure here doesn't flip a freshly-synced repo back
+        // to `failed` — both child syncs carry their own independent
+        // statuses on the repo row.
         if ($metadataSynced) {
-            try {
-                SyncRepositoryIssuesJob::dispatch($repository->id);
-            } catch (Throwable $e) {
-                Log::warning('GitHub issues sync dispatch failed', [
-                    'repository_id' => $repository->id,
-                    'full_name' => $repository->full_name,
-                    'exception' => $e::class,
-                    'message' => $e->getMessage(),
-                ]);
-            }
+            $this->dispatchChildSync(
+                fn () => SyncRepositoryIssuesJob::dispatch($repository->id),
+                $repository,
+                'issues',
+            );
+
+            $this->dispatchChildSync(
+                fn () => SyncRepositoryPullRequestsJob::dispatch($repository->id),
+                $repository,
+                'pulls',
+            );
+        }
+    }
+
+    /**
+     * Wrap a child-sync dispatch in its own try/catch so a queue-driver
+     * blip in one chained sync doesn't suppress the other. Logs the
+     * failure; the user can recover via the per-tab "Run sync" buttons.
+     */
+    private function dispatchChildSync(
+        callable $dispatcher,
+        Repository $repository,
+        string $kind,
+    ): void {
+        try {
+            $dispatcher();
+        } catch (Throwable $e) {
+            Log::warning("GitHub {$kind} sync dispatch failed", [
+                'repository_id' => $repository->id,
+                'full_name' => $repository->full_name,
+                'exception' => $e::class,
+                'message' => $e->getMessage(),
+            ]);
         }
     }
 

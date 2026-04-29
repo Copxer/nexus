@@ -35,6 +35,8 @@ class Repository extends Model
         'sync_status',
         'issues_sync_status',
         'issues_synced_at',
+        'prs_sync_status',
+        'prs_synced_at',
     ];
 
     protected function casts(): array
@@ -42,6 +44,7 @@ class Repository extends Model
         return [
             'sync_status' => RepositorySyncStatus::class,
             'issues_sync_status' => RepositorySyncStatus::class,
+            'prs_sync_status' => RepositorySyncStatus::class,
             'stars_count' => 'integer',
             'forks_count' => 'integer',
             'open_issues_count' => 'integer',
@@ -49,6 +52,7 @@ class Repository extends Model
             'last_pushed_at' => 'datetime',
             'last_synced_at' => 'datetime',
             'issues_synced_at' => 'datetime',
+            'prs_synced_at' => 'datetime',
         ];
     }
 
@@ -70,5 +74,10 @@ class Repository extends Model
     public function issues(): HasMany
     {
         return $this->hasMany(GithubIssue::class);
+    }
+
+    public function pullRequests(): HasMany
+    {
+        return $this->hasMany(GithubPullRequest::class);
     }
 }

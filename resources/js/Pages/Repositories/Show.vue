@@ -56,7 +56,21 @@ interface IssueRow {
     html_url: string;
 }
 
-interface IssuesSyncShape {
+interface PullRequestRow {
+    id: number;
+    number: number;
+    title: string;
+    state: 'open' | 'closed' | 'merged' | string | null;
+    author_login: string | null;
+    base_branch: string;
+    head_branch: string;
+    draft: boolean;
+    comments_count: number;
+    updated_at_github: string | null;
+    html_url: string;
+}
+
+interface SyncShape {
     status: string | null;
     synced_at: string | null;
 }
@@ -66,10 +80,12 @@ const props = defineProps<{
     canDelete: boolean;
     canSync: boolean;
     issues: IssueRow[];
-    issuesSync: IssuesSyncShape;
+    issuesSync: SyncShape;
+    pullRequests: PullRequestRow[];
+    pullRequestsSync: SyncShape;
 }>();
 
-const tab = ref<'overview' | 'issues'>('overview');
+const tab = ref<'overview' | 'issues' | 'pulls'>('overview');
 
 const syncStatusTone = (status: string | null) =>
     (
@@ -84,6 +100,15 @@ const syncStatusTone = (status: string | null) =>
 const issueStateTone = (state: string | null) =>
     state === 'open' ? 'info' : 'muted';
 
+const prStateTone = (state: string | null) =>
+    (
+        ({
+            open: 'info',
+            merged: 'success',
+            closed: 'muted',
+        }) as const
+    )[state ?? ''] ?? 'muted';
+
 const projectAccentClass = (color: string | null) =>
     (
         ({
@@ -97,7 +122,11 @@ const projectAccentClass = (color: string | null) =>
     )[color ?? ''] ?? 'text-text-muted';
 
 const issuesCount = computed(() => props.issues.length);
-const isSyncing = computed(() => props.issuesSync.status === 'syncing');
+const pullRequestsCount = computed(() => props.pullRequests.length);
+const isIssuesSyncing = computed(() => props.issuesSync.status === 'syncing');
+const isPullRequestsSyncing = computed(
+    () => props.pullRequestsSync.status === 'syncing',
+);
 
 const confirmDelete = () => {
     if (!props.canDelete) return;
@@ -115,6 +144,15 @@ const runIssuesSync = () => {
     if (!props.canSync) return;
     router.post(
         route('repositories.issues.sync', props.repository.full_name),
+        {},
+        { preserveScroll: true },
+    );
+};
+
+const runPullRequestsSync = () => {
+    if (!props.canSync) return;
+    router.post(
+        route('repositories.pulls.sync', props.repository.full_name),
         {},
         { preserveScroll: true },
     );
@@ -297,6 +335,25 @@ const runIssuesSync = () => {
                         {{ issuesCount }}
                     </span>
                 </button>
+                <button
+                    type="button"
+                    :class="[
+                        'inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] transition focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60',
+                        tab === 'pulls'
+                            ? 'border-accent-cyan/60 bg-accent-cyan/15 text-accent-cyan'
+                            : 'border-border-subtle bg-background-panel-hover text-text-secondary hover:text-text-primary',
+                    ]"
+                    @click="tab = 'pulls'"
+                >
+                    <GitPullRequest class="h-3.5 w-3.5" aria-hidden="true" />
+                    Pull Requests
+                    <span
+                        v-if="pullRequestsCount > 0"
+                        class="rounded-full border border-current/40 px-1.5 py-0.5 text-[10px] font-mono"
+                    >
+                        {{ pullRequestsCount }}
+                    </span>
+                </button>
             </nav>
 
             <!-- Overview panel -->
@@ -398,7 +455,7 @@ const runIssuesSync = () => {
             </template>
 
             <!-- Issues panel -->
-            <template v-else>
+            <template v-else-if="tab === 'issues'">
                 <section aria-label="Issues" class="glass-card p-6 sm:p-8">
                     <header
                         class="flex flex-wrap items-center justify-between gap-3 border-b border-border-subtle pb-4"
@@ -425,11 +482,11 @@ const runIssuesSync = () => {
                             v-if="canSync"
                             type="button"
                             class="inline-flex items-center gap-2 rounded-lg border border-accent-cyan/40 bg-accent-cyan/15 px-3 py-2 text-sm font-semibold text-accent-cyan transition hover:border-accent-cyan/60 disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
-                            :disabled="isSyncing"
+                            :disabled="isIssuesSyncing"
                             @click="runIssuesSync"
                         >
                             <RefreshCcw class="h-4 w-4" aria-hidden="true" />
-                            {{ isSyncing ? 'Syncing…' : 'Run sync' }}
+                            {{ isIssuesSyncing ? 'Syncing…' : 'Run sync' }}
                         </button>
                     </header>
 
@@ -505,6 +562,129 @@ const runIssuesSync = () => {
                             The last issues sync failed.
                         </span>
                         <span v-else>No issues mirrored for this repository.</span>
+                        <span v-if="canSync"> Click <span class="font-mono">Run sync</span> to fetch from GitHub.</span>
+                    </p>
+                </section>
+            </template>
+
+            <!-- Pull Requests panel -->
+            <template v-else>
+                <section aria-label="Pull Requests" class="glass-card p-6 sm:p-8">
+                    <header
+                        class="flex flex-wrap items-center justify-between gap-3 border-b border-border-subtle pb-4"
+                    >
+                        <div class="flex items-center gap-3">
+                            <h3 class="text-sm font-semibold text-text-primary">
+                                Pull requests mirror
+                            </h3>
+                            <StatusBadge
+                                v-if="pullRequestsSync.status"
+                                :tone="syncStatusTone(pullRequestsSync.status)"
+                            >
+                                {{ pullRequestsSync.status }}
+                            </StatusBadge>
+                            <span
+                                v-if="pullRequestsSync.synced_at"
+                                class="text-xs text-text-muted"
+                            >
+                                Last sync
+                                <span class="font-mono text-text-secondary">{{ pullRequestsSync.synced_at }}</span>
+                            </span>
+                        </div>
+                        <button
+                            v-if="canSync"
+                            type="button"
+                            class="inline-flex items-center gap-2 rounded-lg border border-accent-cyan/40 bg-accent-cyan/15 px-3 py-2 text-sm font-semibold text-accent-cyan transition hover:border-accent-cyan/60 disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
+                            :disabled="isPullRequestsSyncing"
+                            @click="runPullRequestsSync"
+                        >
+                            <RefreshCcw class="h-4 w-4" aria-hidden="true" />
+                            {{ isPullRequestsSyncing ? 'Syncing…' : 'Run sync' }}
+                        </button>
+                    </header>
+
+                    <ul
+                        v-if="pullRequests.length > 0"
+                        class="mt-2 divide-y divide-border-subtle"
+                    >
+                        <li
+                            v-for="pr in pullRequests"
+                            :key="pr.id"
+                            class="flex flex-col gap-2 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+                        >
+                            <div class="flex min-w-0 items-start gap-3">
+                                <GitPullRequest
+                                    class="mt-1 h-4 w-4 shrink-0"
+                                    :class="{
+                                        'text-accent-cyan': pr.state === 'open',
+                                        'text-status-success': pr.state === 'merged',
+                                        'text-text-muted':
+                                            pr.state === 'closed' || !pr.state,
+                                    }"
+                                    aria-hidden="true"
+                                />
+                                <div class="flex min-w-0 flex-col gap-1">
+                                    <a
+                                        :href="pr.html_url"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        class="truncate text-sm font-semibold text-text-primary transition hover:text-accent-cyan"
+                                    >
+                                        <span class="font-mono text-text-muted">#{{ pr.number }}</span>
+                                        {{ pr.title }}
+                                    </a>
+                                    <p class="text-xs text-text-muted">
+                                        <span v-if="pr.author_login">
+                                            <span class="font-mono text-text-secondary">@{{ pr.author_login }}</span>
+                                            ·
+                                        </span>
+                                        <span class="font-mono text-text-secondary">
+                                            {{ pr.base_branch }} ← {{ pr.head_branch }}
+                                        </span>
+                                        · Updated {{ pr.updated_at_github ?? '—' }}
+                                    </p>
+                                </div>
+                            </div>
+                            <div
+                                class="flex flex-shrink-0 items-center gap-3 text-xs text-text-muted"
+                            >
+                                <StatusBadge
+                                    v-if="pr.draft"
+                                    tone="muted"
+                                >
+                                    draft
+                                </StatusBadge>
+                                <StatusBadge :tone="prStateTone(pr.state)">
+                                    {{ pr.state }}
+                                </StatusBadge>
+                                <span class="inline-flex items-center gap-1">
+                                    <MessageSquare class="h-3.5 w-3.5" aria-hidden="true" />
+                                    {{ pr.comments_count }}
+                                </span>
+                                <a
+                                    :href="pr.html_url"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    class="text-text-muted transition hover:text-accent-cyan"
+                                    :aria-label="`Open pull request #${pr.number} on GitHub`"
+                                >
+                                    <ExternalLink class="h-4 w-4" aria-hidden="true" />
+                                </a>
+                            </div>
+                        </li>
+                    </ul>
+
+                    <p
+                        v-else
+                        class="mt-6 rounded-lg border border-dashed border-border-subtle bg-background-panel-hover/30 p-4 text-sm text-text-muted"
+                    >
+                        <span v-if="pullRequestsSync.status === 'pending'">
+                            Pull requests haven't been synced yet.
+                        </span>
+                        <span v-else-if="pullRequestsSync.status === 'failed'">
+                            The last pull requests sync failed.
+                        </span>
+                        <span v-else>No pull requests mirrored for this repository.</span>
                         <span v-if="canSync"> Click <span class="font-mono">Run sync</span> to fetch from GitHub.</span>
                     </p>
                 </section>

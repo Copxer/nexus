@@ -36,7 +36,7 @@ const nav: NavItem[] = [
     { label: 'Overview', icon: LayoutDashboard, routeName: 'overview' },
     { label: 'Projects', icon: FolderKanban, routeName: 'projects.index' },
     { label: 'Repositories', icon: GitBranch, routeName: 'repositories.index' },
-    { label: 'Issues & PRs', icon: GitPullRequest, disabled: true, soonLabel: 'Phase 2' },
+    { label: 'Issues & PRs', icon: GitPullRequest, routeName: 'work-items.index' },
     { label: 'Pipelines', icon: Activity, disabled: true, soonLabel: 'Phase 4' },
     { label: 'Deployments', icon: Rocket, disabled: true, soonLabel: 'Phase 4' },
     { label: 'Hosts', icon: Server, disabled: true, soonLabel: 'Phase 6' },
