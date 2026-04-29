@@ -34,7 +34,7 @@ interface NavItem {
 // helps tell readers which spec will activate each item.
 const nav: NavItem[] = [
     { label: 'Overview', icon: LayoutDashboard, routeName: 'overview' },
-    { label: 'Projects', icon: FolderKanban, disabled: true, soonLabel: 'Phase 1' },
+    { label: 'Projects', icon: FolderKanban, routeName: 'projects.index' },
     { label: 'Repositories', icon: GitBranch, disabled: true, soonLabel: 'Phase 1' },
     { label: 'Issues & PRs', icon: GitPullRequest, disabled: true, soonLabel: 'Phase 2' },
     { label: 'Pipelines', icon: Activity, disabled: true, soonLabel: 'Phase 4' },
@@ -46,8 +46,15 @@ const nav: NavItem[] = [
     { label: 'Settings', icon: SettingsIcon, disabled: true, soonLabel: 'Phase 1' },
 ];
 
-const isActive = (item: NavItem) =>
-    item.routeName ? route().current(item.routeName) : false;
+// Match the route exactly OR any sibling under the same resource family
+// (so `/projects/foo` keeps the Projects nav lit). For non-resourceful
+// routes like `overview` the wildcard match harmlessly returns false.
+const isActive = (item: NavItem): boolean => {
+    if (!item.routeName) return false;
+    if (route().current(item.routeName)) return true;
+    const family = item.routeName.split('.')[0];
+    return route().current(`${family}.*`);
+};
 
 const itemHref = (item: NavItem) =>
     item.routeName ? route(item.routeName) : (item.href ?? '#');
