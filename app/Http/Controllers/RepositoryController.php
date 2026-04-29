@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\GitHub\Actions\ImportRepositoryAction;
 use App\Domain\GitHub\Queries\IssuesForRepositoryQuery;
 use App\Domain\GitHub\Queries\PullRequestsForRepositoryQuery;
-use App\Domain\Repositories\Actions\LinkRepositoryToProjectAction;
 use App\Http\Requests\Repositories\LinkRepositoryRequest;
 use App\Models\Repository;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -64,7 +64,7 @@ class RepositoryController extends Controller
         ]);
     }
 
-    public function store(LinkRepositoryRequest $request, LinkRepositoryToProjectAction $action): RedirectResponse
+    public function store(LinkRepositoryRequest $request, ImportRepositoryAction $action): RedirectResponse
     {
         $project = $request->resolvedProject();
 
@@ -73,7 +73,7 @@ class RepositoryController extends Controller
         $this->authorize('create', [Repository::class, $project]);
 
         try {
-            $action->execute($project, $request->string('repository')->toString());
+            $repository = $action->execute($project, $request->string('repository')->toString());
         } catch (InvalidArgumentException $e) {
             return back()->withErrors(['repository' => $e->getMessage()]);
         } catch (UniqueConstraintViolationException) {
@@ -84,7 +84,7 @@ class RepositoryController extends Controller
 
         return redirect()
             ->route('projects.show', $project)
-            ->with('status', 'Repository linked.');
+            ->with('status', "Linking {$repository->full_name}…");
     }
 
     public function destroy(Repository $repository): RedirectResponse

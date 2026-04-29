@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Repositories;
 
+use App\Domain\GitHub\Jobs\SyncGitHubRepositoryJob;
 use App\Enums\GithubIssueState;
 use App\Enums\GithubPullRequestState;
 use App\Models\GithubIssue;
@@ -10,6 +11,7 @@ use App\Models\Project;
 use App\Models\Repository;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Inertia\Testing\AssertableInertia;
 use Tests\TestCase;
 
@@ -143,6 +145,7 @@ class RepositoryControllerTest extends TestCase
 
     public function test_store_links_via_a_full_github_url(): void
     {
+        Queue::fake();
         $user = $this->verifiedUser();
         $project = Project::factory()->create(['owner_user_id' => $user->id]);
 
@@ -157,10 +160,20 @@ class RepositoryControllerTest extends TestCase
             'full_name' => 'nexus-org/nexus-api',
             'sync_status' => 'pending',
         ]);
+
+        $linked = Repository::query()
+            ->where('full_name', 'nexus-org/nexus-api')
+            ->firstOrFail();
+
+        Queue::assertPushed(
+            SyncGitHubRepositoryJob::class,
+            fn (SyncGitHubRepositoryJob $job) => $job->repositoryId === $linked->id,
+        );
     }
 
     public function test_store_links_via_owner_slash_name(): void
     {
+        Queue::fake();
         $user = $this->verifiedUser();
         $project = Project::factory()->create(['owner_user_id' => $user->id]);
 
@@ -173,6 +186,8 @@ class RepositoryControllerTest extends TestCase
             'project_id' => $project->id,
             'full_name' => 'nexus-labs/edge-cache',
         ]);
+
+        Queue::assertPushed(SyncGitHubRepositoryJob::class);
     }
 
     public function test_store_rejects_garbage_input(): void

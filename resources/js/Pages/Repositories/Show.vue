@@ -17,7 +17,7 @@ import {
     Star,
     Trash2,
 } from 'lucide-vue-next';
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 
 interface RepositoryShape {
     id: number;
@@ -127,6 +127,9 @@ const isIssuesSyncing = computed(() => props.issuesSync.status === 'syncing');
 const isPullRequestsSyncing = computed(
     () => props.pullRequestsSync.status === 'syncing',
 );
+const isRepositorySyncing = computed(
+    () => props.repository.sync_status === 'syncing',
+);
 
 const confirmDelete = () => {
     if (!props.canDelete) return;
@@ -157,6 +160,61 @@ const runPullRequestsSync = () => {
         { preserveScroll: true },
     );
 };
+
+const runRepositorySync = () => {
+    if (!props.canSync) return;
+    router.post(
+        route('repositories.sync', props.repository.full_name),
+        {},
+        { preserveScroll: true },
+    );
+};
+
+// While ANY of the three sync flows (repository / issues / PRs) is in
+// `syncing` state, poll the controller every 2.5s for the latest status —
+// a partial Inertia reload that re-fetches just the three sync-related
+// props so the page updates without flashing or losing scroll. Stops on
+// its own as soon as all three flip out of `syncing`. Spec 019 will
+// replace this with Reverb broadcasts.
+const POLL_INTERVAL_MS = 2500;
+let pollHandle: ReturnType<typeof setInterval> | null = null;
+
+const anySyncing = computed(
+    () =>
+        isRepositorySyncing.value ||
+        isIssuesSyncing.value ||
+        isPullRequestsSyncing.value,
+);
+
+const stopPolling = () => {
+    if (pollHandle !== null) {
+        clearInterval(pollHandle);
+        pollHandle = null;
+    }
+};
+
+const startPolling = () => {
+    if (pollHandle !== null) return;
+    pollHandle = setInterval(() => {
+        // `router.reload` is a same-route partial fetch — no navigation, so
+        // scroll + component state are preserved by default. `only` keeps
+        // the payload tiny (just the three sync-related props).
+        router.reload({
+            only: ['repository', 'issuesSync', 'pullRequestsSync'],
+        });
+    }, POLL_INTERVAL_MS);
+};
+
+watch(
+    anySyncing,
+    (now) => {
+        if (now) startPolling();
+        else stopPolling();
+    },
+    { immediate: true },
+);
+
+onBeforeUnmount(stopPolling);
 </script>
 
 <template>
@@ -217,6 +275,20 @@ const runPullRequestsSync = () => {
                             <ExternalLink class="h-4 w-4" aria-hidden="true" />
                             View on GitHub
                         </a>
+                        <button
+                            v-if="canSync"
+                            type="button"
+                            :disabled="isRepositorySyncing"
+                            class="inline-flex items-center gap-2 rounded-lg border border-accent-cyan/40 bg-accent-cyan/15 px-3 py-2 text-sm font-semibold text-accent-cyan transition hover:border-accent-cyan/60 disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
+                            @click="runRepositorySync"
+                        >
+                            <RefreshCcw
+                                class="h-4 w-4"
+                                :class="{ 'animate-spin': isRepositorySyncing }"
+                                aria-hidden="true"
+                            />
+                            {{ isRepositorySyncing ? 'Syncing…' : 'Run sync' }}
+                        </button>
                         <button
                             v-if="canDelete"
                             type="button"
