@@ -35,6 +35,41 @@ export default defineConfig(({ mode }) => {
     // a brand-new clone with VITE_DEV_SERVER_URL but empty APP_URL still works.
     const corsOrigins = [env.APP_URL, tunnel?.origin].filter(Boolean);
 
+    // Explicit allow-list of host headers Vite will accept in tunnel mode.
+    // Listed eagerly so the value is the same object reference Vite eventually
+    // freezes — see node_modules/vite/dist/node/chunks/node.js, the line that
+    // does `Object.freeze([...config.server.allowedHosts])` during config
+    // resolution. Order:
+    //   - the tunnel's public hostname (preserved by cloudflared on forward),
+    //   - `.trycloudflare.com` subdomain wildcard so a fresh quick-tunnel URL
+    //     works without restarting Vite,
+    //   - `localhost` / `127.0.0.1` for direct local hits and for any
+    //     forwarder that does rewrite Host.
+    // The security boundary stays `cors.origin` below — only browsers from the
+    // configured public origins can actually consume the responses.
+    const allowedHosts = tunnel
+        ? [
+              tunnel.hostname,
+              '.trycloudflare.com',
+              'localhost',
+              '127.0.0.1',
+              `localhost:${localPort}`,
+              `127.0.0.1:${localPort}`,
+          ]
+        : undefined;
+
+    if (tunnel) {
+        // Loud startup banner so tunnel-mode activation (and the resolved
+        // values) is visible inside the `composer run dev` concurrently
+        // output (prefixed `vite:`). If you ever see a "Blocked request" 403,
+        // copy/paste this banner so it's clear what Vite was actually told.
+        console.info(
+            `[vite] tunnel mode active — origin=${tunnel.origin}, port=${localPort}, allowedHosts=${JSON.stringify(allowedHosts)}, cors=${
+                corsOrigins.length > 0 ? corsOrigins.join(',') : 'any'
+            }`,
+        );
+    }
+
     return {
         plugins: [
             laravel({
@@ -51,62 +86,29 @@ export default defineConfig(({ mode }) => {
             }),
         ],
         server: tunnel
-            ? (() => {
-                  // Loud startup log so tunnel-mode activation is visible inside
-                  // the `composer run dev` concurrently output (prefixed `vite:`).
-                  console.info(
-                      `[vite] tunnel mode active — origin=${tunnel.origin}, port=${localPort}, cors=${
-                          corsOrigins.length > 0 ? corsOrigins.join(',') : 'any'
-                      }`,
-                  );
-
-                  return {
-                      // Bind every interface so the cloudflared sidecar can reach Vite.
-                      host: '0.0.0.0',
-                      port: localPort,
-                      // Lock the port. If Vite drifts (5174 etc.) the tunnel
-                      // breaks silently — better to fail loudly so the dev sets
-                      // VITE_DEV_SERVER_PORT or frees the default port.
-                      strictPort: true,
-                      // Explicit allow-list. `allowedHosts: true` ought to work
-                      // but doesn't reliably propagate in rolldown-vite (the
-                      // `vite ^8` flavour this project uses), so we list
-                      // everything Vite might see in tunnel mode:
-                      //   - the tunnel's public hostname (preserved by
-                      //     cloudflared on forward),
-                      //   - `.trycloudflare.com` subdomain wildcard so a fresh
-                      //     quick-tunnel URL works without a restart,
-                      //   - `localhost` / `127.0.0.1` for direct local hits and
-                      //     for any forwarder that does rewrite Host.
-                      // The security boundary stays `cors.origin` below — only
-                      // browsers from the configured public origins can
-                      // actually consume the responses.
-                      allowedHosts: [
-                          tunnel.hostname,
-                          '.trycloudflare.com',
-                          'localhost',
-                          '127.0.0.1',
-                          `localhost:${localPort}`,
-                          `127.0.0.1:${localPort}`,
-                      ],
-                      // Force every asset URL injected into Blade to use the
-                      // public host instead of `[::1]:5173` / `localhost:5173`.
-                      origin: tunnel.origin,
-                      // Cross-origin asset loads from the Laravel-side tunnel.
-                      // Tightened to APP_URL + the tunnel itself; a missing
-                      // APP_URL falls back to `true` so a fresh clone still
-                      // boots.
-                      cors:
-                          corsOrigins.length > 0
-                              ? { origin: corsOrigins }
-                              : true,
-                      hmr: {
-                          host: tunnel.hostname,
-                          protocol: tunnel.protocol === 'https:' ? 'wss' : 'ws',
-                          clientPort: tunnel.protocol === 'https:' ? 443 : 80,
-                      },
-                  };
-              })()
+            ? {
+                  // Bind every interface so the cloudflared sidecar can reach Vite.
+                  host: '0.0.0.0',
+                  port: localPort,
+                  // Lock the port. If Vite drifts (5174 etc.) the tunnel breaks
+                  // silently — better to fail loudly so the dev sets
+                  // VITE_DEV_SERVER_PORT or frees the default port.
+                  strictPort: true,
+                  allowedHosts,
+                  // Force every asset URL injected into Blade to use the
+                  // public host instead of `[::1]:5173` / `localhost:5173`.
+                  origin: tunnel.origin,
+                  // Cross-origin asset loads from the Laravel-side tunnel.
+                  cors:
+                      corsOrigins.length > 0
+                          ? { origin: corsOrigins }
+                          : true,
+                  hmr: {
+                      host: tunnel.hostname,
+                      protocol: tunnel.protocol === 'https:' ? 'wss' : 'ws',
+                      clientPort: tunnel.protocol === 'https:' ? 443 : 80,
+                  },
+              }
             : undefined,
     };
 });
