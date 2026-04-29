@@ -77,6 +77,13 @@ Roadmap reference: §8.10 Activity Feed, §11.3 App Layout, §22.6 Sidebar (the 
 - Spec drafted. Confirmed existing surface: `ActivityEvent` model + table, `CreateActivityEventAction`, `ActivityFeed.vue` + `ActivityFeedItem.vue`, `RightActivityRail.vue` already accept events, `AppLayout.vue` already forwards `activityEvents`. Discovered Overview's `recentActivity` is still **mock** (MOCK_ACTIVITY in `GetOverviewDashboardQuery`); the real-vs-mock split happens in the rail where the shared Inertia prop now serves real events.
 - Built the query, wired the shared prop with a lazy closure (guests pay nothing), updated AppLayout's resolution, added the `/activity` route + page, activated the Sidebar entry. Tests cover scoping, ordering, mapping, controller render, 100-cap, auth gate, and shared-prop visibility from a third-party route (Overview).
 - Pipeline: Pint clean, `npm run build` green, `php artisan test` 216/216 (was 208).
+- Ran `superpowers:code-reviewer`. No blockers; one **wording bug** + a few correctness/coverage materials. Fixed in commit (TBD):
+    - Corrected the "lazy closure" wording in `HandleInertiaRequests.php` and the `AppLayout.vue` doc-comment — Inertia's `share()` invokes returned closures every render; the `$request->user()` guard is what actually spares guests. Behaviour is correct; only the comment was misleading.
+    - Switched AppLayout's discriminator from `props.activityEvents.length > 0` to `props.activityEvents !== undefined` and dropped the default factory, so a page can pass an explicit empty array to force the empty-state instead of being silently fallthrough'd to the shared 20.
+    - Tightened typing: `usePage<PageProps>()`, dropped the `as { recent?: ... }` cast, used `page.props.flash?.status` directly.
+    - Added two test cases — guest request payload (`activity.recent` is empty array, no query invoked) and `repository_id IS NULL` exclusion (system-emitted events are filtered out today and won't leak across users in a future refactor).
+    - Documented the `repository_id IS NULL` filter behaviour with a `TODO(future)` next to the `whereHas` predicate so the next author broadening it (when deployment / website events arrive) sees the constraint.
+- Final pipeline: Pint clean, `npm run build` green, `php artisan test` **218/218**.
 
 ## Open questions / blockers
 - **Sidebar slot ordering.** Roadmap §7.6 lists 11 items, no "Activity" entry — the activity feed lives in the right rail. But a dedicated `/activity` page deserves a sidebar entry. Plan: add it as a 12th item between **Alerts** and **Settings**. If the user prefers a different slot, adjust before implementing.

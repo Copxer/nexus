@@ -43,10 +43,12 @@ class HandleInertiaRequests extends Middleware
                 'status' => fn () => $request->session()->get('status'),
                 'error' => fn () => $request->session()->get('error'),
             ],
-            // Right-rail activity feed (spec 018). Pulled lazily so guest
-            // requests don't pay the query cost — the closure isn't
-            // invoked unless the page actually reads `activity.recent`,
-            // and AppLayout only does that on authenticated pages.
+            // Right-rail activity feed (spec 018). Inertia evaluates this
+            // closure on every render (it's not a `LazyProp`); the
+            // `$request->user()` guard is what spares anonymous requests
+            // from running the query. Authenticated pages pay one indexed
+            // `whereHas` per render, capped at 20 rows. Spec 019 will move
+            // realtime updates onto Reverb; the page-load read stays here.
             'activity' => [
                 'recent' => fn () => $request->user()
                     ? app(RecentActivityForUserQuery::class)

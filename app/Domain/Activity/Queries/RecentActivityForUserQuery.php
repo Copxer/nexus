@@ -44,6 +44,12 @@ class RecentActivityForUserQuery
      */
     public function handle(User $user, int $limit = self::RAIL_LIMIT): array
     {
+        // TODO(future): broaden the predicate when system-emitted events
+        // (deployments, websites, hosts) start landing without a repository.
+        // Today every spec-017 webhook event carries a repository_id, so
+        // the EXISTS subquery against repositories→projects is watertight
+        // and rows with repository_id IS NULL are filtered out for every
+        // user — they don't leak across users, but they also don't show.
         return ActivityEvent::query()
             ->with('repository:id,full_name')
             ->whereHas('repository.project', function ($q) use ($user) {

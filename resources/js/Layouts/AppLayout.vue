@@ -3,28 +3,25 @@ import RightActivityRail from '@/Components/Activity/RightActivityRail.vue';
 import CommandPalette from '@/Components/CommandPalette/CommandPalette.vue';
 import Sidebar from '@/Components/Sidebar/Sidebar.vue';
 import TopBar from '@/Components/TopBar/TopBar.vue';
-import type { ActivityEvent } from '@/types';
+import type { ActivityEvent, PageProps } from '@/types';
 import { router, usePage } from '@inertiajs/vue3';
 import { AlertTriangle, CheckCircle2, X } from 'lucide-vue-next';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
-const props = withDefaults(
-    defineProps<{
-        /**
-         * Optional populated feed forwarded into both `<RightActivityRail>`
-         * instances (column + drawer). When omitted (the common case),
-         * AppLayout falls back to the shared `activity.recent` Inertia prop
-         * registered in `HandleInertiaRequests::share()` (spec 018), so any
-         * authenticated page automatically lights up the rail without
-         * explicit pass-through. Pages that need a different feed (e.g. a
-         * project-scoped slice) can still pass their own array and override.
-         */
-        activityEvents?: ActivityEvent[];
-    }>(),
-    {
-        activityEvents: () => [],
-    },
-);
+const props = defineProps<{
+    /**
+     * Optional populated feed forwarded into both `<RightActivityRail>`
+     * instances (column + drawer). When **omitted** (the common case),
+     * AppLayout falls back to the shared `activity.recent` Inertia prop
+     * registered in `HandleInertiaRequests::share()` (spec 018), so any
+     * authenticated page automatically lights up the rail without
+     * explicit pass-through. Pages that need a different feed (e.g. a
+     * project-scoped slice) can pass their own array. Pass an explicit
+     * empty array to force the empty-state instead of falling back to
+     * the shared feed.
+     */
+    activityEvents?: ActivityEvent[];
+}>();
 
 const sidebarOpen = ref(false);
 const activityRailOpen = ref(false);
@@ -35,32 +32,28 @@ const paletteOpen = ref(false);
 // HandleInertiaRequests::share(). We snapshot to local refs on each
 // page navigation so dismissing the banner via the X is sticky for the
 // current page (and the next nav clears it, regardless).
-const page = usePage();
+const page = usePage<PageProps>();
 const flashStatus = ref<string | null>(null);
 const flashError = ref<string | null>(null);
 
 const syncFlash = () => {
-    const flash = (page.props.flash ?? {}) as {
-        status?: string | null;
-        error?: string | null;
-    };
-    flashStatus.value = flash.status ?? null;
-    flashError.value = flash.error ?? null;
+    flashStatus.value = page.props.flash?.status ?? null;
+    flashError.value = page.props.flash?.error ?? null;
 };
 
 syncFlash();
 router.on('navigate', syncFlash);
 
-// Activity feed sourcing: explicit prop wins when a page passed one;
-// otherwise read the shared `activity.recent` Inertia prop populated by
-// `HandleInertiaRequests::share()`. Reactive on every navigation so a
-// fresh page sees fresh events without the rail flickering.
+// Activity feed sourcing: an **explicit** prop (including an explicit
+// empty array, to force the empty-state) wins. When the prop is absent
+// entirely, fall back to the shared `activity.recent` Inertia prop
+// populated by `HandleInertiaRequests::share()`. Reactive on every
+// navigation so a fresh page sees fresh events without flickering.
 const resolvedActivityEvents = computed<ActivityEvent[]>(() => {
-    if (props.activityEvents.length > 0) {
+    if (props.activityEvents !== undefined) {
         return props.activityEvents;
     }
-    const shared = (page.props.activity as { recent?: ActivityEvent[] } | undefined)?.recent;
-    return shared ?? [];
+    return page.props.activity?.recent ?? [];
 });
 
 const hasFlash = computed(
