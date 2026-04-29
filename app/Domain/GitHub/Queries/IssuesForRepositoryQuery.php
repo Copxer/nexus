@@ -35,9 +35,7 @@ class IssuesForRepositoryQuery
                 'state' => $issue->state?->value,
                 'author_login' => $issue->author_login,
                 'comments_count' => $issue->comments_count,
-                'labels' => $issue->labels ?? [],
                 'updated_at_github' => $issue->updated_at_github?->diffForHumans(),
-                'closed_at_github' => $issue->closed_at_github?->diffForHumans(),
                 'html_url' => "https://github.com/{$repository->full_name}/issues/{$issue->number}",
             ])
             ->all();

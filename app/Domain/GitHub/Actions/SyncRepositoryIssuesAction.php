@@ -29,10 +29,18 @@ class SyncRepositoryIssuesAction
 
     public function execute(Repository $repository, GitHubClient $client): int
     {
-        $payload = $client->listIssues(
-            $repository->full_name,
-            $repository->issues_synced_at,
-        );
+        // If the local mirror is empty but `issues_synced_at` is set
+        // (e.g. someone cleaned out `github_issues` rows manually),
+        // we'd otherwise only fetch issues touched since that
+        // timestamp — leaving the mirror permanently incomplete.
+        // Fall back to a full refetch in that case.
+        $hasLocalRows = GithubIssue::query()
+            ->where('repository_id', $repository->id)
+            ->exists();
+
+        $since = $hasLocalRows ? $repository->issues_synced_at : null;
+
+        $payload = $client->listIssues($repository->full_name, $since);
 
         $now = now();
         $count = 0;

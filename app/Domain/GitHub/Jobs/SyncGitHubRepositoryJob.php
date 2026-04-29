@@ -68,6 +68,8 @@ class SyncGitHubRepositoryJob implements ShouldQueue
             'sync_status' => RepositorySyncStatus::Syncing->value,
         ])->save();
 
+        $metadataSynced = false;
+
         try {
             $payload = (new GitHubClient($connection))
                 ->fetchRepository($repository->full_name);
@@ -79,10 +81,7 @@ class SyncGitHubRepositoryJob implements ShouldQueue
                 'last_synced_at' => now(),
             ])->save();
 
-            // Chain spec 015's issues sync. Independent statuses on the
-            // repo row mean a failure here would NOT roll back the
-            // metadata sync above — they're observed separately.
-            SyncRepositoryIssuesJob::dispatch($repository->id);
+            $metadataSynced = true;
         } catch (GitHubApiException $e) {
             if ($e->isUnauthorized()) {
                 $this->expireConnection($connection);
@@ -105,6 +104,23 @@ class SyncGitHubRepositoryJob implements ShouldQueue
             ]);
 
             $this->markFailed($repository);
+        }
+
+        // Chain spec 015's issues sync. Dispatch lives outside the
+        // try/catch above so a transient queue failure here doesn't
+        // flip a freshly-synced repo back to `failed` — issues sync
+        // has its own independent status on the repo row.
+        if ($metadataSynced) {
+            try {
+                SyncRepositoryIssuesJob::dispatch($repository->id);
+            } catch (Throwable $e) {
+                Log::warning('GitHub issues sync dispatch failed', [
+                    'repository_id' => $repository->id,
+                    'full_name' => $repository->full_name,
+                    'exception' => $e::class,
+                    'message' => $e->getMessage(),
+                ]);
+            }
         }
     }
 

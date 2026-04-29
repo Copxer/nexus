@@ -52,9 +52,7 @@ interface IssueRow {
     state: 'open' | 'closed' | string | null;
     author_login: string | null;
     comments_count: number;
-    labels: { name: string; color: string }[];
     updated_at_github: string | null;
-    closed_at_github: string | null;
     html_url: string;
 }
 

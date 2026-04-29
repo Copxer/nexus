@@ -139,6 +139,13 @@ class SyncRepositoryIssuesActionTest extends TestCase
         $context = $this->setUpRepository();
         $previous = now()->subHour();
         $context['repository']->forceFill(['issues_synced_at' => $previous])->save();
+        // M4 fix: a local row must exist or the action falls back to a
+        // full refetch (no `since` param). The test exists to verify
+        // the incremental-sync happy path, so seed one row.
+        GithubIssue::factory()->create([
+            'repository_id' => $context['repository']->id,
+            'github_id' => 999,
+        ]);
 
         Http::fake([
             'api.github.com/repos/octocat/hello-world/issues*' => Http::response([]),
@@ -151,6 +158,26 @@ class SyncRepositoryIssuesActionTest extends TestCase
             return str_contains($request->url(), 'since=')
                 && str_contains(rawurldecode($request->url()), $previous->toIso8601String());
         });
+    }
+
+    public function test_ignores_since_when_local_mirror_is_empty(): void
+    {
+        // Edge: someone wiped `github_issues` rows manually but the
+        // repository row still has a stale `issues_synced_at`. Without
+        // this guard, the next sync would only fetch updates after that
+        // timestamp and the mirror would stay permanently incomplete.
+        $context = $this->setUpRepository();
+        $context['repository']->forceFill(['issues_synced_at' => now()->subDay()])->save();
+        // No GithubIssue rows exist for this repository.
+
+        Http::fake([
+            'api.github.com/repos/octocat/hello-world/issues*' => Http::response([]),
+        ]);
+
+        $action = new SyncRepositoryIssuesAction(new NormalizeGitHubIssueAction);
+        $action->execute($context['repository']->fresh(), new GitHubClient($context['connection']));
+
+        Http::assertSent(fn ($request) => ! str_contains($request->url(), 'since='));
     }
 
     public function test_does_not_send_since_on_first_sync(): void
