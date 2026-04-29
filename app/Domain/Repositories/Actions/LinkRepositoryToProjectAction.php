@@ -31,6 +31,10 @@ class LinkRepositoryToProjectAction
         [$owner, $name] = $this->parse($input);
         $full = "{$owner}/{$name}";
 
+        // TODO(multi-team): the check-then-create below is TOCTOU-vulnerable
+        // under concurrent inserts on the same project. Acceptable while
+        // phase-1 is single-user dev. Wrap in a transaction or rely on a
+        // (project_id, full_name) compound unique index when multi-tenant.
         $existing = Repository::query()
             ->where('full_name', $full)
             ->where('project_id', $project->id)
@@ -67,16 +71,27 @@ class LinkRepositoryToProjectAction
 
         // Try the URL shape first.
         if (preg_match('#^https?://(?:www\.)?github\.com/([\w.-]+)/([\w.-]+?)(?:\.git)?/?$#i', $trimmed, $matches) === 1) {
-            return [$matches[1], $matches[2]];
+            return [$matches[1], $this->stripGitSuffix($matches[2])];
         }
 
         // Bare `owner/name` slug.
         if (preg_match('#^([\w.-]+)/([\w.-]+)$#', $trimmed, $matches) === 1) {
-            return [$matches[1], $matches[2]];
+            return [$matches[1], $this->stripGitSuffix($matches[2])];
         }
 
         throw new InvalidArgumentException(
             "Couldn't parse \"{$input}\" — expected a GitHub URL or `owner/name` slug.",
         );
+    }
+
+    /**
+     * Repos are sometimes copy-pasted with a `.git` suffix from a clone
+     * URL. Drop it so URL and bare-slug inputs converge on the same
+     * `full_name` — otherwise `owner/name` and `owner/name.git` would
+     * persist as two distinct rows under the same logical repository.
+     */
+    private function stripGitSuffix(string $name): string
+    {
+        return preg_replace('/\.git$/', '', $name) ?? $name;
     }
 }

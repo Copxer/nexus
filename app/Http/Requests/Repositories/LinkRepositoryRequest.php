@@ -43,7 +43,12 @@ class LinkRepositoryRequest extends FormRequest
         ];
     }
 
-    /** Resolve the parent project once; cached for `authorize()` + the controller. */
+    /**
+     * Look up the parent project from the validated `project_id`. Called
+     * once from `authorize()` and once from the controller — two database
+     * reads per request, fine at this scale; revisit if the request grows
+     * a third call site.
+     */
     public function resolvedProject(): ?Project
     {
         $id = $this->input('project_id');

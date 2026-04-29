@@ -6,6 +6,7 @@ use App\Enums\RepositorySyncStatus;
 use App\Models\Project;
 use App\Models\Repository;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Str;
 
 /** @extends Factory<Repository> */
 class RepositoryFactory extends Factory
@@ -24,7 +25,10 @@ class RepositoryFactory extends Factory
     public function definition(): array
     {
         $owner = fake()->randomElement(self::OWNER_POOL);
-        $name = fake()->unique()->randomElement(self::NAME_POOL);
+        // Append a 4-char suffix so the factory can produce more than
+        // NAME_POOL repos without `unique()` overflow. The seeder uses
+        // explicit names; this only affects ad-hoc factory calls in tests.
+        $name = fake()->randomElement(self::NAME_POOL).'-'.Str::lower(Str::random(4));
         $full = "{$owner}/{$name}";
 
         // Weight toward `synced` so the seeded dashboard reads as healthy

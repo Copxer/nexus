@@ -52,6 +52,18 @@ class LinkRepositoryToProjectActionTest extends TestCase
         );
     }
 
+    public function test_parses_bare_slug_with_git_suffix(): void
+    {
+        $action = new LinkRepositoryToProjectAction;
+
+        // `owner/name.git` (sometimes copy-pasted from clone URLs) must
+        // converge on the same parse result as `https://github.com/owner/name.git`.
+        $this->assertSame(
+            ['nexus-labs', 'edge-cache'],
+            $action->parse('nexus-labs/edge-cache.git'),
+        );
+    }
+
     public function test_throws_on_garbage_input(): void
     {
         $this->expectException(InvalidArgumentException::class);

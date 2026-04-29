@@ -2,6 +2,7 @@
 
 namespace App\Policies;
 
+use App\Models\Project;
 use App\Models\Repository;
 use App\Models\User;
 
@@ -32,7 +33,7 @@ class RepositoryPolicy
      * `Gate::authorize('create', [Repository::class, $project])` from
      * the form request and the controller.
      */
-    public function create(User $user, $project): bool
+    public function create(User $user, ?Project $project): bool
     {
         return $project !== null
             && $user->hasVerifiedEmail()
