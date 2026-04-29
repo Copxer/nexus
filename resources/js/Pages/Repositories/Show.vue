@@ -17,7 +17,7 @@ import {
     Star,
     Trash2,
 } from 'lucide-vue-next';
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 
 interface RepositoryShape {
     id: number;
@@ -169,6 +169,52 @@ const runRepositorySync = () => {
         { preserveScroll: true },
     );
 };
+
+// While ANY of the three sync flows (repository / issues / PRs) is in
+// `syncing` state, poll the controller every 2.5s for the latest status —
+// a partial Inertia reload that re-fetches just the three sync-related
+// props so the page updates without flashing or losing scroll. Stops on
+// its own as soon as all three flip out of `syncing`. Spec 019 will
+// replace this with Reverb broadcasts.
+const POLL_INTERVAL_MS = 2500;
+let pollHandle: ReturnType<typeof setInterval> | null = null;
+
+const anySyncing = computed(
+    () =>
+        isRepositorySyncing.value ||
+        isIssuesSyncing.value ||
+        isPullRequestsSyncing.value,
+);
+
+const stopPolling = () => {
+    if (pollHandle !== null) {
+        clearInterval(pollHandle);
+        pollHandle = null;
+    }
+};
+
+const startPolling = () => {
+    if (pollHandle !== null) return;
+    pollHandle = setInterval(() => {
+        // `router.reload` is a same-route partial fetch — no navigation, so
+        // scroll + component state are preserved by default. `only` keeps
+        // the payload tiny (just the three sync-related props).
+        router.reload({
+            only: ['repository', 'issuesSync', 'pullRequestsSync'],
+        });
+    }, POLL_INTERVAL_MS);
+};
+
+watch(
+    anySyncing,
+    (now) => {
+        if (now) startPolling();
+        else stopPolling();
+    },
+    { immediate: true },
+);
+
+onBeforeUnmount(stopPolling);
 </script>
 
 <template>
