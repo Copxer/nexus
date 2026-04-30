@@ -18,8 +18,8 @@ class GetOverviewDashboardQueryTest extends TestCase
         $payload = (new GetOverviewDashboardQuery)->handle();
 
         $this->assertArrayHasKey('dashboard', $payload);
-        $this->assertArrayHasKey('recentActivity', $payload);
         $this->assertArrayHasKey('activityHeatmap', $payload);
+        $this->assertArrayNotHasKey('recentActivity', $payload);
 
         foreach (['projects', 'deployments', 'services', 'hosts', 'alerts', 'uptime', 'topRepositories'] as $key) {
             $this->assertArrayHasKey($key, $payload['dashboard']);
@@ -154,7 +154,6 @@ class GetOverviewDashboardQueryTest extends TestCase
         $this->assertSame('danger', $payload['dashboard']['alerts']['status']);
         $this->assertSame(99.98, $payload['dashboard']['uptime']['overall']);
 
-        $this->assertCount(9, $payload['recentActivity']);
         $this->assertCount(7, $payload['activityHeatmap']);
         $this->assertCount(6, $payload['activityHeatmap'][0]);
     }

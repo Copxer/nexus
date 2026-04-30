@@ -26,8 +26,12 @@ use Illuminate\Support\Collection;
  *
  * Still mock (extracted to MOCK_* constants — clearly marked):
  *   - dashboard.{deployments,services,alerts,uptime}  → MOCK_KPIS
- *   - recentActivity                                  → MOCK_ACTIVITY
  *   - activityHeatmap                                 → MOCK_HEATMAP
+ *
+ * The right-rail activity feed is no longer surfaced from this query —
+ * the AppLayout consumes the shared `activity.recent` Inertia prop
+ * populated by `HandleInertiaRequests` (specs 018/019), so Overview no
+ * longer ships its own copy.
  *
  * Each MOCK constant comments the phase that ships its real source.
  *
@@ -51,7 +55,6 @@ class GetOverviewDashboardQuery
                 'hosts' => $this->hosts(),
                 'topRepositories' => $this->topRepositories(),
             ]),
-            'recentActivity' => self::MOCK_ACTIVITY,
             'activityHeatmap' => self::MOCK_HEATMAP,
         ];
     }
@@ -187,84 +190,6 @@ class GetOverviewDashboardQuery
             'change' => 0.01,
             'sparkline' => [99.92, 99.93, 99.95, 99.94, 99.96, 99.97, 99.96, 99.97, 99.98, 99.98, 99.97, 99.98],
             'status' => 'success',
-        ],
-    ];
-
-    /** Phase 3 ships the real activity feed. */
-    private const MOCK_ACTIVITY = [
-        [
-            'id' => 'evt-001',
-            'type' => 'deployment.succeeded',
-            'severity' => 'success',
-            'title' => 'Deployed nexus-api v2.14.3 to production',
-            'source' => 'nexus-api',
-            'occurred_at' => '2 min ago',
-            'metadata' => 'us-east',
-        ],
-        [
-            'id' => 'evt-002',
-            'type' => 'pull_request.merged',
-            'severity' => 'info',
-            'title' => 'PR #142 — Switch session driver to Redis cluster',
-            'source' => 'nexus-web',
-            'occurred_at' => '14 min ago',
-        ],
-        [
-            'id' => 'evt-003',
-            'type' => 'alert.triggered',
-            'severity' => 'danger',
-            'title' => 'CPU sustained > 90% on prod-api-02 for 5 min',
-            'source' => 'monitoring',
-            'occurred_at' => '38 min ago',
-            'metadata' => 'critical',
-        ],
-        [
-            'id' => 'evt-004',
-            'type' => 'workflow.failed',
-            'severity' => 'danger',
-            'title' => 'CI failed — flaky test on nexus-mail#main',
-            'source' => 'nexus-mail',
-            'occurred_at' => '52 min ago',
-        ],
-        [
-            'id' => 'evt-005',
-            'type' => 'pull_request.review_requested',
-            'severity' => 'info',
-            'title' => 'Review requested on PR #218 — Billing webhook hardening',
-            'source' => 'nexus-api',
-            'occurred_at' => '1 h ago',
-        ],
-        [
-            'id' => 'evt-006',
-            'type' => 'website.recovered',
-            'severity' => 'success',
-            'title' => 'status.nexus.io recovered after 3 m 12 s outage',
-            'source' => 'monitoring',
-            'occurred_at' => '2 h ago',
-        ],
-        [
-            'id' => 'evt-007',
-            'type' => 'container.unhealthy',
-            'severity' => 'warning',
-            'title' => 'billing-worker container restarted after OOM',
-            'source' => 'prod-api-02',
-            'occurred_at' => '3 h ago',
-        ],
-        [
-            'id' => 'evt-008',
-            'type' => 'issue.created',
-            'severity' => 'muted',
-            'title' => 'Login flow rejects valid 2FA codes intermittently',
-            'source' => 'nexus-web',
-            'occurred_at' => '4 h ago',
-        ],
-        [
-            'id' => 'evt-009',
-            'type' => 'host.recovered',
-            'severity' => 'success',
-            'title' => 'edge-eu-01 back online after scheduled maintenance',
-            'source' => 'edge-eu-01',
-            'occurred_at' => '6 h ago',
         ],
     ];
 

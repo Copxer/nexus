@@ -11,11 +11,11 @@ use BackedEnum;
  * `ActivityEvent` interface).
  *
  * Used by:
- *   - `RecentActivityForUserQuery` (page-load reads)
- *   - `App\Events\ActivityEventCreated::broadcastWith()` (real-time)
- *   - `GetOverviewDashboardQuery` (when the MOCK_ACTIVITY swap lands)
+ *   - `RecentActivityForUserQuery` (page-load reads, including the shared
+ *     `activity.recent` Inertia prop the AppLayout rail consumes).
+ *   - `App\Events\ActivityEventCreated::broadcastWith()` (real-time).
  *
- * Keeping the mapping here avoids the three-call-site drift the spec-018
+ * Keeping the mapping here avoids the call-site drift the spec-018
  * code-reviewer flagged.
  */
 class ActivityEventPresenter

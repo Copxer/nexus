@@ -22,7 +22,7 @@ const { events: liveEvents, connected: realtimeConnected } = useActivityFeed({
 <template>
     <Head title="Activity" />
 
-    <AppLayout>
+    <AppLayout :hide-activity-rail="true">
         <template #title>
             <div class="flex flex-col">
                 <span

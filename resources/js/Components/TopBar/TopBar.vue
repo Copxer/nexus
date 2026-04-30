@@ -14,10 +14,15 @@ import {
 } from 'lucide-vue-next';
 import { computed } from 'vue';
 
-defineProps<{
-    /** Number of unread notifications to render in the bell badge. Visual only this spec. */
-    notificationsCount?: number;
-}>();
+withDefaults(
+    defineProps<{
+        /** Number of unread notifications to render in the bell badge. Visual only this spec. */
+        notificationsCount?: number;
+        /** Hide the activity rail toggle when the page itself is the activity feed. */
+        showActivityRailToggle?: boolean;
+    }>(),
+    { showActivityRailToggle: true },
+);
 
 const emit = defineEmits<{
     /** Mobile/tablet hamburger pressed — AppLayout opens the sidebar drawer. */
@@ -101,8 +106,11 @@ const initials = computed(() => {
 
         <!-- Activity rail toggle — visible whenever the rail isn't a
              persistent column (i.e. below 2xl). Includes mobile so users
-             can reach the populated feed via the drawer. -->
+             can reach the populated feed via the drawer. Hidden on
+             pages that *are* the feed (e.g. /activity) so the toggle
+             doesn't open a redundant drawer. -->
         <button
+            v-if="showActivityRailToggle"
             type="button"
             class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border-subtle bg-slate-950/40 text-text-muted transition hover:border-accent-cyan/40 hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60 2xl:hidden"
             aria-label="Toggle activity rail"

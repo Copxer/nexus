@@ -2,6 +2,18 @@ import type { ActivityEvent, PageProps } from '@/types';
 import { router, usePage } from '@inertiajs/vue3';
 import { onBeforeUnmount, onMounted, ref } from 'vue';
 
+// Same gate as bootstrap.ts — set `localStorage.NEXUS_DEBUG_ECHO = '1'`
+// in DevTools and refresh to see the channel + connection lifecycle.
+const isTruthy = (v: unknown): boolean =>
+    v === true || v === '1' || v === 'true';
+const debugFlag =
+    isTruthy(import.meta.env.VITE_REVERB_DEBUG) ||
+    (typeof window !== 'undefined' &&
+        isTruthy(window.localStorage?.getItem('NEXUS_DEBUG_ECHO')));
+const log = (...args: unknown[]) => {
+    if (debugFlag) console.log('[echo:feed]', ...args);
+};
+
 /**
  * Reactive activity-feed composable used by the AppLayout right rail
  * and the dedicated `/activity` page. Spec 019.
@@ -62,6 +74,7 @@ export function useActivityFeed(options: {
         unbindNavigate = router.on('navigate', () => reseed());
 
         if (typeof window === 'undefined' || !window.Echo) {
+            log('skipping subscription — window.Echo is undefined');
             return;
         }
 
@@ -69,21 +82,48 @@ export function useActivityFeed(options: {
         const userId = page.props.auth?.user?.id;
 
         if (userId == null) {
+            log('skipping subscription — no auth.user.id in shared props');
             return;
         }
 
-        const channel = window.Echo.private(`users.${userId}.activity`);
+        const channelName = `users.${userId}.activity`;
+        log('subscribing to private channel', channelName);
+
+        const channel = window.Echo.private(channelName);
         channel.listen('.ActivityEventCreated', (payload: ActivityEvent) => {
+            log('event received', payload.id, payload.type);
             prepend(payload);
+        });
+        channel.error?.((err: unknown) => {
+            log('channel error', err);
+        });
+        channel.subscribed?.(() => {
+            log('channel subscribed');
         });
 
         const connector = window.Echo.connector;
-        const pusher = (connector as { pusher?: { connection?: { bind: (e: string, cb: () => void) => void; unbind: (e: string, cb: () => void) => void } } })?.pusher;
+        const pusher = (connector as { pusher?: { connection?: { state?: string; bind: (e: string, cb: () => void) => void; unbind: (e: string, cb: () => void) => void } } })?.pusher;
+        log('initial pusher state', pusher?.connection?.state);
 
-        const onConnect = () => (connected.value = true);
-        const onDisconnect = () => (connected.value = false);
+        const onConnect = () => {
+            log('connected');
+            connected.value = true;
+        };
+        const onDisconnect = () => {
+            log('disconnected');
+            connected.value = false;
+        };
 
         if (pusher?.connection) {
+            // Seed from the current state. When this composable mounts
+            // *after* the connection is already established (Inertia
+            // navigation, second instance on the same page) the
+            // 'connected' bind never fires for us — it already fired
+            // for the original listener. Without this, the pill
+            // permanently shows OFFLINE despite an active socket.
+            if (pusher.connection.state === 'connected') {
+                connected.value = true;
+            }
             pusher.connection.bind('connected', onConnect);
             pusher.connection.bind('disconnected', onDisconnect);
             pusher.connection.bind('unavailable', onDisconnect);
