@@ -22,6 +22,12 @@ const props = defineProps<{
      * the shared feed.
      */
     activityEvents?: ActivityEvent[];
+    /**
+     * Suppresses the right-side activity rail (and its TopBar drawer
+     * toggle). Useful on pages that *are* the activity feed (e.g. the
+     * dedicated `/activity` index) where a duplicate rail is just noise.
+     */
+    hideActivityRail?: boolean;
 }>();
 
 const sidebarOpen = ref(false);
@@ -168,6 +174,7 @@ onBeforeUnmount(() => {
         <!-- Main column -->
         <div class="flex min-w-0 flex-1 flex-col">
             <TopBar
+                :show-activity-rail-toggle="!hideActivityRail"
                 @open-sidebar="sidebarOpen = true"
                 @open-activity-rail="activityRailOpen = true"
                 @open-palette="paletteOpen = true"
@@ -233,7 +240,7 @@ onBeforeUnmount(() => {
         </div>
 
         <!-- Persistent activity rail (≥ 2xl) -->
-        <div class="relative z-30 hidden 2xl:flex">
+        <div v-if="!hideActivityRail" class="relative z-30 hidden 2xl:flex">
             <RightActivityRail
                 variant="column"
                 :events="resolvedActivityEvents"

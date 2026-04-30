@@ -49,27 +49,22 @@ class SmokeTest extends TestCase
             );
     }
 
-    public function test_overview_carries_activity_feed_and_heatmap_payloads(): void
+    public function test_overview_carries_activity_heatmap_payload(): void
     {
         $user = User::factory()->create([
             'email_verified_at' => now(),
         ]);
 
+        // Overview no longer ships its own activity slice — the rail
+        // consumes the shared `activity.recent` prop populated by
+        // `HandleInertiaRequests` (specs 018/019). Heatmap stays here
+        // until phase 3's heatmap aggregate replaces the mock.
         $this->actingAs($user)
             ->get('/overview')
             ->assertInertia(
                 fn (AssertableInertia $page) => $page
                     ->component('Overview')
-                    ->has('recentActivity', 9)
-                    ->has('recentActivity.0', fn (AssertableInertia $event) => $event
-                        ->has('id')
-                        ->has('type')
-                        ->has('severity')
-                        ->has('title')
-                        ->has('source')
-                        ->has('occurred_at')
-                        ->etc()
-                    )
+                    ->missing('recentActivity')
                     ->has('activityHeatmap', 7)
                     ->has('activityHeatmap.0', 6)
             );

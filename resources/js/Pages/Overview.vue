@@ -4,11 +4,7 @@ import KpiCard from '@/Components/Dashboard/KpiCard.vue';
 import Sparkline from '@/Components/Dashboard/Sparkline.vue';
 import StatusBadge from '@/Components/Dashboard/StatusBadge.vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
-import type {
-    ActivityEvent,
-    ActivityHeatmapPayload,
-    DashboardPayload,
-} from '@/types';
+import type { ActivityHeatmapPayload, DashboardPayload } from '@/types';
 import { Head } from '@inertiajs/vue3';
 import {
     Activity,
@@ -28,7 +24,6 @@ import {
 
 defineProps<{
     dashboard: DashboardPayload;
-    recentActivity: ActivityEvent[];
     activityHeatmap: ActivityHeatmapPayload;
 }>();
 
@@ -113,7 +108,7 @@ const visualizationStubs = [
 <template>
     <Head title="Overview" />
 
-    <AppLayout :activity-events="recentActivity">
+    <AppLayout>
         <template #title>
             <div class="flex flex-col">
                 <span
