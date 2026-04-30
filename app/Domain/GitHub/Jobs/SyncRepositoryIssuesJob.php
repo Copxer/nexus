@@ -14,6 +14,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Throwable;
 
 /**
@@ -61,13 +62,15 @@ class SyncRepositoryIssuesJob implements ShouldQueue
                 'repository_id' => $repository->id,
                 'full_name' => $repository->full_name,
             ]);
-            $this->markFailed($repository);
+            $this->markFailed($repository, 'No GitHub connection — reconnect in Settings to sync issues.');
 
             return;
         }
 
         $repository->forceFill([
             'issues_sync_status' => RepositorySyncStatus::Syncing->value,
+            'issues_sync_error' => null,
+            'issues_sync_failed_at' => null,
         ])->save();
 
         try {
@@ -76,6 +79,8 @@ class SyncRepositoryIssuesJob implements ShouldQueue
             $repository->forceFill([
                 'issues_sync_status' => RepositorySyncStatus::Synced->value,
                 'issues_synced_at' => now(),
+                'issues_sync_error' => null,
+                'issues_sync_failed_at' => null,
             ])->save();
         } catch (GitHubApiException $e) {
             if ($e->isUnauthorized()) {
@@ -89,7 +94,7 @@ class SyncRepositoryIssuesJob implements ShouldQueue
                 'message' => $e->getMessage(),
             ]);
 
-            $this->markFailed($repository);
+            $this->markFailed($repository, $e->getMessage());
         } catch (Throwable $e) {
             Log::error('GitHub issues sync errored', [
                 'repository_id' => $repository->id,
@@ -98,7 +103,7 @@ class SyncRepositoryIssuesJob implements ShouldQueue
                 'message' => $e->getMessage(),
             ]);
 
-            $this->markFailed($repository);
+            $this->markFailed($repository, $e->getMessage() !== '' ? $e->getMessage() : $e::class);
         }
     }
 
@@ -110,15 +115,22 @@ class SyncRepositoryIssuesJob implements ShouldQueue
     }
 
     /**
-     * Flip to `failed`. We deliberately do NOT update `issues_synced_at`
-     * — that column means "last successful sync" and feeds the Repository
-     * Issues tab's "Last sync N min ago" indicator. A failed run keeps
-     * the previous successful timestamp.
+     * Flip to `failed` and persist the failure reason for the UI.
+     *
+     * We deliberately do NOT update `issues_synced_at` — that column
+     * means "last successful sync" and feeds the Repository Issues tab's
+     * "Last sync N min ago" indicator. A failed run keeps the previous
+     * successful timestamp.
+     *
+     * `issues_sync_error` is hard-capped at 500 chars; the full message
+     * is still in Pail at the call site.
      */
-    private function markFailed(Repository $repository): void
+    private function markFailed(Repository $repository, ?string $reason = null): void
     {
         $repository->forceFill([
             'issues_sync_status' => RepositorySyncStatus::Failed->value,
+            'issues_sync_error' => $reason !== null ? Str::limit($reason, 500, '…') : null,
+            'issues_sync_failed_at' => now(),
         ])->save();
     }
 

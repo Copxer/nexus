@@ -32,8 +32,20 @@ class RepositorySyncController extends Controller
         $repository->loadMissing('project');
         $this->authorize('update', $repository->project);
 
+        // Clear the metadata error and the child-sync errors as well —
+        // the metadata job chains issues + PRs syncs on success, so the
+        // user's mental model is "Run sync re-runs all three." If we
+        // cleared only the metadata error, the page would briefly show
+        // "Syncing…" at the top while stale red error alerts on the
+        // Issues / PRs tabs persisted until those child jobs picked up.
         $repository->update([
             'sync_status' => RepositorySyncStatus::Syncing->value,
+            'sync_error' => null,
+            'sync_failed_at' => null,
+            'issues_sync_error' => null,
+            'issues_sync_failed_at' => null,
+            'prs_sync_error' => null,
+            'prs_sync_failed_at' => null,
         ]);
 
         SyncGitHubRepositoryJob::dispatch($repository->id);
