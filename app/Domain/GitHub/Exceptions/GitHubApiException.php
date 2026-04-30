@@ -42,6 +42,14 @@ class GitHubApiException extends RuntimeException
             ? ($body['message'] ?? $body['error_description'] ?? $body['error'] ?? 'unknown')
             : 'invalid response';
 
+        // Defensive: GitHub's `message` is a string in practice, but a
+        // malformed payload (or future API change) could deliver an
+        // array/object. Coerce non-strings to a stable label so we never
+        // emit `Array` into a thrown message that bubbles into the UI.
+        if (! is_string($reason)) {
+            $reason = 'unknown';
+        }
+
         return new self("{$context}: HTTP {$status} {$reason}", $status);
     }
 

@@ -158,4 +158,46 @@ class SyncRepositoryPullRequestsJobTest extends TestCase
         $this->assertSame(0, Repository::query()->count());
         $this->assertSame(0, GithubPullRequest::query()->count());
     }
+
+    public function test_handle_persists_prs_sync_error_and_failed_at_on_api_failure(): void
+    {
+        $context = $this->setUpProjectWithConnection();
+
+        Http::fake([
+            'api.github.com/repos/octocat/hello-world/pulls*' => Http::response(
+                ['message' => 'Not Found'],
+                404,
+            ),
+        ]);
+
+        (new SyncRepositoryPullRequestsJob($context['repository']->id))->handle($this->action());
+
+        $repo = $context['repository']->fresh();
+        $this->assertSame(RepositorySyncStatus::Failed, $repo->prs_sync_status);
+        $this->assertNotNull($repo->prs_sync_error);
+        $this->assertStringContainsString('404', $repo->prs_sync_error);
+        $this->assertNotNull($repo->prs_sync_failed_at);
+    }
+
+    public function test_handle_clears_prs_sync_error_after_successful_resync(): void
+    {
+        $context = $this->setUpProjectWithConnection();
+
+        $context['repository']->forceFill([
+            'prs_sync_status' => RepositorySyncStatus::Failed->value,
+            'prs_sync_error' => 'Stale failure message',
+            'prs_sync_failed_at' => now()->subMinutes(10),
+        ])->save();
+
+        Http::fake([
+            'api.github.com/repos/octocat/hello-world/pulls*' => Http::response([]),
+        ]);
+
+        (new SyncRepositoryPullRequestsJob($context['repository']->id))->handle($this->action());
+
+        $repo = $context['repository']->fresh();
+        $this->assertSame(RepositorySyncStatus::Synced, $repo->prs_sync_status);
+        $this->assertNull($repo->prs_sync_error);
+        $this->assertNull($repo->prs_sync_failed_at);
+    }
 }

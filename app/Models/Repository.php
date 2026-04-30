@@ -33,10 +33,16 @@ class Repository extends Model
         'last_pushed_at',
         'last_synced_at',
         'sync_status',
+        'sync_error',
+        'sync_failed_at',
         'issues_sync_status',
         'issues_synced_at',
+        'issues_sync_error',
+        'issues_sync_failed_at',
         'prs_sync_status',
         'prs_synced_at',
+        'prs_sync_error',
+        'prs_sync_failed_at',
     ];
 
     protected function casts(): array
@@ -51,8 +57,11 @@ class Repository extends Model
             'open_prs_count' => 'integer',
             'last_pushed_at' => 'datetime',
             'last_synced_at' => 'datetime',
+            'sync_failed_at' => 'datetime',
             'issues_synced_at' => 'datetime',
+            'issues_sync_failed_at' => 'datetime',
             'prs_synced_at' => 'datetime',
+            'prs_sync_failed_at' => 'datetime',
         ];
     }
 

@@ -55,11 +55,15 @@ class RepositoryController extends Controller
             'issuesSync' => [
                 'status' => $repository->issues_sync_status?->value,
                 'synced_at' => $repository->issues_synced_at?->diffForHumans(),
+                'error' => $repository->issues_sync_error,
+                'failed_at' => $repository->issues_sync_failed_at?->diffForHumans(),
             ],
             'pullRequests' => $pullRequestsQuery->execute($repository),
             'pullRequestsSync' => [
                 'status' => $repository->prs_sync_status?->value,
                 'synced_at' => $repository->prs_synced_at?->diffForHumans(),
+                'error' => $repository->prs_sync_error,
+                'failed_at' => $repository->prs_sync_failed_at?->diffForHumans(),
             ],
         ]);
     }
@@ -122,6 +126,8 @@ class RepositoryController extends Controller
             'last_pushed_at' => $repository->last_pushed_at?->diffForHumans(),
             'last_synced_at' => $repository->last_synced_at?->diffForHumans(),
             'sync_status' => $repository->sync_status?->value,
+            'sync_error' => $repository->sync_error,
+            'sync_failed_at' => $repository->sync_failed_at?->diffForHumans(),
             'project' => $repository->project ? [
                 'id' => $repository->project->id,
                 'slug' => $repository->project->slug,

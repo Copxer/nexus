@@ -123,6 +123,39 @@ class RepositoryControllerTest extends TestCase
             );
     }
 
+    public function test_show_exposes_sync_errors_in_inertia_props(): void
+    {
+        $user = $this->verifiedUser();
+        $project = Project::factory()->create(['owner_user_id' => $user->id]);
+        $repo = Repository::factory()->create([
+            'project_id' => $project->id,
+            'full_name' => 'nexus-org/nexus-web',
+            'sync_status' => 'failed',
+            'sync_error' => 'GitHub request failed: HTTP 404 Not Found',
+            'sync_failed_at' => now()->subMinutes(3),
+            'issues_sync_status' => 'failed',
+            'issues_sync_error' => 'Issues sync failed',
+            'issues_sync_failed_at' => now()->subMinutes(3),
+            'prs_sync_status' => 'failed',
+            'prs_sync_error' => 'PRs sync failed',
+            'prs_sync_failed_at' => now()->subMinutes(3),
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('repositories.show', $repo))
+            ->assertSuccessful()
+            ->assertInertia(
+                fn (AssertableInertia $page) => $page
+                    ->where('repository.sync_error', 'GitHub request failed: HTTP 404 Not Found')
+                    ->where('repository.sync_status', 'failed')
+                    ->has('repository.sync_failed_at')
+                    ->where('issuesSync.error', 'Issues sync failed')
+                    ->has('issuesSync.failed_at')
+                    ->where('pullRequestsSync.error', 'PRs sync failed')
+                    ->has('pullRequestsSync.failed_at')
+            );
+    }
+
     public function test_show_hides_run_sync_button_for_non_owner(): void
     {
         $owner = $this->verifiedUser();

@@ -4,6 +4,7 @@ import { projectIcon } from '@/lib/projectIcons';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import {
+    AlertTriangle,
     ChevronLeft,
     CircleDot,
     ExternalLink,
@@ -36,6 +37,8 @@ interface RepositoryShape {
     last_pushed_at: string | null;
     last_synced_at: string | null;
     sync_status: string | null;
+    sync_error: string | null;
+    sync_failed_at: string | null;
     project: {
         id: number;
         slug: string;
@@ -73,6 +76,8 @@ interface PullRequestRow {
 interface SyncShape {
     status: string | null;
     synced_at: string | null;
+    error: string | null;
+    failed_at: string | null;
 }
 
 const props = defineProps<{
@@ -370,6 +375,30 @@ onBeforeUnmount(stopPolling);
                 </dl>
             </header>
 
+            <!-- Repository metadata sync failure -->
+            <section
+                v-if="repository.sync_status === 'failed' && repository.sync_error"
+                aria-live="polite"
+                class="flex items-start gap-3 rounded-lg border border-status-danger/40 bg-status-danger/10 p-4"
+            >
+                <AlertTriangle
+                    class="mt-0.5 h-4 w-4 shrink-0 text-status-danger"
+                    aria-hidden="true"
+                />
+                <div class="flex min-w-0 flex-col gap-1 text-sm">
+                    <p class="font-semibold text-status-danger">
+                        Last repository sync failed<span
+                            v-if="repository.sync_failed_at"
+                            class="font-normal text-text-muted"
+                        >
+                            · {{ repository.sync_failed_at }}</span>
+                    </p>
+                    <p class="break-words font-mono text-xs text-text-secondary">
+                        {{ repository.sync_error }}
+                    </p>
+                </div>
+            </section>
+
             <!-- Tabs -->
             <nav
                 aria-label="Repository tabs"
@@ -549,6 +578,13 @@ onBeforeUnmount(stopPolling);
                                 Last sync
                                 <span class="font-mono text-text-secondary">{{ issuesSync.synced_at }}</span>
                             </span>
+                            <span
+                                v-else-if="issuesSync.status === 'failed' && issuesSync.failed_at"
+                                class="text-xs text-text-muted"
+                            >
+                                Failed
+                                <span class="font-mono text-status-danger">{{ issuesSync.failed_at }}</span>
+                            </span>
                         </div>
                         <button
                             v-if="canSync"
@@ -561,6 +597,19 @@ onBeforeUnmount(stopPolling);
                             {{ isIssuesSyncing ? 'Syncing…' : 'Run sync' }}
                         </button>
                     </header>
+
+                    <p
+                        v-if="issuesSync.status === 'failed' && issuesSync.error"
+                        class="mt-4 flex items-start gap-2 rounded-lg border border-status-danger/40 bg-status-danger/10 p-3 text-xs"
+                    >
+                        <AlertTriangle
+                            class="mt-0.5 h-3.5 w-3.5 shrink-0 text-status-danger"
+                            aria-hidden="true"
+                        />
+                        <span class="break-words font-mono text-text-secondary">
+                            {{ issuesSync.error }}
+                        </span>
+                    </p>
 
                     <ul
                         v-if="issues.length > 0"
@@ -662,6 +711,13 @@ onBeforeUnmount(stopPolling);
                                 Last sync
                                 <span class="font-mono text-text-secondary">{{ pullRequestsSync.synced_at }}</span>
                             </span>
+                            <span
+                                v-else-if="pullRequestsSync.status === 'failed' && pullRequestsSync.failed_at"
+                                class="text-xs text-text-muted"
+                            >
+                                Failed
+                                <span class="font-mono text-status-danger">{{ pullRequestsSync.failed_at }}</span>
+                            </span>
                         </div>
                         <button
                             v-if="canSync"
@@ -674,6 +730,19 @@ onBeforeUnmount(stopPolling);
                             {{ isPullRequestsSyncing ? 'Syncing…' : 'Run sync' }}
                         </button>
                     </header>
+
+                    <p
+                        v-if="pullRequestsSync.status === 'failed' && pullRequestsSync.error"
+                        class="mt-4 flex items-start gap-2 rounded-lg border border-status-danger/40 bg-status-danger/10 p-3 text-xs"
+                    >
+                        <AlertTriangle
+                            class="mt-0.5 h-3.5 w-3.5 shrink-0 text-status-danger"
+                            aria-hidden="true"
+                        />
+                        <span class="break-words font-mono text-text-secondary">
+                            {{ pullRequestsSync.error }}
+                        </span>
+                    </p>
 
                     <ul
                         v-if="pullRequests.length > 0"

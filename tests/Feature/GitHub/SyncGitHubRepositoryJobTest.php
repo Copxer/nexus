@@ -206,4 +206,94 @@ class SyncGitHubRepositoryJobTest extends TestCase
         Queue::assertNotPushed(SyncRepositoryIssuesJob::class);
         Queue::assertNotPushed(SyncRepositoryPullRequestsJob::class);
     }
+
+    public function test_handle_persists_sync_error_and_failed_at_on_api_failure(): void
+    {
+        $context = $this->setUpProjectWithConnection();
+
+        Http::fake([
+            'api.github.com/repos/octocat/hello-world' => Http::response(
+                ['message' => 'Not Found'],
+                404,
+            ),
+        ]);
+
+        (new SyncGitHubRepositoryJob($context['repository']->id))->handle();
+
+        $repo = $context['repository']->fresh();
+        $this->assertSame(RepositorySyncStatus::Failed, $repo->sync_status);
+        $this->assertNotNull($repo->sync_error);
+        $this->assertStringContainsString('404', $repo->sync_error);
+        $this->assertNotNull($repo->sync_failed_at);
+    }
+
+    public function test_handle_persists_sync_error_when_no_connection(): void
+    {
+        $owner = User::factory()->create();
+        $project = Project::factory()->create(['owner_user_id' => $owner->id]);
+        $repository = Repository::factory()->create([
+            'project_id' => $project->id,
+            'sync_status' => RepositorySyncStatus::Pending->value,
+        ]);
+
+        (new SyncGitHubRepositoryJob($repository->id))->handle();
+
+        $repo = $repository->fresh();
+        $this->assertSame(RepositorySyncStatus::Failed, $repo->sync_status);
+        $this->assertNotNull($repo->sync_error);
+        $this->assertStringContainsString('connection', strtolower($repo->sync_error));
+        $this->assertNotNull($repo->sync_failed_at);
+    }
+
+    public function test_handle_clears_sync_error_after_successful_resync(): void
+    {
+        $context = $this->setUpProjectWithConnection();
+
+        // Seed a previous failure so we can verify it's cleared.
+        $context['repository']->forceFill([
+            'sync_status' => RepositorySyncStatus::Failed->value,
+            'sync_error' => 'GitHub request failed: HTTP 500 Server error',
+            'sync_failed_at' => now()->subMinutes(10),
+        ])->save();
+
+        Http::fake([
+            'api.github.com/repos/octocat/hello-world' => Http::response([
+                'id' => 1234,
+                'default_branch' => 'main',
+                'visibility' => 'public',
+                'pushed_at' => '2026-04-29T00:00:00Z',
+                'html_url' => 'https://github.com/octocat/hello-world',
+            ]),
+        ]);
+
+        (new SyncGitHubRepositoryJob($context['repository']->id))->handle();
+
+        $repo = $context['repository']->fresh();
+        $this->assertSame(RepositorySyncStatus::Synced, $repo->sync_status);
+        $this->assertNull($repo->sync_error);
+        $this->assertNull($repo->sync_failed_at);
+    }
+
+    public function test_handle_truncates_long_sync_error_messages(): void
+    {
+        $context = $this->setUpProjectWithConnection();
+
+        $longMessage = str_repeat('x', 800);
+
+        Http::fake([
+            'api.github.com/repos/octocat/hello-world' => Http::response(
+                ['message' => $longMessage],
+                500,
+            ),
+        ]);
+
+        (new SyncGitHubRepositoryJob($context['repository']->id))->handle();
+
+        $repo = $context['repository']->fresh();
+        $this->assertNotNull($repo->sync_error);
+        // Str::limit($x, 500, '…') yields exactly 500 chars + the '…'
+        // ellipsis when truncation kicked in.
+        $this->assertSame(501, mb_strlen($repo->sync_error));
+        $this->assertStringEndsWith('…', $repo->sync_error);
+    }
 }

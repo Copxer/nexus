@@ -81,6 +81,43 @@ class RepositorySyncControllerTest extends TestCase
         Queue::assertNotPushed(SyncGitHubRepositoryJob::class);
     }
 
+    public function test_dispatch_clears_stale_sync_errors_across_all_three_flows(): void
+    {
+        Queue::fake();
+        $owner = User::factory()->create(['email_verified_at' => now()]);
+        $project = Project::factory()->create(['owner_user_id' => $owner->id]);
+        $repository = Repository::factory()->create([
+            'project_id' => $project->id,
+            'full_name' => 'octocat/hello-world',
+            'sync_status' => 'failed',
+            'sync_error' => 'GitHub request failed: HTTP 500',
+            'sync_failed_at' => now()->subMinutes(5),
+            'issues_sync_status' => 'failed',
+            'issues_sync_error' => 'Issues sync errored',
+            'issues_sync_failed_at' => now()->subMinutes(5),
+            'prs_sync_status' => 'failed',
+            'prs_sync_error' => 'PRs sync errored',
+            'prs_sync_failed_at' => now()->subMinutes(5),
+        ]);
+
+        $this->actingAs($owner)
+            ->from(route('repositories.show', $repository->full_name))
+            ->post(route('repositories.sync', $repository->full_name))
+            ->assertRedirect(route('repositories.show', $repository->full_name));
+
+        // The metadata job re-runs both child syncs on success, so the
+        // controller clears all six error columns up-front. Otherwise
+        // the page would briefly show "Syncing…" at the top while
+        // stale red error alerts persisted on the Issues / PRs tabs.
+        $repo = $repository->fresh();
+        $this->assertNull($repo->sync_error);
+        $this->assertNull($repo->sync_failed_at);
+        $this->assertNull($repo->issues_sync_error);
+        $this->assertNull($repo->issues_sync_failed_at);
+        $this->assertNull($repo->prs_sync_error);
+        $this->assertNull($repo->prs_sync_failed_at);
+    }
+
     public function test_unknown_repository_returns_404(): void
     {
         $owner = User::factory()->create(['email_verified_at' => now()]);

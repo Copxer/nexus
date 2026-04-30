@@ -14,6 +14,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Throwable;
 
 /**
@@ -59,13 +60,15 @@ class SyncGitHubRepositoryJob implements ShouldQueue
                 'repository_id' => $repository->id,
                 'full_name' => $repository->full_name,
             ]);
-            $this->markFailed($repository);
+            $this->markFailed($repository, 'No GitHub connection — reconnect in Settings to sync this repository.');
 
             return;
         }
 
         $repository->forceFill([
             'sync_status' => RepositorySyncStatus::Syncing->value,
+            'sync_error' => null,
+            'sync_failed_at' => null,
         ])->save();
 
         $metadataSynced = false;
@@ -79,6 +82,8 @@ class SyncGitHubRepositoryJob implements ShouldQueue
             $repository->forceFill([
                 'sync_status' => RepositorySyncStatus::Synced->value,
                 'last_synced_at' => now(),
+                'sync_error' => null,
+                'sync_failed_at' => null,
             ])->save();
 
             $metadataSynced = true;
@@ -94,7 +99,7 @@ class SyncGitHubRepositoryJob implements ShouldQueue
                 'message' => $e->getMessage(),
             ]);
 
-            $this->markFailed($repository);
+            $this->markFailed($repository, $e->getMessage());
         } catch (Throwable $e) {
             Log::error('GitHub repository sync errored', [
                 'repository_id' => $repository->id,
@@ -103,7 +108,7 @@ class SyncGitHubRepositoryJob implements ShouldQueue
                 'message' => $e->getMessage(),
             ]);
 
-            $this->markFailed($repository);
+            $this->markFailed($repository, $e->getMessage() !== '' ? $e->getMessage() : $e::class);
         }
 
         // Chain spec 015's issues sync and spec 016's PRs sync. Both
@@ -191,21 +196,23 @@ class SyncGitHubRepositoryJob implements ShouldQueue
     }
 
     /**
-     * Flip the row to `failed`. We deliberately do NOT update
-     * `last_synced_at` — that column means "last successful sync" and
-     * is what the Settings card surfaces as "Last sync N min ago". A
-     * failed run keeps the previous successful timestamp (or null if
-     * never synced).
+     * Flip the row to `failed` and persist the failure reason for the UI.
      *
-     * Failure reason is logged at the call site (see the catches above)
-     * — spec 014's schema doesn't carry a `sync_error` column yet. A
-     * future spec that surfaces error messages on the Repository page
-     * will add the column + thread the reason through here.
+     * We deliberately do NOT update `last_synced_at` — that column means
+     * "last successful sync" and is what the Settings card surfaces as
+     * "Last sync N min ago". A failed run keeps the previous successful
+     * timestamp (or null if never synced).
+     *
+     * `sync_error` is hard-capped at 500 chars so a runaway exception
+     * message can't bloat the row. The full message is still in Pail at
+     * the call site.
      */
-    private function markFailed(Repository $repository): void
+    private function markFailed(Repository $repository, ?string $reason = null): void
     {
         $repository->forceFill([
             'sync_status' => RepositorySyncStatus::Failed->value,
+            'sync_error' => $reason !== null ? Str::limit($reason, 500, '…') : null,
+            'sync_failed_at' => now(),
         ])->save();
     }
 
