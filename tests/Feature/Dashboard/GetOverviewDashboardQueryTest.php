@@ -3,11 +3,13 @@
 namespace Tests\Feature\Dashboard;
 
 use App\Domain\Dashboard\Queries\GetOverviewDashboardQuery;
+use App\Models\ActivityEvent;
 use App\Models\Project;
 use App\Models\Repository;
 use App\Models\User;
 use App\Models\WorkflowRun;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 class GetOverviewDashboardQueryTest extends TestCase
@@ -430,5 +432,130 @@ class GetOverviewDashboardQueryTest extends TestCase
             ->handle()['dashboard']['deployments']['sparkline'];
 
         $this->assertSame(array_fill(0, 12, 0), $sparkline);
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    // fix/activity-heatmap — real `activity_events` aggregate.
+    // ────────────────────────────────────────────────────────────────
+
+    public function test_activity_heatmap_is_all_zeros_with_no_events(): void
+    {
+        $heatmap = (new GetOverviewDashboardQuery)->handle()['activityHeatmap'];
+
+        $this->assertSame(array_fill(0, 7, array_fill(0, 6, 0)), $heatmap);
+    }
+
+    public function test_activity_heatmap_buckets_event_by_day_and_hour(): void
+    {
+        $repository = $this->setUpRepository();
+
+        // Wednesday at 14:30 → day=3, hour=14, bucket=3 (12:00–16:00).
+        ActivityEvent::factory()->create([
+            'repository_id' => $repository->id,
+            'occurred_at' => Carbon::parse('2026-04-29 14:30:00', 'UTC'), // 2026-04-29 was a Wed
+        ]);
+
+        $heatmap = (new GetOverviewDashboardQuery)->handle()['activityHeatmap'];
+
+        $this->assertSame(1, $heatmap[3][3]);
+        // Every other cell is zero.
+        $this->assertSame(1, array_sum(array_map('array_sum', $heatmap)));
+    }
+
+    public function test_activity_heatmap_accumulates_multiple_events_in_same_bucket(): void
+    {
+        $repository = $this->setUpRepository();
+
+        // Three events all on Monday at 09:00–10:30 → day=1, bucket=2 (08:00–12:00).
+        foreach (['2026-04-27 09:00:00', '2026-04-27 09:45:00', '2026-04-27 10:30:00'] as $iso) {
+            ActivityEvent::factory()->create([
+                'repository_id' => $repository->id,
+                'occurred_at' => Carbon::parse($iso, 'UTC'), // 2026-04-27 was a Mon
+            ]);
+        }
+
+        $heatmap = (new GetOverviewDashboardQuery)->handle()['activityHeatmap'];
+
+        $this->assertSame(3, $heatmap[1][2]);
+    }
+
+    public function test_activity_heatmap_excludes_events_older_than_90_days(): void
+    {
+        $repository = $this->setUpRepository();
+
+        ActivityEvent::factory()->create([
+            'repository_id' => $repository->id,
+            'occurred_at' => now()->subDays(91)->startOfDay()->addHours(10),
+        ]);
+
+        $heatmap = (new GetOverviewDashboardQuery)->handle()['activityHeatmap'];
+
+        $this->assertSame(array_fill(0, 7, array_fill(0, 6, 0)), $heatmap);
+    }
+
+    public function test_activity_heatmap_includes_events_inside_90_day_window(): void
+    {
+        $repository = $this->setUpRepository();
+
+        ActivityEvent::factory()->create([
+            'repository_id' => $repository->id,
+            'occurred_at' => now()->subDays(89)->startOfDay()->addHours(10),
+        ]);
+
+        $heatmap = (new GetOverviewDashboardQuery)->handle()['activityHeatmap'];
+
+        $this->assertSame(1, array_sum(array_map('array_sum', $heatmap)));
+    }
+
+    public function test_activity_heatmap_returns_seven_by_six_grid(): void
+    {
+        $heatmap = (new GetOverviewDashboardQuery)->handle()['activityHeatmap'];
+
+        $this->assertCount(7, $heatmap);
+        foreach ($heatmap as $day) {
+            $this->assertCount(6, $day);
+        }
+    }
+
+    /**
+     * Pin the four-hour bucket boundary contract: 00:00 → bucket 0,
+     * 03:59 → bucket 0, 04:00 → bucket 1, 23:59 → bucket 5. A boundary
+     * regression here would silently misbucket a chunk of every
+     * account's events.
+     */
+    public function test_activity_heatmap_bucket_boundary_contract(): void
+    {
+        $repository = $this->setUpRepository();
+
+        // 2026-04-26 was a Sunday → day-of-week index 0. Seed one event
+        // per boundary so each (time, expected bucket) row asserts in
+        // isolation against the heatmap's grand total.
+        $cases = [
+            '00:00:00' => 0,
+            '03:59:59' => 0,
+            '04:00:00' => 1,
+            '11:59:59' => 2,
+            '12:00:00' => 3,
+            '23:59:59' => 5,
+        ];
+
+        foreach (array_keys($cases) as $time) {
+            ActivityEvent::factory()->create([
+                'repository_id' => $repository->id,
+                'occurred_at' => Carbon::parse("2026-04-26 {$time}", 'UTC'),
+            ]);
+        }
+
+        $heatmap = (new GetOverviewDashboardQuery)->handle()['activityHeatmap'];
+
+        // Aggregate the expected counts per bucket from the case map.
+        $expected = array_fill(0, 6, 0);
+        foreach ($cases as $bucket) {
+            $expected[$bucket]++;
+        }
+
+        $this->assertSame($expected, $heatmap[0]);
+        // Other day rows are untouched.
+        $this->assertSame(count($cases), array_sum(array_map('array_sum', $heatmap)));
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Domain\Dashboard\Queries;
 
+use App\Models\ActivityEvent;
 use App\Models\Project;
 use App\Models\Repository;
 use App\Models\WorkflowRun;
@@ -29,10 +30,13 @@ use Illuminate\Support\Collection;
  *   - dashboard.topRepositories[] — ordered by stars_count desc, default
  *     limit 4. `commits` proxies via stars_count until phase 2 syncs
  *     real commit counts from GitHub.
+ *   - activityHeatmap — 7 days × 6 four-hour buckets aggregated from
+ *     `activity_events.occurred_at` over the last 90 days. Bucketing
+ *     happens in PHP so the query stays cross-DB without `DAYOFWEEK()` /
+ *     `HOUR()` polyfills.
  *
  * Still mock (extracted to MOCK_* constants — clearly marked):
  *   - dashboard.{services,alerts,uptime}              → MOCK_KPIS
- *   - activityHeatmap                                 → MOCK_HEATMAP
  *
  * The right-rail activity feed is no longer surfaced from this query —
  * the AppLayout consumes the shared `activity.recent` Inertia prop
@@ -62,7 +66,7 @@ class GetOverviewDashboardQuery
                 'deployments' => $this->deploymentsKpi(),
                 'topRepositories' => $this->topRepositories(),
             ]),
-            'activityHeatmap' => self::MOCK_HEATMAP,
+            'activityHeatmap' => $this->activityHeatmap(),
         ];
     }
 
@@ -200,6 +204,56 @@ class GetOverviewDashboardQuery
     }
 
     /**
+     * Engineering-rhythm heatmap (7 days × 6 four-hour buckets).
+     *
+     * Aggregates `activity_events.occurred_at` over the last 90 days
+     * into a `[day_of_week][bucket]` grid where:
+     *   - day_of_week: 0=Sun, 1=Mon, …, 6=Sat (Carbon's convention,
+     *     matches the JS `Date#getDay()` axis on the heatmap component)
+     *   - bucket: 0=00:00–04:00, 1=04:00–08:00, …, 5=20:00–24:00
+     *
+     * 90-day window is long enough to surface a recurring rhythm but
+     * recent enough to reflect *current* habits — narrower than "all
+     * time" (which dilutes signal forever) and wider than "last week"
+     * (which is noisy on quiet accounts).
+     *
+     * **Why bucket in PHP, not SQL:** `DAYOFWEEK()` (MySQL) and
+     * `strftime('%w', …)` (SQLite) disagree on indexing AND on
+     * timezone handling, and the test suite runs on SQLite while prod
+     * uses MySQL. A single `SELECT occurred_at FROM activity_events
+     * WHERE occurred_at >= ?` is cheap at phase-1 scale (≤90d × low
+     * webhook traffic), and bucketing in PHP keeps the math obvious.
+     *
+     * **Timezone caveat:** the hour bucket is computed in the app's
+     * configured timezone (today: UTC). Flipping `app.timezone` would
+     * shift every bucket by N hours — sharper exposure than the
+     * `dailyCounts()` day-bucket case because a 6-hour TZ shift moves
+     * events into *different* buckets, not just adjacent days.
+     *
+     * @return array<int, array<int, int>>
+     */
+    private function activityHeatmap(): array
+    {
+        $grid = array_fill(0, 7, array_fill(0, 6, 0));
+
+        ActivityEvent::query()
+            ->where('occurred_at', '>=', now()->subDays(90))
+            ->select('occurred_at')
+            ->get()
+            ->each(function (ActivityEvent $event) use (&$grid) {
+                $occurredAt = $event->occurred_at;
+                if ($occurredAt === null) {
+                    return;
+                }
+                $day = $occurredAt->dayOfWeek;
+                $bucket = intdiv($occurredAt->hour, 4);
+                $grid[$day][$bucket]++;
+            });
+
+        return $grid;
+    }
+
+    /**
      * Map (sample size, success rate) → KpiCard status tone.
      * `muted` floor on empty windows prevents quiet weekends from
      * flashing red on low-traffic accounts.
@@ -330,16 +384,5 @@ class GetOverviewDashboardQuery
             'sparkline' => [99.92, 99.93, 99.95, 99.94, 99.96, 99.97, 99.96, 99.97, 99.98, 99.98, 99.97, 99.98],
             'status' => 'success',
         ],
-    ];
-
-    /** Phase 3 ships the real heatmap on top of activity-event aggregates. */
-    private const MOCK_HEATMAP = [
-        [1, 0, 1, 3, 2, 1], // Sun
-        [2, 1, 4, 7, 6, 3], // Mon
-        [1, 1, 5, 9, 8, 4], // Tue
-        [2, 1, 6, 10, 9, 5], // Wed
-        [2, 1, 5, 9, 7, 4], // Thu
-        [1, 0, 4, 6, 5, 2], // Fri
-        [0, 0, 1, 2, 1, 1], // Sat
     ];
 }
