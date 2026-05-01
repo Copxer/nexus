@@ -42,6 +42,11 @@ class HandleInertiaRequests extends Middleware
             'flash' => [
                 'status' => fn () => $request->session()->get('status'),
                 'error' => fn () => $request->session()->get('error'),
+                // Spec 026 — plaintext agent token shown once after
+                // issue/rotate. Flashed by AgentTokenController; read
+                // by AgentTokenPanel.vue via `usePage().props.flash`.
+                // Never persisted, never logged.
+                'agentTokenPlaintext' => fn () => $request->session()->get('agentTokenPlaintext'),
             ],
             // Right-rail activity feed (spec 018). Inertia evaluates this
             // closure on every render (it's not a `LazyProp`); the
