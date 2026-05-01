@@ -43,6 +43,10 @@ class Repository extends Model
         'prs_synced_at',
         'prs_sync_error',
         'prs_sync_failed_at',
+        'workflow_runs_sync_status',
+        'workflow_runs_synced_at',
+        'workflow_runs_sync_error',
+        'workflow_runs_sync_failed_at',
     ];
 
     protected function casts(): array
@@ -51,6 +55,7 @@ class Repository extends Model
             'sync_status' => RepositorySyncStatus::class,
             'issues_sync_status' => RepositorySyncStatus::class,
             'prs_sync_status' => RepositorySyncStatus::class,
+            'workflow_runs_sync_status' => RepositorySyncStatus::class,
             'stars_count' => 'integer',
             'forks_count' => 'integer',
             'open_issues_count' => 'integer',
@@ -62,6 +67,8 @@ class Repository extends Model
             'issues_sync_failed_at' => 'datetime',
             'prs_synced_at' => 'datetime',
             'prs_sync_failed_at' => 'datetime',
+            'workflow_runs_synced_at' => 'datetime',
+            'workflow_runs_sync_failed_at' => 'datetime',
         ];
     }
 
@@ -88,5 +95,10 @@ class Repository extends Model
     public function pullRequests(): HasMany
     {
         return $this->hasMany(GithubPullRequest::class);
+    }
+
+    public function workflowRuns(): HasMany
+    {
+        return $this->hasMany(WorkflowRun::class);
     }
 }

@@ -10,6 +10,7 @@ use App\Http\Controllers\RepositoryController;
 use App\Http\Controllers\RepositoryIssuesSyncController;
 use App\Http\Controllers\RepositoryPullRequestsSyncController;
 use App\Http\Controllers\RepositorySyncController;
+use App\Http\Controllers\RepositoryWorkflowRunsSyncController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\Webhooks\GitHubWebhookController;
 use App\Http\Controllers\WorkItemController;
@@ -68,6 +69,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/repositories/{repository}/pulls/sync', RepositoryPullRequestsSyncController::class)
         ->where('repository', '[\w.-]+/[\w.-]+')
         ->name('repositories.pulls.sync');
+
+    // Spec 020 — manual "Run sync" button on the Repository Workflow Runs tab.
+    Route::post('/repositories/{repository}/workflow-runs/sync', RepositoryWorkflowRunsSyncController::class)
+        ->where('repository', '[\w.-]+/[\w.-]+')
+        ->name('repositories.workflow-runs.sync');
 
     // Spec 016 — unified Work Items queue (issues + PRs).
     Route::get('/work-items', WorkItemController::class)->name('work-items.index');

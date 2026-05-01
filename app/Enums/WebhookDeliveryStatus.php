@@ -8,8 +8,19 @@ namespace App\Enums;
  *  - `received` — controller stored the row + dispatched the job
  *  - `processed` — handler ran successfully
  *  - `failed`    — handler threw; `error_message` carries the reason
- *  - `skipped`   — event type or action we don't know how to handle
- *                  (per §8.5 "Log unknown events. Do not fail silently")
+ *  - `skipped`   — handler chose not to surface the event to the
+ *                  activity feed (e.g. unknown event type, non-terminal
+ *                  workflow run action, repository not imported into
+ *                  Nexus). Per §8.5: "Log unknown events. Do not fail
+ *                  silently."
+ *
+ *                  As of spec 020, `skipped` no longer guarantees zero
+ *                  side-effects — the workflow_run handler upserts the
+ *                  run into `workflow_runs` for ALL deliveries (so the
+ *                  timeline reflects in-flight states) and only
+ *                  short-circuits the activity-event creation. The
+ *                  semantic intent is "no activity event," not "no
+ *                  DB writes."
  */
 enum WebhookDeliveryStatus: string
 {

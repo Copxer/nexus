@@ -60,6 +60,10 @@ class RepositoryControllerTest extends TestCase
                     ->where('canSync', true)
                     ->has('issues')
                     ->has('issuesSync')
+                    ->has('pullRequests')
+                    ->has('pullRequestsSync')
+                    ->has('workflowRuns')
+                    ->has('workflowRunsSync')
             );
     }
 

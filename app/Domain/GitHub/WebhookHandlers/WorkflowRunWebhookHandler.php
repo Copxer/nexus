@@ -3,10 +3,12 @@
 namespace App\Domain\GitHub\WebhookHandlers;
 
 use App\Domain\Activity\Actions\CreateActivityEventAction;
+use App\Domain\GitHub\Actions\NormalizeGitHubWorkflowRunAction;
 use App\Enums\ActivitySeverity;
 use App\Enums\WebhookDeliveryStatus;
 use App\Models\Repository;
 use App\Models\WebhookDelivery;
+use App\Models\WorkflowRun;
 use Illuminate\Support\Carbon;
 
 /**
@@ -39,6 +41,7 @@ class WorkflowRunWebhookHandler
 
     public function __construct(
         private readonly CreateActivityEventAction $createActivity,
+        private readonly NormalizeGitHubWorkflowRunAction $normalizer,
     ) {}
 
     public function handle(WebhookDelivery $delivery): WebhookDeliveryStatus
@@ -47,7 +50,32 @@ class WorkflowRunWebhookHandler
         $action = (string) ($payload['action'] ?? '');
         $run = $payload['workflow_run'] ?? null;
 
-        if ($action !== 'completed' || ! is_array($run)) {
+        if (! is_array($run)) {
+            $delivery->forceFill([
+                'error_message' => 'Skipped — `workflow_run` payload missing or malformed.',
+            ])->save();
+
+            return WebhookDeliveryStatus::Skipped;
+        }
+
+        $repository = $this->resolveRepository($delivery);
+
+        if ($repository === null) {
+            $delivery->forceFill([
+                'error_message' => 'Repository not imported into Nexus.',
+            ])->save();
+
+            return WebhookDeliveryStatus::Skipped;
+        }
+
+        // Spec 020 — upsert the run row regardless of action/conclusion so
+        // the timeline + Workflow Runs tab reflect in-flight + non-terminal
+        // states (queued / in_progress / cancelled / etc.). Activity-event
+        // creation below remains gated to terminal outcomes so the rail
+        // doesn't thrash.
+        $this->upsertWorkflowRun($repository, $run);
+
+        if ($action !== 'completed') {
             $delivery->forceFill([
                 'error_message' => "Skipped — only `completed` actions surface to activity (got `{$action}`).",
             ])->save();
@@ -61,16 +89,6 @@ class WorkflowRunWebhookHandler
         if ($rule === null) {
             $delivery->forceFill([
                 'error_message' => "Skipped — conclusion `{$conclusion}` not surfaced to activity.",
-            ])->save();
-
-            return WebhookDeliveryStatus::Skipped;
-        }
-
-        $repository = $this->resolveRepository($delivery);
-
-        if ($repository === null) {
-            $delivery->forceFill([
-                'error_message' => 'Repository not imported into Nexus.',
             ])->save();
 
             return WebhookDeliveryStatus::Skipped;
@@ -114,6 +132,34 @@ class WorkflowRunWebhookHandler
         }
 
         return Repository::query()->where('full_name', $fullName)->first();
+    }
+
+    /**
+     * Normalize the webhook payload's `workflow_run` field and upsert
+     * onto `workflow_runs` keyed by `(repository_id, github_id)`. The
+     * sync job (`SyncRepositoryWorkflowRunsJob`) lands on the same key,
+     * so live deliveries + REST backfill cleanly converge.
+     *
+     * Returns silently if the normalizer rejects the payload — bad
+     * deliveries shouldn't break the activity-event path that follows.
+     *
+     * @param  array<string, mixed>  $run
+     */
+    private function upsertWorkflowRun(Repository $repository, array $run): void
+    {
+        $normalized = $this->normalizer->execute($run);
+
+        if ($normalized === null) {
+            return;
+        }
+
+        WorkflowRun::query()->updateOrCreate(
+            [
+                'repository_id' => $repository->id,
+                'github_id' => $normalized['github_id'],
+            ],
+            $normalized,
+        );
     }
 
     private function occurredAt(array $run): Carbon

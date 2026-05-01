@@ -1,7 +1,7 @@
 ---
 spec: workflow-runs-storage-and-sync
 phase: 4-deployments-cicd
-status: in-progress
+status: done
 owner: yoany
 created: 2026-04-30
 updated: 2026-04-30
@@ -169,6 +169,9 @@ Dated notes as work progresses.
 ### 2026-04-30
 - Spec drafted.
 - Opened issue [#61](https://github.com/Copxer/nexus/issues/61) and branch `spec/020-workflow-runs-storage-and-sync` off `main`.
+- Implementation complete: 2 migrations + `WorkflowRun` + `WorkflowRunStatus` + `WorkflowRunConclusion` enums + factory, `NormalizeGitHubWorkflowRunAction` (pure transform), `GitHubClient::listWorkflowRuns`, `SyncRepositoryWorkflowRunsAction` + `SyncRepositoryWorkflowRunsJob` (mirrors issues/PRs lifecycle), chained off `SyncGitHubRepositoryJob`, `RepositoryWorkflowRunsSyncController` + route, `WorkflowRunsForRepositoryQuery`, `RepositorySyncController` extended to clear all 8 error columns, `RepositoryController::show` payload extended, `Repositories/Show.vue` Workflow Runs tab. `WorkflowRunWebhookHandler` extended to upsert into `workflow_runs` for ALL deliveries (in-flight + terminal); spec 019's existing assertions stay valid.
+- 26 net new passing tests; full suite: 239 passed (was 213). Pint + build clean.
+- Self-review pass via `superpowers:code-reviewer`; addressed 4 of 5 recommendations: added `workflowStatusTone()` helper for the run-status badge fallback, doc'd the `WebhookDeliveryStatus::Skipped` semantics shift, switched the Workflow Runs `v-else` to `v-else-if` for forward safety, and added a re-run comment on `run_completed_at`. Deferred: a stale-webhook overwrite guard (last-write-wins on the upsert) — pre-existing across all three sync flows; will harden in a follow-up if it bites.
 
 ## Decisions (locked 2026-04-30)
 - **Naming: `WorkflowRun`, not `Deployment`.** The model + DB use GitHub's own vocabulary; the user-facing UI in spec 021 will say "deployments" where appropriate. The mismatch in the roadmap is a UX choice, not a data-model one.

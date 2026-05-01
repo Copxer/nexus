@@ -168,6 +168,47 @@ class GitHubClient
     }
 
     /**
+     * GET /repos/{owner}/{name}/actions/runs — GitHub Actions workflow
+     * runs across all workflows in the repository. GitHub wraps the
+     * payload in `{ total_count, workflow_runs: [...] }`; we unwrap and
+     * return just the runs array.
+     *
+     * Capped at the most-recent 100 runs in the response. Pagination
+     * is a follow-up if the timeline UI in spec 021 needs deeper history.
+     */
+    public function listWorkflowRuns(
+        string $fullName,
+        int $perPage = self::DEFAULT_PER_PAGE,
+    ): array {
+        try {
+            $response = $this->request()
+                ->get(self::BASE_URL."/repos/{$fullName}/actions/runs", [
+                    'per_page' => max(1, min($perPage, 100)),
+                    'page' => 1,
+                ]);
+
+            if ($response->failed()) {
+                throw GitHubApiException::fromResponse(
+                    $response,
+                    "GitHub /repos/{$fullName}/actions/runs failed",
+                );
+            }
+
+            $body = (array) $response->json();
+
+            // Defensive: a missing `workflow_runs` key falls back to an
+            // empty list rather than tripping the normalizer downstream
+            // with a non-array.
+            return is_array($body['workflow_runs'] ?? null) ? $body['workflow_runs'] : [];
+        } catch (RequestException $e) {
+            throw GitHubApiException::fromTransport(
+                $e,
+                "GitHub /repos/{$fullName}/actions/runs failed",
+            );
+        }
+    }
+
+    /**
      * Shared HTTP client config — auth + pinned API version + UA.
      * Note: we don't call `->throw()` on the PendingRequest; the
      * callers check `$response->failed()` and route the failure into

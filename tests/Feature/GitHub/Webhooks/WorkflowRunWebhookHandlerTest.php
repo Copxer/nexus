@@ -3,6 +3,7 @@
 namespace Tests\Feature\GitHub\Webhooks;
 
 use App\Domain\Activity\Actions\CreateActivityEventAction;
+use App\Domain\GitHub\Actions\NormalizeGitHubWorkflowRunAction;
 use App\Domain\GitHub\WebhookHandlers\WorkflowRunWebhookHandler;
 use App\Enums\WebhookDeliveryStatus;
 use App\Events\ActivityEventCreated;
@@ -11,6 +12,7 @@ use App\Models\Project;
 use App\Models\Repository;
 use App\Models\User;
 use App\Models\WebhookDelivery;
+use App\Models\WorkflowRun;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Tests\TestCase;
@@ -21,7 +23,10 @@ class WorkflowRunWebhookHandlerTest extends TestCase
 
     private function handler(): WorkflowRunWebhookHandler
     {
-        return new WorkflowRunWebhookHandler(new CreateActivityEventAction);
+        return new WorkflowRunWebhookHandler(
+            new CreateActivityEventAction,
+            new NormalizeGitHubWorkflowRunAction,
+        );
     }
 
     private function deliveryFor(
@@ -40,12 +45,15 @@ class WorkflowRunWebhookHandlerTest extends TestCase
                     'id' => 1234,
                     'name' => 'CI',
                     'head_branch' => 'main',
+                    'head_sha' => 'a'.str_repeat('1', 39),
+                    'event' => 'push',
                     'run_number' => 42,
                     'conclusion' => $conclusion,
                     'status' => 'completed',
                     'updated_at' => '2026-04-29T12:00:00Z',
                     'run_started_at' => '2026-04-29T11:55:00Z',
                     'html_url' => 'https://github.com/octocat/hello-world/actions/runs/1234',
+                    'actor' => ['login' => 'alice'],
                 ],
                 'sender' => ['login' => 'alice'],
             ],
@@ -124,5 +132,77 @@ class WorkflowRunWebhookHandlerTest extends TestCase
 
         $this->assertSame(WebhookDeliveryStatus::Skipped, $status);
         $this->assertSame(0, ActivityEvent::query()->count());
+        // No FK target for the upsert when the repo isn't imported yet.
+        $this->assertSame(0, WorkflowRun::query()->count());
+    }
+
+    public function test_completed_handled_run_upserts_into_workflow_runs(): void
+    {
+        Event::fake([ActivityEventCreated::class]);
+        $repository = $this->importedRepository();
+        $delivery = $this->deliveryFor('completed', 'success');
+
+        $this->handler()->handle($delivery);
+
+        $this->assertSame(1, WorkflowRun::query()->count());
+        $run = WorkflowRun::query()->first();
+        $this->assertSame($repository->id, $run->repository_id);
+        $this->assertSame(1234, $run->github_id);
+        $this->assertSame(42, $run->run_number);
+        $this->assertSame('CI', $run->name);
+        $this->assertSame('completed', $run->status->value);
+        $this->assertSame('success', $run->conclusion->value);
+        $this->assertSame('main', $run->head_branch);
+        $this->assertSame('alice', $run->actor_login);
+    }
+
+    public function test_in_progress_action_still_upserts_workflow_run(): void
+    {
+        $this->importedRepository();
+        $delivery = WebhookDelivery::factory()->create([
+            'event' => 'workflow_run',
+            'action' => 'in_progress',
+            'repository_full_name' => 'octocat/hello-world',
+            'payload_json' => [
+                'action' => 'in_progress',
+                'repository' => ['full_name' => 'octocat/hello-world'],
+                'workflow_run' => [
+                    'id' => 5678,
+                    'name' => 'Deploy',
+                    'head_branch' => 'main',
+                    'head_sha' => 'b'.str_repeat('2', 39),
+                    'event' => 'workflow_dispatch',
+                    'run_number' => 1,
+                    'status' => 'in_progress',
+                    'conclusion' => null,
+                    'run_started_at' => '2026-04-29T11:55:00Z',
+                    'updated_at' => '2026-04-29T11:56:00Z',
+                    'html_url' => 'https://github.com/octocat/hello-world/actions/runs/5678',
+                ],
+            ],
+        ]);
+
+        $status = $this->handler()->handle($delivery);
+
+        // Existing semantics preserved — Skipped means no activity event.
+        $this->assertSame(WebhookDeliveryStatus::Skipped, $status);
+        $this->assertSame(0, ActivityEvent::query()->count());
+        // But the timeline upsert happens regardless so in-flight runs
+        // surface on the Workflow Runs tab.
+        $this->assertSame(1, WorkflowRun::query()->count());
+        $run = WorkflowRun::query()->first();
+        $this->assertSame('in_progress', $run->status->value);
+        $this->assertNull($run->conclusion);
+    }
+
+    public function test_replayed_delivery_is_idempotent(): void
+    {
+        $this->importedRepository();
+        $delivery = $this->deliveryFor('completed', 'success');
+
+        $this->handler()->handle($delivery);
+        $this->handler()->handle($delivery);
+
+        $this->assertSame(1, WorkflowRun::query()->where('github_id', 1234)->count());
     }
 }

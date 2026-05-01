@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Domain\GitHub\Actions\ImportRepositoryAction;
 use App\Domain\GitHub\Queries\IssuesForRepositoryQuery;
 use App\Domain\GitHub\Queries\PullRequestsForRepositoryQuery;
+use App\Domain\GitHub\Queries\WorkflowRunsForRepositoryQuery;
 use App\Http\Requests\Repositories\LinkRepositoryRequest;
 use App\Models\Repository;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -37,6 +38,7 @@ class RepositoryController extends Controller
         Repository $repository,
         IssuesForRepositoryQuery $issuesQuery,
         PullRequestsForRepositoryQuery $pullRequestsQuery,
+        WorkflowRunsForRepositoryQuery $workflowRunsQuery,
     ): Response {
         $this->authorize('view', $repository);
 
@@ -64,6 +66,13 @@ class RepositoryController extends Controller
                 'synced_at' => $repository->prs_synced_at?->diffForHumans(),
                 'error' => $repository->prs_sync_error,
                 'failed_at' => $repository->prs_sync_failed_at?->diffForHumans(),
+            ],
+            'workflowRuns' => $workflowRunsQuery->execute($repository),
+            'workflowRunsSync' => [
+                'status' => $repository->workflow_runs_sync_status?->value,
+                'synced_at' => $repository->workflow_runs_synced_at?->diffForHumans(),
+                'error' => $repository->workflow_runs_sync_error,
+                'failed_at' => $repository->workflow_runs_sync_failed_at?->diffForHumans(),
             ],
         ]);
     }
