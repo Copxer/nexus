@@ -146,7 +146,11 @@ const visualizationStubs = [
                     accent="blue"
                     label="Deployments (24h)"
                     :value="String(dashboard.deployments.successful_24h)"
-                    secondary="Successful"
+                    :secondary="
+                        dashboard.deployments.success_rate_24h === null
+                            ? '—% success'
+                            : `${dashboard.deployments.success_rate_24h}% success`
+                    "
                     :status="dashboard.deployments.status"
                     status-label="On track"
                     :trend="{
