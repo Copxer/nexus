@@ -10,7 +10,7 @@ Surface GitHub Actions workflow runs as a "deployment timeline" inside Nexus. Ph
 | # | Task | Status |
 |---|------|--------|
 | 020 | Workflow runs storage + sync (table, model, sync job chained off repo-import + manual sync, webhook-handler upsert, per-repo Workflow Runs tab) | 🟢 |
-| 021 | Deployment timeline UI (`/deployments` page, status timeline, detail drawer, filters by project / repository / status / branch) | ⬜ |
+| 021 | Deployment timeline UI (`/deployments` page, status timeline, detail drawer, filters by project / repository / status / branch, real-time refresh via Reverb) | 🟢 |
 | 022 | Overview success-rate widget (KPI card on Overview powered by an aggregate query over `workflow_runs`) | ⬜ |
 
 ## Acceptance criteria (phase-level)

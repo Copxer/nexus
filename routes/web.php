@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ActivityController;
+use App\Http\Controllers\DeploymentController;
 use App\Http\Controllers\GithubConnectionController;
 use App\Http\Controllers\GithubRepositoryImportController;
 use App\Http\Controllers\OverviewController;
@@ -83,6 +84,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // HandleInertiaRequests::share(); this page just hosts the wider
     // 100-event view + future filters.
     Route::get('/activity', [ActivityController::class, 'index'])->name('activity.index');
+
+    // Spec 021 — cross-repo deployment timeline (workflow runs).
+    Route::get('/deployments', [DeploymentController::class, 'index'])
+        ->name('deployments.index');
 });
 
 // Spec 017 — GitHub webhooks (no auth/CSRF; signature-verified inside).
