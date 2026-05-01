@@ -4,8 +4,10 @@ namespace App\Providers;
 
 use App\Models\Project;
 use App\Models\Repository;
+use App\Models\Website;
 use App\Policies\ProjectPolicy;
 use App\Policies\RepositoryPolicy;
+use App\Policies\WebsitePolicy;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\Vite;
@@ -30,6 +32,7 @@ class AppServiceProvider extends ServiceProvider
 
         Gate::policy(Project::class, ProjectPolicy::class);
         Gate::policy(Repository::class, RepositoryPolicy::class);
+        Gate::policy(Website::class, WebsitePolicy::class);
 
         // Force https URL generation when APP_URL is https. Required for
         // Cloudflare/ngrok tunnels: TLS terminates at the tunnel and

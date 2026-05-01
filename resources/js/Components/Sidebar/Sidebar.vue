@@ -43,7 +43,7 @@ const nav: NavItem[] = [
     { label: 'Pipelines', icon: Activity, disabled: true, soonLabel: 'Phase 4' },
     { label: 'Deployments', icon: Rocket, routeName: 'deployments.index' },
     { label: 'Hosts', icon: Server, disabled: true, soonLabel: 'Phase 6' },
-    { label: 'Monitoring', icon: Globe, disabled: true, soonLabel: 'Phase 5' },
+    { label: 'Monitoring', icon: Globe, routeName: 'monitoring.websites.index' },
     { label: 'Analytics', icon: BarChart3, disabled: true, soonLabel: 'Phase 8' },
     { label: 'Alerts', icon: Bell, disabled: true, soonLabel: 'Phase 7' },
     { label: 'Activity', icon: History, routeName: 'activity.index' },

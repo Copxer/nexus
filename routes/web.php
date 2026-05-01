@@ -4,6 +4,8 @@ use App\Http\Controllers\ActivityController;
 use App\Http\Controllers\DeploymentController;
 use App\Http\Controllers\GithubConnectionController;
 use App\Http\Controllers\GithubRepositoryImportController;
+use App\Http\Controllers\Monitoring\WebsiteController;
+use App\Http\Controllers\Monitoring\WebsiteProbeController;
 use App\Http\Controllers\OverviewController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProjectController;
@@ -88,6 +90,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Spec 021 — cross-repo deployment timeline (workflow runs).
     Route::get('/deployments', [DeploymentController::class, 'index'])
         ->name('deployments.index');
+
+    // Spec 023 — website monitoring CRUD + manual probe.
+    // Nested under /monitoring/* so phase-6 hosts can sit beside it.
+    Route::resource('monitoring/websites', WebsiteController::class)
+        ->parameters(['websites' => 'website'])
+        ->names('monitoring.websites');
+    Route::post('/monitoring/websites/{website}/probe', WebsiteProbeController::class)
+        ->name('monitoring.websites.probe');
 });
 
 // Spec 017 — GitHub webhooks (no auth/CSRF; signature-verified inside).

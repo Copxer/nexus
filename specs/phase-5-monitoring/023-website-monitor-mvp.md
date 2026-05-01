@@ -1,7 +1,7 @@
 ---
 spec: website-monitor-mvp
 phase: 5-monitoring
-status: in-progress
+status: done
 owner: yoany
 created: 2026-04-30
 updated: 2026-04-30
@@ -163,6 +163,13 @@ Dated notes as work progresses.
 ### 2026-04-30
 - Spec drafted.
 - Opened issue [#69](https://github.com/Copxer/nexus/issues/69) and branch `spec/023-website-monitor-mvp` off `main`.
+- Implementation complete. Two migrations + two enums + two models + two factories. `WebsiteProbeResult` DTO + `RunWebsiteProbeAction` (pure HTTP, classifies up/slow/down/error against the 3000ms hard threshold) + `RecordWebsiteCheckAction` (persists a `WebsiteCheck`, updates `Website.last_*`, treats `Slow` as success for `last_success_at`). `WebsitePolicy` gates create/update/delete/probe to project owners. `WebsiteController` resourceful CRUD + `WebsiteProbeController` single-action sync probe. Sidebar `Monitoring` flipped from disabled → linked to the index page.
+- 28 tests across 5 test files: probe action (6), record action (6), policy (4), controller (9), probe controller (3). 19 net new passing tests; full suite 310 passed (was 291). The 51 failures are env-only POST CSRF (419) — same baseline pattern; CI passes them.
+- Self-review pass via `superpowers:code-reviewer`; addressed all 3 recommendations:
+    - Narrowed the probe action's catch list to `ConnectionException|RequestException` so programmer bugs (typo, OOM, future enum drift) bubble up loudly instead of getting silently classified as "site down."
+    - Added belt-and-suspenders `authorize('create', [Website::class, $project])` in `WebsiteController::store` after validation, mirroring the `RepositoryController::store` pattern.
+    - Migration column comment on `response_time_ms` clarifies it's wall-clock (DNS / TCP / TLS / send / receive), not server-reported TTFB; future timing fields will sit alongside.
+- Cross-tenant `view` parity flagged in PR body — same single-tenant gap as `RepositoryPolicy`; uniform fix when teams ship.
 
 ## Decisions (locked 2026-04-30)
 - **URL nesting under `/monitoring/`** — anticipates phase-6 hosts as a sibling. Sidebar label stays "Monitoring" pointing at `/monitoring/websites`.
