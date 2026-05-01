@@ -43,20 +43,25 @@ class WebsiteController extends Controller
 
     public function create(Request $request): Response
     {
+        $this->authorize('viewAny', Website::class);
+
         $user = $request->user();
 
         // Pre-select via `?project_id=N` so the link from a project
-        // page lands on the right project.
-        $preselect = $request->integer('project_id') ?: null;
-        $project = $preselect !== null
-            ? Project::query()->where('owner_user_id', $user->id)->find($preselect)
+        // page lands on the right project. If the project ID resolves
+        // to one the user owns we authorise create against it; if it
+        // resolves to a foreign project (or doesn't resolve at all),
+        // we drop the preselect rather than 403'ing the form — the
+        // user still needs to see the page to pick one of their own
+        // projects, and `store` will re-authorise at submit time.
+        $preselectId = $request->integer('project_id') ?: null;
+        $preselect = $preselectId !== null
+            ? Project::query()->where('owner_user_id', $user->id)->find($preselectId)
             : null;
-
-        $this->authorize('create', [Website::class, $project]);
 
         return Inertia::render('Monitoring/Websites/Create', [
             'projects' => $this->ownedProjects($user->id),
-            'preselectedProjectId' => $project?->id,
+            'preselectedProjectId' => $preselect?->id,
             'options' => $this->formOptions(),
         ]);
     }
