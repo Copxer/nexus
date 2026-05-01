@@ -5,6 +5,7 @@ namespace App\Domain\Activity\Queries;
 use App\Domain\Activity\ActivityEventPresenter;
 use App\Models\ActivityEvent;
 use App\Models\User;
+use App\Models\Website;
 
 /**
  * Read-side query for the activity feed shown in the AppLayout right rail
@@ -45,16 +46,35 @@ class RecentActivityForUserQuery
      */
     public function handle(User $user, int $limit = self::RAIL_LIMIT): array
     {
-        // TODO(future): broaden the predicate when system-emitted events
-        // (deployments, websites, hosts) start landing without a repository.
-        // Today every spec-017 webhook event carries a repository_id, so
-        // the EXISTS subquery against repositories→projects is watertight
-        // and rows with repository_id IS NULL are filtered out for every
-        // user — they don't leak across users, but they also don't show.
+        // Two scoping paths land in the same feed:
+        //   1. Repository-scoped events (spec 017's webhook handlers
+        //      and deployments — `repository_id` resolves through the
+        //      project's owner).
+        //   2. Monitoring-scoped events (spec 024 — `source: monitoring`,
+        //      `metadata.website_id` resolves through the website's
+        //      project's owner). These rows have `repository_id` null.
+        //
+        // The user's website ids are pre-resolved into a list once so
+        // the JSON predicate stays cheap (no JSON join per row); cross-
+        // DB JSON-extract syntax is the same shape on MySQL and SQLite.
+        $userWebsiteIds = Website::query()
+            ->whereHas('project', fn ($q) => $q->where('owner_user_id', $user->id))
+            ->pluck('id')
+            ->all();
+
         return ActivityEvent::query()
             ->with('repository:id,full_name')
-            ->whereHas('repository.project', function ($q) use ($user) {
-                $q->where('owner_user_id', $user->id);
+            ->where(function ($q) use ($user, $userWebsiteIds) {
+                $q->whereHas('repository.project', function ($inner) use ($user) {
+                    $inner->where('owner_user_id', $user->id);
+                });
+
+                if (! empty($userWebsiteIds)) {
+                    $q->orWhere(function ($inner) use ($userWebsiteIds) {
+                        $inner->where('source', 'monitoring')
+                            ->whereIn('metadata->website_id', $userWebsiteIds);
+                    });
+                }
             })
             ->orderByDesc('occurred_at')
             ->orderByDesc('id')

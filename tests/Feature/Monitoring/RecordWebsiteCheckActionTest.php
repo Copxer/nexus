@@ -2,29 +2,39 @@
 
 namespace Tests\Feature\Monitoring;
 
+use App\Domain\Activity\Actions\CreateActivityEventAction;
 use App\Domain\Monitoring\Actions\RecordWebsiteCheckAction;
 use App\Domain\Monitoring\Probes\WebsiteProbeResult;
+use App\Enums\ActivitySeverity;
 use App\Enums\WebsiteCheckStatus;
 use App\Enums\WebsiteStatus;
+use App\Events\ActivityEventCreated;
+use App\Models\ActivityEvent;
 use App\Models\Project;
 use App\Models\User;
 use App\Models\Website;
 use App\Models\WebsiteCheck;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
 use Tests\TestCase;
 
 class RecordWebsiteCheckActionTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function makeWebsite(): Website
+    private function action(): RecordWebsiteCheckAction
+    {
+        return new RecordWebsiteCheckAction(new CreateActivityEventAction);
+    }
+
+    private function makeWebsite(WebsiteStatus $status = WebsiteStatus::Pending): Website
     {
         $owner = User::factory()->create();
         $project = Project::factory()->create(['owner_user_id' => $owner->id]);
 
         return Website::factory()->create([
             'project_id' => $project->id,
-            'status' => WebsiteStatus::Pending->value,
+            'status' => $status->value,
         ]);
     }
 
@@ -38,7 +48,9 @@ class RecordWebsiteCheckActionTest extends TestCase
             errorMessage: null,
         );
 
-        $check = (new RecordWebsiteCheckAction)->execute($website, $result);
+        Event::fake([ActivityEventCreated::class]);
+
+        $check = $this->action()->execute($website, $result);
 
         $this->assertInstanceOf(WebsiteCheck::class, $check);
         $this->assertSame(1, WebsiteCheck::query()->count());
@@ -57,7 +69,7 @@ class RecordWebsiteCheckActionTest extends TestCase
             errorMessage: null,
         );
 
-        (new RecordWebsiteCheckAction)->execute($website, $result);
+        $this->action()->execute($website, $result);
 
         $website->refresh();
         $this->assertSame(WebsiteStatus::Up, $website->status);
@@ -76,7 +88,7 @@ class RecordWebsiteCheckActionTest extends TestCase
             errorMessage: null,
         );
 
-        (new RecordWebsiteCheckAction)->execute($website, $result);
+        $this->action()->execute($website, $result);
 
         $website->refresh();
         $this->assertSame(WebsiteStatus::Slow, $website->status);
@@ -94,7 +106,7 @@ class RecordWebsiteCheckActionTest extends TestCase
             errorMessage: 'HTTP 503: Service Unavailable',
         );
 
-        (new RecordWebsiteCheckAction)->execute($website, $result);
+        $this->action()->execute($website, $result);
 
         $website->refresh();
         $this->assertSame(WebsiteStatus::Down, $website->status);
@@ -113,7 +125,7 @@ class RecordWebsiteCheckActionTest extends TestCase
             errorMessage: 'Connection timed out after 10000ms',
         );
 
-        (new RecordWebsiteCheckAction)->execute($website, $result);
+        $this->action()->execute($website, $result);
 
         $website->refresh();
         $this->assertSame(WebsiteStatus::Error, $website->status);
@@ -128,7 +140,7 @@ class RecordWebsiteCheckActionTest extends TestCase
         // when status was Up"). The same rule applies in reverse.
         $website = $this->makeWebsite();
 
-        (new RecordWebsiteCheckAction)->execute(
+        $this->action()->execute(
             $website,
             new WebsiteProbeResult(WebsiteCheckStatus::Up, 200, 100, null),
         );
@@ -137,7 +149,7 @@ class RecordWebsiteCheckActionTest extends TestCase
         // Sleep so the timestamps differ enough to compare reliably.
         sleep(1);
 
-        (new RecordWebsiteCheckAction)->execute(
+        $this->action()->execute(
             $website,
             new WebsiteProbeResult(WebsiteCheckStatus::Down, 500, 150, 'HTTP 500'),
         );
@@ -146,5 +158,112 @@ class RecordWebsiteCheckActionTest extends TestCase
         $this->assertEquals($firstSuccess->toIso8601String(), $fresh->last_success_at->toIso8601String());
         $this->assertNotNull($fresh->last_failure_at);
         $this->assertSame(WebsiteStatus::Down, $fresh->status);
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    // Spec 024 — activity events on category transitions.
+    // ────────────────────────────────────────────────────────────────
+
+    public function test_pending_to_healthy_does_not_emit_an_activity_event(): void
+    {
+        Event::fake([ActivityEventCreated::class]);
+        $website = $this->makeWebsite(WebsiteStatus::Pending);
+
+        $this->action()->execute(
+            $website,
+            new WebsiteProbeResult(WebsiteCheckStatus::Up, 200, 100, null),
+        );
+
+        $this->assertSame(0, ActivityEvent::query()->count());
+        Event::assertNotDispatched(ActivityEventCreated::class);
+    }
+
+    public function test_pending_to_failed_emits_incident_event(): void
+    {
+        Event::fake([ActivityEventCreated::class]);
+        $website = $this->makeWebsite(WebsiteStatus::Pending);
+
+        $this->action()->execute(
+            $website,
+            new WebsiteProbeResult(WebsiteCheckStatus::Down, 503, 220, 'HTTP 503: Service Unavailable'),
+        );
+
+        $this->assertSame(1, ActivityEvent::query()->count());
+        $event = ActivityEvent::query()->first();
+        $this->assertSame('website.down', $event->event_type);
+        $this->assertSame(ActivitySeverity::Danger, $event->severity);
+        $this->assertSame('monitoring', $event->source);
+        $this->assertSame($website->id, $event->metadata['website_id']);
+    }
+
+    public function test_healthy_to_failed_emits_incident_event(): void
+    {
+        Event::fake([ActivityEventCreated::class]);
+        $website = $this->makeWebsite(WebsiteStatus::Up);
+
+        $this->action()->execute(
+            $website,
+            new WebsiteProbeResult(WebsiteCheckStatus::Error, null, null, 'Connection timed out'),
+        );
+
+        $event = ActivityEvent::query()->firstOrFail();
+        $this->assertSame('website.down', $event->event_type);
+        $this->assertSame(ActivitySeverity::Danger, $event->severity);
+        $this->assertStringContainsString($website->name, $event->title);
+    }
+
+    public function test_failed_to_healthy_emits_recovery_event(): void
+    {
+        Event::fake([ActivityEventCreated::class]);
+        $website = $this->makeWebsite(WebsiteStatus::Down);
+
+        $this->action()->execute(
+            $website,
+            new WebsiteProbeResult(WebsiteCheckStatus::Up, 200, 95, null),
+        );
+
+        $event = ActivityEvent::query()->firstOrFail();
+        $this->assertSame('website.up', $event->event_type);
+        $this->assertSame(ActivitySeverity::Success, $event->severity);
+        $this->assertSame('monitoring', $event->source);
+    }
+
+    public function test_steady_state_healthy_emits_nothing(): void
+    {
+        Event::fake([ActivityEventCreated::class]);
+        $website = $this->makeWebsite(WebsiteStatus::Up);
+
+        $this->action()->execute(
+            $website,
+            new WebsiteProbeResult(WebsiteCheckStatus::Up, 200, 100, null),
+        );
+
+        $this->assertSame(0, ActivityEvent::query()->count());
+    }
+
+    public function test_steady_state_failed_emits_nothing(): void
+    {
+        Event::fake([ActivityEventCreated::class]);
+        $website = $this->makeWebsite(WebsiteStatus::Down);
+
+        $this->action()->execute(
+            $website,
+            new WebsiteProbeResult(WebsiteCheckStatus::Down, 500, 200, 'HTTP 500'),
+        );
+
+        $this->assertSame(0, ActivityEvent::query()->count());
+    }
+
+    public function test_up_to_slow_emits_nothing_steady_state_within_healthy(): void
+    {
+        Event::fake([ActivityEventCreated::class]);
+        $website = $this->makeWebsite(WebsiteStatus::Up);
+
+        $this->action()->execute(
+            $website,
+            new WebsiteProbeResult(WebsiteCheckStatus::Slow, 200, 4_200, null),
+        );
+
+        $this->assertSame(0, ActivityEvent::query()->count());
     }
 }

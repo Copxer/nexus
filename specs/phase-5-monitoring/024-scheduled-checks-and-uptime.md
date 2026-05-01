@@ -1,7 +1,7 @@
 ---
 spec: scheduled-checks-and-uptime
 phase: 5-monitoring
-status: in-progress
+status: done
 owner: yoany
 created: 2026-04-30
 updated: 2026-04-30
@@ -49,7 +49,7 @@ Roadmap reference: §8.8 Website Performance Monitoring (scheduler example, perf
         - `Healthy → Failed` OR `Pending → Failed` → `event_type: website.down`, `severity: danger`, title `"{name} went down"`, description `"HTTP {code}"` or the captured error message.
         - `Failed → Healthy` → `event_type: website.up`, `severity: success`, title `"{name} recovered"`, description `"Up in {response_time_ms}ms"`.
         - Steady-state checks (Healthy → Healthy, Failed → Failed, Pending → Healthy) emit nothing — keeps the feed signal-dense.
-    - Reuses the existing `CreateActivityEventAction` (spec 017) so the event automatically broadcasts via `ActivityEventCreated` (spec 019). Free realtime.
+    - Reuses the existing `CreateActivityEventAction` (spec 017) so the event broadcasts via `ActivityEventCreated` (spec 019). Spec 019's broadcaster originally resolved the recipient channel through `repository → project → owner_user_id`, which would silently drop monitoring events (`repository_id` is null on those rows). **Extend `ActivityEventCreated::broadcastOn()`** to additionally resolve via `metadata.website_id → website → project → owner_user_id` for `source === 'monitoring'` rows so the right rail receives them in realtime.
     - `source: 'monitoring'` (new value alongside the existing `'github'`). Stored as a free string per spec 017's schema; no migration needed.
     - `metadata` carries `{ website_id, url, http_status_code, error_message }` for future drill-down.
     - Activity events reference the website indirectly — `repository_id` is null because monitoring isn't repo-scoped. `RecentActivityForUserQuery` (spec 018) currently filters by `whereHas('repository.project')`, so monitoring events would be filtered OUT today. **Extend that query** to also include events whose source is `'monitoring'` AND whose `metadata->website_id` resolves to a website under one of the user's projects.
@@ -131,6 +131,9 @@ Dated notes as work progresses.
 ### 2026-04-30
 - Spec drafted.
 - Opened issue [#73](https://github.com/Copxer/nexus/issues/73) and branch `spec/024-scheduled-checks-and-uptime` off `main`.
+- Implementation complete. New `DispatchDueWebsiteChecksJob` (every-minute scheduler dispatcher, soft-cap 500, in-PHP filter ordered by `last_checked_at` so the high-id tail can't starve), new `RunWebsiteCheckJob` (per-website async wrapper around the spec-023 actions, `tries=1`), new `GetWebsitePerformanceSummaryQuery` (count-based uptime over 24h/7d/30d + last-incident timestamp; slow counts as up; null on empty windows), `RecordWebsiteCheckAction` extended to detect healthy/failed category transitions and emit `website.down` / `website.up` activity events via `CreateActivityEventAction` (steady-state runs stay silent). `ActivityEventCreated::broadcastOn()` extended to resolve the recipient channel via `metadata.website_id → website → project → owner_user_id` so monitoring rows broadcast in realtime instead of silently dropping. `RecentActivityForUserQuery` extended to surface monitoring events in the user's feed alongside repo events.
+- 27 net new passing tests across 4 new test files + 2 extended; full suite 339 passed (was 312).
+- Self-review pass via `superpowers:code-reviewer` flagged one material item (broadcast no-op for monitoring rows) — fixed by extending `ActivityEventCreated::broadcastOn()` plus updating spec + docblock to be honest about the path. Plus the recommended `orderBy('last_checked_at')` swap on the dispatcher to prevent starvation when website count exceeds the soft cap.
 
 ## Decisions (locked 2026-04-30)
 - **Count-based uptime (option A).** `successful / total` per window. Phase-1 simple; switches to duration-based if real users find the count-based number misleading on long check intervals.

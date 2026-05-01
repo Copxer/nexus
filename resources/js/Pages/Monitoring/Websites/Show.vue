@@ -45,13 +45,24 @@ interface CheckRow {
     checked_at_iso: string | null;
 }
 
+interface SummaryShape {
+    uptime_24h: number | null;
+    uptime_7d: number | null;
+    uptime_30d: number | null;
+    last_incident_at: string | null;
+}
+
 const props = defineProps<{
     website: WebsiteShape;
     checks: CheckRow[];
+    summary: SummaryShape;
     canUpdate: boolean;
     canDelete: boolean;
     canProbe: boolean;
 }>();
+
+const formatUptime = (rate: number | null): string =>
+    rate === null ? '—%' : `${rate}%`;
 
 // `statusTone` re-exported from `@/lib/websiteStyles` above so the
 // four consumers stay in sync when the WebsiteStatus enum grows.
@@ -210,6 +221,51 @@ const confirmDelete = () => {
                         </dt>
                         <dd class="text-text-secondary">
                             {{ website.last_checked_at ?? '—' }}
+                        </dd>
+                    </div>
+                </dl>
+
+                <dl
+                    class="grid grid-cols-2 gap-4 border-t border-border-subtle pt-4 text-sm sm:grid-cols-4"
+                >
+                    <div class="flex flex-col gap-1">
+                        <dt
+                            class="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted"
+                        >
+                            Uptime · 24h
+                        </dt>
+                        <dd class="font-display text-lg font-semibold tabular-nums text-text-primary">
+                            {{ formatUptime(summary.uptime_24h) }}
+                        </dd>
+                    </div>
+                    <div class="flex flex-col gap-1">
+                        <dt
+                            class="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted"
+                        >
+                            Uptime · 7d
+                        </dt>
+                        <dd class="font-display text-lg font-semibold tabular-nums text-text-primary">
+                            {{ formatUptime(summary.uptime_7d) }}
+                        </dd>
+                    </div>
+                    <div class="flex flex-col gap-1">
+                        <dt
+                            class="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted"
+                        >
+                            Uptime · 30d
+                        </dt>
+                        <dd class="font-display text-lg font-semibold tabular-nums text-text-primary">
+                            {{ formatUptime(summary.uptime_30d) }}
+                        </dd>
+                    </div>
+                    <div class="flex flex-col gap-1">
+                        <dt
+                            class="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted"
+                        >
+                            Last incident
+                        </dt>
+                        <dd class="text-text-secondary">
+                            {{ summary.last_incident_at ?? 'Never' }}
                         </dd>
                     </div>
                 </dl>
