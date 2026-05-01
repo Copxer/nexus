@@ -1,14 +1,23 @@
 <script setup lang="ts">
+import ActivityFeed from '@/Components/Activity/ActivityFeed.vue';
 import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import StatusBadge from '@/Components/Dashboard/StatusBadge.vue';
 import TextInput from '@/Components/TextInput.vue';
 import { projectIcon } from '@/lib/projectIcons';
+import {
+    conclusionLabel,
+    conclusionTone,
+    runStatusDotClass,
+    runStatusTone,
+} from '@/lib/workflowRunStyles';
 import AppLayout from '@/Layouts/AppLayout.vue';
+import type { ActivityEvent } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import {
     Activity,
+    ArrowRight,
     BarChart3,
     ChevronLeft,
     ExternalLink,
@@ -23,6 +32,7 @@ import {
     Server,
     Settings,
     Trash2,
+    Workflow,
     X,
     type LucideIcon,
 } from 'lucide-vue-next';
@@ -58,12 +68,28 @@ interface RepositoryRow {
     sync_status: string | null;
 }
 
+interface DeploymentRow {
+    id: number;
+    run_number: number;
+    name: string;
+    event: string;
+    status: string | null;
+    conclusion: string | null;
+    head_branch: string | null;
+    actor_login: string | null;
+    html_url: string;
+    run_started_at: string | null;
+    repository: { id: number; full_name: string; name: string } | null;
+}
+
 const props = defineProps<{
     project: ProjectShape;
     canUpdate: boolean;
     canDelete: boolean;
     repositories: RepositoryRow[];
     hasGithubConnection: boolean;
+    projectActivity: ActivityEvent[];
+    projectDeployments: DeploymentRow[];
 }>();
 
 const linkForm = useForm({
@@ -118,12 +144,17 @@ type TabKey =
 const tabs: { key: TabKey; label: string; icon: LucideIcon; pendingPhase: string | null }[] = [
     { key: 'overview', label: 'Overview', icon: BarChart3, pendingPhase: null },
     { key: 'repositories', label: 'Repositories', icon: GitBranch, pendingPhase: null },
-    { key: 'deployments', label: 'Deployments', icon: Rocket, pendingPhase: 'phase 4' },
+    { key: 'deployments', label: 'Deployments', icon: Rocket, pendingPhase: null },
     { key: 'hosts', label: 'Hosts', icon: Server, pendingPhase: 'phase 6' },
     { key: 'monitoring', label: 'Monitoring', icon: Globe, pendingPhase: 'phase 5' },
-    { key: 'activity', label: 'Activity', icon: Activity, pendingPhase: 'phase 3' },
+    { key: 'activity', label: 'Activity', icon: Activity, pendingPhase: null },
     { key: 'settings', label: 'Settings', icon: Settings, pendingPhase: null },
 ];
+
+// Tone helpers live in `@/lib/workflowRunStyles` so the four
+// consumers (this page + Repositories/Show + Deployments/Index +
+// DeploymentDrawer) stay in sync when the GitHub conclusion enum
+// grows a new case.
 
 const activeTab = ref<TabKey>('overview');
 
@@ -565,7 +596,198 @@ const confirmDelete = () => {
                 </p>
             </section>
 
-            <!-- Phase-pending placeholder for the other 5 tabs -->
+            <!-- Activity panel — events from this project's repos. -->
+            <section
+                v-else-if="activeTab === 'activity'"
+                aria-label="Activity"
+                class="glass-card p-6 sm:p-8"
+            >
+                <header class="mb-4 flex items-center justify-between gap-3">
+                    <div class="flex flex-col gap-1">
+                        <h3 class="text-sm font-semibold text-text-primary">
+                            Project activity
+                        </h3>
+                        <p class="text-xs text-text-muted">
+                            Up to 20 recent events from this project's
+                            repositories.
+                        </p>
+                    </div>
+                    <Link
+                        :href="route('activity.index')"
+                        class="inline-flex items-center gap-1.5 rounded-md border border-border-subtle bg-background-panel-hover px-2.5 py-1.5 text-xs font-semibold text-text-secondary transition hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
+                    >
+                        Browse all activity
+                        <ArrowRight class="h-3.5 w-3.5" aria-hidden="true" />
+                    </Link>
+                </header>
+
+                <ActivityFeed
+                    v-if="projectActivity.length > 0"
+                    :events="projectActivity"
+                />
+                <div
+                    v-else
+                    class="flex flex-col items-center justify-center gap-3 px-6 py-12 text-center"
+                >
+                    <span
+                        class="flex h-12 w-12 items-center justify-center rounded-full border border-border-subtle bg-slate-950/60"
+                    >
+                        <Activity
+                            class="h-5 w-5 text-text-muted"
+                            aria-hidden="true"
+                        />
+                    </span>
+                    <p class="text-sm font-medium text-text-secondary">
+                        No events yet
+                    </p>
+                    <p class="max-w-sm text-xs text-text-muted">
+                        Events land here once a webhook from one of this
+                        project's repositories fires.
+                    </p>
+                </div>
+            </section>
+
+            <!-- Deployments panel — workflow runs from this project's repos. -->
+            <section
+                v-else-if="activeTab === 'deployments'"
+                aria-label="Deployments"
+                class="glass-card p-6 sm:p-8"
+            >
+                <header class="mb-4 flex items-center justify-between gap-3">
+                    <div class="flex flex-col gap-1">
+                        <h3 class="text-sm font-semibold text-text-primary">
+                            Project deployments
+                        </h3>
+                        <p class="text-xs text-text-muted">
+                            Recent GitHub Actions workflow runs across this
+                            project's repositories.
+                        </p>
+                    </div>
+                    <Link
+                        :href="
+                            route('deployments.index', {
+                                project_id: project.id,
+                            })
+                        "
+                        class="inline-flex items-center gap-1.5 rounded-md border border-border-subtle bg-background-panel-hover px-2.5 py-1.5 text-xs font-semibold text-text-secondary transition hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
+                    >
+                        View all
+                        <ArrowRight class="h-3.5 w-3.5" aria-hidden="true" />
+                    </Link>
+                </header>
+
+                <ul
+                    v-if="projectDeployments.length > 0"
+                    class="divide-y divide-border-subtle"
+                >
+                    <li
+                        v-for="row in projectDeployments.slice(0, 10)"
+                        :key="row.id"
+                        class="flex items-center gap-4 py-3"
+                    >
+                        <span
+                            class="h-2.5 w-2.5 shrink-0 rounded-full"
+                            :class="runStatusDotClass(row)"
+                            aria-hidden="true"
+                        />
+                        <Workflow
+                            class="h-4 w-4 shrink-0 text-text-muted"
+                            aria-hidden="true"
+                        />
+                        <div class="flex min-w-0 flex-1 flex-col gap-1">
+                            <a
+                                :href="row.html_url"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class="truncate text-sm font-semibold text-text-primary transition hover:text-accent-cyan"
+                            >
+                                <span class="font-mono text-text-muted">#{{ row.run_number }}</span>
+                                {{ row.name }}
+                            </a>
+                            <p
+                                class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-text-muted"
+                            >
+                                <span
+                                    v-if="row.repository"
+                                    class="font-mono text-text-secondary"
+                                >
+                                    {{ row.repository.full_name }}
+                                </span>
+                                <span
+                                    v-if="row.head_branch"
+                                    class="inline-flex items-center gap-1 font-mono"
+                                >
+                                    <GitBranch
+                                        class="h-3 w-3"
+                                        aria-hidden="true"
+                                    />
+                                    {{ row.head_branch }}
+                                </span>
+                                <span class="font-mono">{{ row.event }}</span>
+                                <span v-if="row.actor_login">
+                                    <span
+                                        class="font-mono text-text-secondary"
+                                    >
+                                        @{{ row.actor_login }}
+                                    </span>
+                                </span>
+                                <span v-if="row.run_started_at">
+                                    · Started {{ row.run_started_at }}
+                                </span>
+                            </p>
+                        </div>
+                        <div class="flex shrink-0 items-center gap-2">
+                            <StatusBadge
+                                v-if="row.conclusion"
+                                :tone="conclusionTone(row.conclusion)"
+                            >
+                                {{ conclusionLabel(row.conclusion) }}
+                            </StatusBadge>
+                            <StatusBadge
+                                v-else
+                                :tone="runStatusTone(row.status)"
+                            >
+                                {{ row.status }}
+                            </StatusBadge>
+                            <a
+                                :href="row.html_url"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class="text-text-muted transition hover:text-accent-cyan"
+                                :aria-label="`Open run #${row.run_number} on GitHub`"
+                            >
+                                <ExternalLink
+                                    class="h-4 w-4"
+                                    aria-hidden="true"
+                                />
+                            </a>
+                        </div>
+                    </li>
+                </ul>
+
+                <div
+                    v-else
+                    class="flex flex-col items-center justify-center gap-3 px-6 py-12 text-center"
+                >
+                    <span
+                        class="flex h-12 w-12 items-center justify-center rounded-full border border-border-subtle bg-slate-950/60"
+                    >
+                        <Rocket
+                            class="h-5 w-5 text-text-muted"
+                            aria-hidden="true"
+                        />
+                    </span>
+                    <p class="text-sm font-medium text-text-secondary">
+                        No workflow runs yet
+                    </p>
+                    <p class="max-w-sm text-xs text-text-muted">
+                        Trigger a GitHub Action on one of this project's
+                        repositories — runs appear here in real-time.
+                    </p>
+                </div>
+            </section>
+
+            <!-- Phase-pending placeholder for hosts / monitoring tabs. -->
             <section
                 v-else
                 :aria-label="`${activeTab} (coming soon)`"

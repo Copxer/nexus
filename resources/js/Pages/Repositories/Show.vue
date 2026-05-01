@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import StatusBadge from '@/Components/Dashboard/StatusBadge.vue';
 import { projectIcon } from '@/lib/projectIcons';
+import {
+    conclusionLabel as workflowConclusionLabel,
+    conclusionTone as workflowConclusionTone,
+    runStatusTone as workflowStatusTone,
+} from '@/lib/workflowRunStyles';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import {
@@ -147,37 +152,9 @@ const prStateTone = (state: string | null) =>
         }) as const
     )[state ?? ''] ?? 'muted';
 
-const workflowConclusionTone = (conclusion: string | null) =>
-    (
-        ({
-            success: 'success',
-            failure: 'danger',
-            cancelled: 'warning',
-            timed_out: 'warning',
-            action_required: 'warning',
-            stale: 'muted',
-            neutral: 'muted',
-            skipped: 'muted',
-        }) as const
-    )[conclusion ?? ''] ?? 'muted';
-
-// Tone for the run-status badge shown when a run has no conclusion
-// yet — `WorkflowRunConclusion` is null pre-completion. Keys match
-// `WorkflowRunStatus::badgeTone()` on the PHP side so the two
-// renderers agree.
-const workflowStatusTone = (status: string | null) =>
-    (
-        ({
-            queued: 'muted',
-            in_progress: 'info',
-            completed: 'success',
-        }) as const
-    )[status ?? ''] ?? 'muted';
-
-// Display label for the conclusion badge — `timed_out` reads cleaner
-// as `timed out`, etc. Falls back to a humanized form for unknowns.
-const workflowConclusionLabel = (conclusion: string | null) =>
-    conclusion === null ? '—' : conclusion.replace(/_/g, ' ');
+// Tone helpers for workflow runs live in `@/lib/workflowRunStyles`
+// (re-exported above as workflow-prefixed names to avoid colliding
+// with the page's existing issue-state / PR-state tone fns).
 
 const projectAccentClass = (color: string | null) =>
     (

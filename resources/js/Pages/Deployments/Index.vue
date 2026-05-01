@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import StatusBadge from '@/Components/Dashboard/StatusBadge.vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
+import {
+    conclusionLabel,
+    conclusionTone,
+    runStatusDotClass,
+    runStatusTone,
+} from '@/lib/workflowRunStyles';
 import type { PageProps } from '@/types';
 import { Head, router, usePage } from '@inertiajs/vue3';
 import {
@@ -198,46 +204,11 @@ const grouped = computed(() => {
     return order.map((key) => ({ key, label: groupLabel(key), rows: buckets.get(key)! }));
 });
 
-// Conclusion / status tone helpers. Mirror the PHP enums'
-// `badgeTone()` so the two renderers agree.
-const conclusionTone = (conclusion: string | null) =>
-    (
-        ({
-            success: 'success',
-            failure: 'danger',
-            cancelled: 'warning',
-            timed_out: 'warning',
-            action_required: 'warning',
-            stale: 'muted',
-            neutral: 'muted',
-            skipped: 'muted',
-        }) as const
-    )[conclusion ?? ''] ?? 'muted';
-
-const statusTone = (status: string | null) =>
-    (
-        ({
-            queued: 'muted',
-            in_progress: 'info',
-            completed: 'success',
-        }) as const
-    )[status ?? ''] ?? 'muted';
-
-const conclusionLabel = (conclusion: string | null) =>
-    conclusion === null ? '—' : conclusion.replace(/_/g, ' ');
-
-const statusDotClass = (row: DeploymentRow): string => {
-    if (row.conclusion === 'success') return 'bg-status-success';
-    if (row.conclusion === 'failure') return 'bg-status-danger';
-    if (
-        row.conclusion === 'cancelled' ||
-        row.conclusion === 'timed_out' ||
-        row.conclusion === 'action_required'
-    )
-        return 'bg-status-warning';
-    if (row.status === 'in_progress') return 'bg-accent-cyan animate-pulse';
-    return 'bg-text-muted';
-};
+// Conclusion / status tone helpers + status-dot class live in
+// `@/lib/workflowRunStyles` so the cross-page set stays in sync when
+// the GitHub conclusion enum grows.
+const statusTone = runStatusTone;
+const statusDotClass = runStatusDotClass;
 
 const projectAccentClass = (color: string | null) =>
     (
