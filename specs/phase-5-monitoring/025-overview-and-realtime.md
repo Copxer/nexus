@@ -1,7 +1,7 @@
 ---
 spec: overview-and-realtime
 phase: 5-monitoring
-status: in-progress
+status: done
 owner: yoany
 created: 2026-04-30
 updated: 2026-04-30
@@ -120,6 +120,10 @@ Dated notes as work progresses.
 ### 2026-04-30
 - Spec drafted.
 - Opened issue [#75](https://github.com/Copxer/nexus/issues/75) and branch `spec/025-overview-and-realtime` off `main`.
+- Implementation complete. New `GetMonitoringUptimeKpiQuery` (volume-weighted 24h uptime + change vs prior 24h + 12-day daily sparkline + status thresholds at 99 / 95). Wired into `GetOverviewDashboardQuery`; `MOCK_KPIS['uptime']` removed; class docblock graduates uptime to "real today". New `WebsiteCheckRecorded` `ShouldBroadcastNow` event with pre-resolved owner id, broadcasts on `users.{ownerUserId}.monitoring` with light pulse `{ check_id, website_id }`. `routes/channels.php` authorizes the new channel. `RecordWebsiteCheckAction` dispatches the event after every persisted check (steady-state runs included; transition events stay separate per spec 024). `Show.vue` subscribes via Echo, filters client-side by `website_id`, partial-reloads on matching pulses; offline pill via `realtimeConnected` ref; response-time `Sparkline` of last 50 checks with leading-null skip and carry-forward fill.
+- 18 net new passing tests across 3 new files + 2 extended; full suite 357 passed (was 339).
+- Self-review pass via `superpowers:code-reviewer` flagged 3 recommendations, all addressed: hoisted `usePage()` to setup top-level (idiomatic Inertia), skipped leading-null Error checks in the sparkline so the line doesn't anchor at the 0ms floor, and added a docblock note on `WebsiteCheckRecorded::broadcastOn()` documenting the per-user-channel-vs-per-website-channel trade-off for when monitor counts cross ~1k.
+- **Phase 5 complete (3/3 specs done).** Phase-pending tabs and stubs related to website monitoring are all wired; the only remaining `MOCK_KPIS` slices are `services` (phase 6) and `alerts` (phase 7).
 
 ## Decisions (locked 2026-04-30)
 - **Volume-weighted uptime (option B).** `successful_checks / total_checks` across all websites — truest "system-wide uptime" measure.
