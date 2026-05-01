@@ -12,6 +12,7 @@ import {
     runStatusDotClass,
     runStatusTone,
 } from '@/lib/workflowRunStyles';
+import { websiteStatusTone as monitorStatusTone } from '@/lib/websiteStyles';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import type { ActivityEvent } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
@@ -82,6 +83,22 @@ interface DeploymentRow {
     repository: { id: number; full_name: string; name: string } | null;
 }
 
+interface MonitorRow {
+    id: number;
+    name: string;
+    url: string;
+    method: string;
+    status:
+        | 'pending'
+        | 'up'
+        | 'down'
+        | 'slow'
+        | 'error'
+        | string
+        | null;
+    last_checked_at: string | null;
+}
+
 const props = defineProps<{
     project: ProjectShape;
     canUpdate: boolean;
@@ -90,6 +107,7 @@ const props = defineProps<{
     hasGithubConnection: boolean;
     projectActivity: ActivityEvent[];
     projectDeployments: DeploymentRow[];
+    projectMonitors: MonitorRow[];
 }>();
 
 const linkForm = useForm({
@@ -130,6 +148,10 @@ const syncStatusTone = (status: string | null) =>
         }) as const
     )[status ?? ''] ?? 'muted';
 
+// `monitorStatusTone` lives in `@/lib/websiteStyles` so the four
+// consumers (this page + Monitoring/Websites/Index + Show + future
+// fourth) stay in sync when the WebsiteStatus enum grows a new case.
+
 // Tab definitions. Overview + Settings have content this spec; the others
 // advertise the phase that ships their real implementation.
 type TabKey =
@@ -146,7 +168,7 @@ const tabs: { key: TabKey; label: string; icon: LucideIcon; pendingPhase: string
     { key: 'repositories', label: 'Repositories', icon: GitBranch, pendingPhase: null },
     { key: 'deployments', label: 'Deployments', icon: Rocket, pendingPhase: null },
     { key: 'hosts', label: 'Hosts', icon: Server, pendingPhase: 'phase 6' },
-    { key: 'monitoring', label: 'Monitoring', icon: Globe, pendingPhase: 'phase 5' },
+    { key: 'monitoring', label: 'Monitoring', icon: Globe, pendingPhase: null },
     { key: 'activity', label: 'Activity', icon: Activity, pendingPhase: null },
     { key: 'settings', label: 'Settings', icon: Settings, pendingPhase: null },
 ];
@@ -783,6 +805,104 @@ const confirmDelete = () => {
                     <p class="max-w-sm text-xs text-text-muted">
                         Trigger a GitHub Action on one of this project's
                         repositories — runs appear here in real-time.
+                    </p>
+                </div>
+            </section>
+
+            <!-- Monitoring panel — website monitors under this project. -->
+            <section
+                v-else-if="activeTab === 'monitoring'"
+                aria-label="Monitoring"
+                class="glass-card p-6 sm:p-8"
+            >
+                <header class="mb-4 flex items-center justify-between gap-3">
+                    <div class="flex flex-col gap-1">
+                        <h3 class="text-sm font-semibold text-text-primary">
+                            Project monitors
+                        </h3>
+                        <p class="text-xs text-text-muted">
+                            Website health checks under this project. Up to
+                            20 shown — full list at
+                            <span class="font-mono">/monitoring/websites</span>.
+                        </p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <Link
+                            v-if="canUpdate"
+                            :href="
+                                route('monitoring.websites.create', {
+                                    project_id: project.id,
+                                })
+                            "
+                            class="inline-flex items-center gap-1.5 rounded-md border border-accent-cyan/40 bg-accent-cyan/15 px-2.5 py-1.5 text-xs font-semibold text-accent-cyan transition hover:border-accent-cyan/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
+                        >
+                            <Plus class="h-3.5 w-3.5" aria-hidden="true" />
+                            Add monitor
+                        </Link>
+                        <Link
+                            :href="route('monitoring.websites.index')"
+                            class="inline-flex items-center gap-1.5 rounded-md border border-border-subtle bg-background-panel-hover px-2.5 py-1.5 text-xs font-semibold text-text-secondary transition hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
+                        >
+                            Browse all
+                            <ArrowRight class="h-3.5 w-3.5" aria-hidden="true" />
+                        </Link>
+                    </div>
+                </header>
+
+                <ul
+                    v-if="projectMonitors.length > 0"
+                    class="divide-y divide-border-subtle"
+                >
+                    <li
+                        v-for="monitor in projectMonitors"
+                        :key="monitor.id"
+                        class="flex items-center gap-4 py-3"
+                    >
+                        <Globe
+                            class="h-4 w-4 shrink-0 text-text-muted"
+                            aria-hidden="true"
+                        />
+                        <Link
+                            :href="route('monitoring.websites.show', monitor.id)"
+                            class="flex min-w-0 flex-1 flex-col gap-1 transition hover:text-accent-cyan"
+                        >
+                            <span class="truncate text-sm font-semibold text-text-primary">
+                                {{ monitor.name }}
+                            </span>
+                            <p
+                                class="flex flex-wrap items-center gap-x-2 truncate text-xs text-text-muted"
+                            >
+                                <span class="font-mono text-text-secondary">{{ monitor.method }}</span>
+                                <span class="truncate font-mono">{{ monitor.url }}</span>
+                                <span v-if="monitor.last_checked_at">
+                                    · Last check {{ monitor.last_checked_at }}
+                                </span>
+                            </p>
+                        </Link>
+                        <StatusBadge :tone="monitorStatusTone(monitor.status)">
+                            {{ monitor.status }}
+                        </StatusBadge>
+                    </li>
+                </ul>
+
+                <div
+                    v-else
+                    class="flex flex-col items-center justify-center gap-3 px-6 py-12 text-center"
+                >
+                    <span
+                        class="flex h-12 w-12 items-center justify-center rounded-full border border-border-subtle bg-slate-950/60"
+                    >
+                        <Globe
+                            class="h-5 w-5 text-text-muted"
+                            aria-hidden="true"
+                        />
+                    </span>
+                    <p class="text-sm font-medium text-text-secondary">
+                        No monitors yet
+                    </p>
+                    <p class="max-w-sm text-xs text-text-muted">
+                        Add a website URL to start tracking response time
+                        and uptime under this project.
                     </p>
                 </div>
             </section>

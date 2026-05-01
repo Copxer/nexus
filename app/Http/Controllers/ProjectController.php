@@ -9,6 +9,7 @@ use App\Enums\ProjectStatus;
 use App\Http\Requests\Projects\StoreProjectRequest;
 use App\Http\Requests\Projects\UpdateProjectRequest;
 use App\Models\Project;
+use App\Models\Website;
 use App\Support\ProjectPalette;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -88,6 +89,27 @@ class ProjectController extends Controller
             10,
         );
 
+        // Per-project Monitoring tab (spec 023) — website monitors
+        // belonging to this project. Cap at 20 inline — the cross-repo
+        // monitor list at `/monitoring/websites` is the wider view.
+        // Phase-1 single-tenant: any monitor under the project is
+        // visible to its owner; cross-tenant scoping arrives uniformly
+        // when teams ship.
+        $projectMonitors = Website::query()
+            ->where('project_id', $project->id)
+            ->orderBy('name')
+            ->limit(20)
+            ->get()
+            ->map(fn (Website $website) => [
+                'id' => $website->id,
+                'name' => $website->name,
+                'url' => $website->url,
+                'method' => $website->method,
+                'status' => $website->status?->value,
+                'last_checked_at' => $website->last_checked_at?->diffForHumans(),
+            ])
+            ->all();
+
         return Inertia::render('Projects/Show', [
             'project' => $this->transform($project),
             'canUpdate' => $request->user()?->can('update', $project) ?? false,
@@ -109,6 +131,7 @@ class ProjectController extends Controller
             ])->all(),
             'projectActivity' => $projectActivity,
             'projectDeployments' => $projectDeployments,
+            'projectMonitors' => $projectMonitors,
         ]);
     }
 
