@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Monitoring\Jobs\DispatchDueWebsiteChecksJob;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -18,3 +19,14 @@ Artisan::command('inspire', function () {
 // ──────────────────────────────────────────────────────────────────────
 Schedule::command('app:heartbeat')->everyTenMinutes();
 Schedule::command('inspire')->hourly();
+
+// Spec 024 — every-minute dispatcher that picks website monitors whose
+// configured `check_interval_seconds` has elapsed. The dispatcher itself
+// stays fast (DB read + filter); per-website probes run async via
+// `RunWebsiteCheckJob`. `withoutOverlapping()` guards against a slow
+// dispatcher tick stacking onto the next minute. Production needs
+// `php artisan schedule:work` (or cron) running.
+Schedule::job(new DispatchDueWebsiteChecksJob)
+    ->everyMinute()
+    ->name('monitoring:dispatch-due-website-checks')
+    ->withoutOverlapping();

@@ -4,6 +4,7 @@ namespace App\Events;
 
 use App\Domain\Activity\ActivityEventPresenter;
 use App\Models\ActivityEvent;
+use App\Models\Website;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
@@ -34,28 +35,63 @@ class ActivityEventCreated implements ShouldBroadcastNow
      * Broadcast on the project owner's private activity channel.
      * `users.{userId}.activity` is authorized in `routes/channels.php`.
      *
+     * Two scoping paths:
+     *   1. **Repo-scoped events** (spec 017's webhook handlers,
+     *      spec 020's deployments) — channel resolves through
+     *      `repository → project → owner_user_id`.
+     *   2. **Monitoring-scoped events** (spec 024 — `source: monitoring`,
+     *      `repository_id` is null) — channel resolves through
+     *      `metadata.website_id → website → project → owner_user_id`.
+     *
+     * If neither path resolves to an owner the broadcast no-ops; the
+     * row still exists in the DB, and `RecentActivityForUserQuery`
+     * picks it up on the next page-load refresh.
+     *
      * @return list<PrivateChannel>
      */
     public function broadcastOn(): array
     {
-        $repository = $this->activityEvent->repository;
+        $ownerUserId = $this->resolveOwnerUserId();
 
-        // No repository → no project → no recipient. Silently drop the
-        // broadcast (the row still exists in the DB; spec 018's
-        // page-load query already filters these out for every user).
-        if ($repository === null) {
-            return [];
-        }
-
-        $project = $repository->project;
-
-        if ($project === null || $project->owner_user_id === null) {
+        if ($ownerUserId === null) {
             return [];
         }
 
         return [
-            new PrivateChannel("users.{$project->owner_user_id}.activity"),
+            new PrivateChannel("users.{$ownerUserId}.activity"),
         ];
+    }
+
+    /**
+     * Resolve the broadcast recipient user id. Returns null when the
+     * event isn't tied to any owner (orphan rows, system events
+     * without a website / repository).
+     */
+    private function resolveOwnerUserId(): ?int
+    {
+        // Repo-scoped path (specs 017 / 020).
+        if ($this->activityEvent->repository_id !== null) {
+            $repository = $this->activityEvent->repository;
+            $project = $repository?->project;
+
+            return $project?->owner_user_id;
+        }
+
+        // Monitoring-scoped path (spec 024).
+        if ($this->activityEvent->source === 'monitoring') {
+            $metadata = $this->activityEvent->metadata ?? [];
+            $websiteId = $metadata['website_id'] ?? null;
+
+            if ($websiteId === null) {
+                return null;
+            }
+
+            $website = Website::query()->find($websiteId);
+
+            return $website?->project?->owner_user_id;
+        }
+
+        return null;
     }
 
     /**

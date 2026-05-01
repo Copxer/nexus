@@ -137,6 +137,12 @@ class WebsiteControllerTest extends TestCase
                     ->component('Monitoring/Websites/Show')
                     ->has('website')
                     ->has('checks', 3)
+                    ->has('summary', fn (AssertableInertia $summary) => $summary
+                        ->has('uptime_24h')
+                        ->has('uptime_7d')
+                        ->has('uptime_30d')
+                        ->has('last_incident_at')
+                    )
                     ->where('canUpdate', true)
                     ->where('canDelete', true)
                     ->where('canProbe', true)

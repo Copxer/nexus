@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Monitoring;
 
+use App\Domain\Monitoring\Queries\GetWebsitePerformanceSummaryQuery;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Monitoring\StoreWebsiteRequest;
 use App\Http\Requests\Monitoring\UpdateWebsiteRequest;
@@ -81,8 +82,11 @@ class WebsiteController extends Controller
             ->with('status', "Monitor created for {$website->name}.");
     }
 
-    public function show(Request $request, Website $website): Response
-    {
+    public function show(
+        Request $request,
+        Website $website,
+        GetWebsitePerformanceSummaryQuery $summaryQuery,
+    ): Response {
         $this->authorize('view', $website);
 
         $website->loadMissing('project:id,slug,name,color,icon,owner_user_id');
@@ -103,9 +107,21 @@ class WebsiteController extends Controller
             ])
             ->all();
 
+        // Spec 024 — uptime % over 24h / 7d / 30d windows + last
+        // incident timestamp. Three count queries; cheap at phase-1
+        // scale, no caching layer.
+        $rawSummary = $summaryQuery->execute($website);
+        $summary = [
+            'uptime_24h' => $rawSummary['uptime_24h'],
+            'uptime_7d' => $rawSummary['uptime_7d'],
+            'uptime_30d' => $rawSummary['uptime_30d'],
+            'last_incident_at' => $rawSummary['last_incident_at']?->diffForHumans(),
+        ];
+
         return Inertia::render('Monitoring/Websites/Show', [
             'website' => $this->transform($website),
             'checks' => $checks,
+            'summary' => $summary,
             'canUpdate' => $request->user()?->can('update', $website) ?? false,
             'canDelete' => $request->user()?->can('delete', $website) ?? false,
             'canProbe' => $request->user()?->can('probe', $website) ?? false,

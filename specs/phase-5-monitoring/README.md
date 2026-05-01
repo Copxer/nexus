@@ -10,7 +10,7 @@ Stand up website uptime + response-time monitoring end-to-end. By the end of pha
 | # | Task | Status |
 |---|------|--------|
 | 023 | Website monitor MVP (CRUD + manual probe + check history) | 🟢 |
-| 024 | Scheduled checks + uptime calc + activity events | ⬜ |
+| 024 | Scheduled checks + uptime calc + activity events | 🟢 |
 | 025 | Overview integration + Reverb live updates + perf charts | ⬜ |
 
 ## Acceptance criteria (phase-level)
