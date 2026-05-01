@@ -6,6 +6,7 @@ use App\Models\ActivityEvent;
 use App\Models\Project;
 use App\Models\Repository;
 use App\Models\User;
+use App\Models\Website;
 use App\Models\WorkflowRun;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia;
@@ -95,6 +96,33 @@ class ProjectControllerTest extends TestCase
                     ->where('canDelete', true)
                     ->has('projectActivity')
                     ->has('projectDeployments')
+                    ->has('projectMonitors')
+            );
+    }
+
+    public function test_show_scopes_monitors_to_this_project(): void
+    {
+        $user = $this->verifiedUser();
+        $project = Project::factory()->create(['owner_user_id' => $user->id]);
+        Website::factory()->create([
+            'project_id' => $project->id,
+            'name' => 'Project monitor',
+        ]);
+
+        // Sibling project's monitor must NOT leak.
+        $sibling = Project::factory()->create(['owner_user_id' => $user->id]);
+        Website::factory()->create([
+            'project_id' => $sibling->id,
+            'name' => 'Sibling monitor',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('projects.show', $project))
+            ->assertSuccessful()
+            ->assertInertia(
+                fn (AssertableInertia $page) => $page
+                    ->has('projectMonitors', 1)
+                    ->where('projectMonitors.0.name', 'Project monitor')
             );
     }
 

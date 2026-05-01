@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import StatusBadge from '@/Components/Dashboard/StatusBadge.vue';
+import { websiteStatusTone as statusTone } from '@/lib/websiteStyles';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import {
@@ -52,16 +53,8 @@ const props = defineProps<{
     canProbe: boolean;
 }>();
 
-const statusTone = (status: string | null) =>
-    (
-        ({
-            pending: 'muted',
-            up: 'success',
-            down: 'danger',
-            slow: 'warning',
-            error: 'danger',
-        }) as const
-    )[status ?? ''] ?? 'muted';
+// `statusTone` re-exported from `@/lib/websiteStyles` above so the
+// four consumers stay in sync when the WebsiteStatus enum grows.
 
 const projectAccentClass = (color: string | null) =>
     (

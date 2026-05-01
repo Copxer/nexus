@@ -102,8 +102,8 @@ export function getCommands(): Command[] {
             label: 'Go to Issues & PRs',
             group: 'navigation',
             icon: GitPullRequest,
-            disabled: true,
-            soonLabel: 'Phase 2',
+            keywords: ['issues', 'pull requests', 'prs', 'work items'],
+            run: () => router.visit(route('work-items.index')),
         },
         {
             id: 'go-pipelines',
@@ -118,8 +118,8 @@ export function getCommands(): Command[] {
             label: 'Go to Deployments',
             group: 'navigation',
             icon: Rocket,
-            disabled: true,
-            soonLabel: 'Phase 4',
+            keywords: ['deploy', 'workflow runs', 'actions', 'ci'],
+            run: () => router.visit(route('deployments.index')),
         },
         {
             id: 'go-hosts',
@@ -134,8 +134,8 @@ export function getCommands(): Command[] {
             label: 'Go to Monitoring',
             group: 'navigation',
             icon: Globe,
-            disabled: true,
-            soonLabel: 'Phase 5',
+            keywords: ['monitor', 'websites', 'uptime', 'probes'],
+            run: () => router.visit(route('monitoring.websites.index')),
         },
         {
             id: 'go-analytics',

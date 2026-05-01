@@ -34,7 +34,7 @@ const capabilities: Capability[] = [
     {
         title: 'Website performance',
         description:
-            'Probes for uptime, response time, and TLS health, charted against your SLA targets — coming with phase 5.',
+            'Probes for uptime, response time, and TLS health, charted against your SLA targets.',
         accent: 'success',
     },
     {

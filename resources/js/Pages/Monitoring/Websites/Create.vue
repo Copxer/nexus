@@ -5,7 +5,8 @@ import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
-import { ChevronLeft } from 'lucide-vue-next';
+import { AlertTriangle, ChevronLeft } from 'lucide-vue-next';
+import { computed } from 'vue';
 
 interface ProjectOption {
     id: number;
@@ -45,6 +46,28 @@ const form = useForm({
 const submit = () => {
     form.post(route('monitoring.websites.store'));
 };
+
+/**
+ * Detect when the entered URL points back at the same Nexus instance.
+ * `php artisan serve`'s default single-process worker deadlocks when
+ * a sync request loops back to itself (probe → controller → probe).
+ * Surface a heads-up so the user knows to use a different URL or run
+ * the dev server with `--workers=4`.
+ *
+ * Match by hostname only — port, scheme, and path don't matter for
+ * the loop. SSR-safe: `window` may not exist during initial render.
+ */
+const selfProbeWarning = computed(() => {
+    if (typeof window === 'undefined' || !form.url) return false;
+    try {
+        const target = new URL(form.url);
+        return target.hostname === window.location.hostname;
+    } catch {
+        // `new URL()` throws on malformed input; the form's url
+        // validation will catch that path on submit.
+        return false;
+    }
+});
 </script>
 
 <template>
@@ -107,8 +130,30 @@ const submit = () => {
                         id="url"
                         v-model="form.url"
                         type="url"
-                        placeholder="https://example.com/health"
+                        placeholder="https://example.com/up"
                     />
+                    <p class="text-xs text-text-muted">
+                        Tip: for Laravel apps, monitor
+                        <span class="font-mono">/up</span> — Laravel's
+                        built-in health endpoint.
+                    </p>
+                    <p
+                        v-if="selfProbeWarning"
+                        class="flex items-start gap-1.5 rounded-md border border-status-warning/40 bg-status-warning/10 p-2 text-xs text-status-warning"
+                    >
+                        <AlertTriangle
+                            class="mt-0.5 h-3.5 w-3.5 shrink-0"
+                            aria-hidden="true"
+                        />
+                        <span class="break-words">
+                            Heads up — this URL points at the same host
+                            as Nexus itself. If you're running
+                            <span class="font-mono">php artisan serve</span>,
+                            the probe will deadlock (single worker). Use
+                            <span class="font-mono">--workers=4</span> or
+                            point this monitor at a different URL.
+                        </span>
+                    </p>
                     <InputError :message="form.errors.url" />
                 </div>
 
