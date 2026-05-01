@@ -2,6 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\GithubIssue;
+use App\Models\Project;
+use App\Models\Repository;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia;
@@ -46,6 +49,47 @@ class SmokeTest extends TestCase
                         ->has('uptime.overall')
                         ->has('topRepositories')
                     )
+                    ->has('topWorkItems')
+            );
+    }
+
+    public function test_overview_topworkitems_pulls_from_user_repos_only(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+        ]);
+        $project = Project::factory()->create(['owner_user_id' => $user->id]);
+        $repository = Repository::factory()->create([
+            'project_id' => $project->id,
+            'full_name' => 'mine/repo',
+        ]);
+        GithubIssue::factory()->create([
+            'repository_id' => $repository->id,
+            'number' => 7,
+            'title' => 'Mine',
+            'state' => 'open',
+        ]);
+
+        // Sibling user's open issue must NOT leak into the widget.
+        $other = User::factory()->create(['email_verified_at' => now()]);
+        $otherProject = Project::factory()->create(['owner_user_id' => $other->id]);
+        $otherRepo = Repository::factory()->create([
+            'project_id' => $otherProject->id,
+            'full_name' => 'other/repo',
+        ]);
+        GithubIssue::factory()->create([
+            'repository_id' => $otherRepo->id,
+            'number' => 1,
+            'title' => 'Sibling',
+            'state' => 'open',
+        ]);
+
+        $this->actingAs($user)
+            ->get('/overview')
+            ->assertInertia(
+                fn (AssertableInertia $page) => $page
+                    ->has('topWorkItems', 1)
+                    ->where('topWorkItems.0.title', 'Mine')
             );
     }
 
