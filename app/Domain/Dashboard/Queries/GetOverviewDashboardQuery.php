@@ -2,6 +2,7 @@
 
 namespace App\Domain\Dashboard\Queries;
 
+use App\Domain\Monitoring\Queries\GetMonitoringUptimeKpiQuery;
 use App\Models\ActivityEvent;
 use App\Models\Project;
 use App\Models\Repository;
@@ -34,9 +35,13 @@ use Illuminate\Support\Collection;
  *     `activity_events.occurred_at` over the last 90 days. Bucketing
  *     happens in PHP so the query stays cross-DB without `DAYOFWEEK()` /
  *     `HOUR()` polyfills.
+ *   - dashboard.uptime.{overall,change,sparkline,status} — Spec 025;
+ *     `GetMonitoringUptimeKpiQuery` aggregates `website_checks`
+ *     volume-weighted across all of the user's monitors over 24h
+ *     (vs prior 24h) plus a 12-day daily sparkline.
  *
  * Still mock (extracted to MOCK_* constants — clearly marked):
- *   - dashboard.{services,alerts,uptime}              → MOCK_KPIS
+ *   - dashboard.{services,alerts}                    → MOCK_KPIS
  *
  * The right-rail activity feed is no longer surfaced from this query —
  * the AppLayout consumes the shared `activity.recent` Inertia prop
@@ -64,6 +69,7 @@ class GetOverviewDashboardQuery
                 'projects' => $this->projects(),
                 'hosts' => $this->hosts(),
                 'deployments' => $this->deploymentsKpi(),
+                'uptime' => app(GetMonitoringUptimeKpiQuery::class)->execute(),
                 'topRepositories' => $this->topRepositories(),
             ]),
             'activityHeatmap' => $this->activityHeatmap(),
@@ -364,7 +370,7 @@ class GetOverviewDashboardQuery
     // that ships the real source.
     // ──────────────────────────────────────────────────────────────────
 
-    /** Phase 5/6 (Services/Hosts), phase 7 (Alerts), phase 8 (Uptime). */
+    /** Phase 5/6 (Services/Hosts), phase 7 (Alerts). */
     private const MOCK_KPIS = [
         'services' => [
             'running' => 47,
@@ -377,12 +383,6 @@ class GetOverviewDashboardQuery
             'critical' => 1,
             'sparkline' => [1, 0, 1, 2, 1, 1, 2, 2, 3, 2, 3, 3],
             'status' => 'danger',
-        ],
-        'uptime' => [
-            'overall' => 99.98,
-            'change' => 0.01,
-            'sparkline' => [99.92, 99.93, 99.95, 99.94, 99.96, 99.97, 99.96, 99.97, 99.98, 99.98, 99.97, 99.98],
-            'status' => 'success',
         ],
     ];
 }

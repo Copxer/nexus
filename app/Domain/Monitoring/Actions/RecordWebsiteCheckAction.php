@@ -7,6 +7,7 @@ use App\Domain\Monitoring\Probes\WebsiteProbeResult;
 use App\Enums\ActivitySeverity;
 use App\Enums\WebsiteCheckStatus;
 use App\Enums\WebsiteStatus;
+use App\Events\WebsiteCheckRecorded;
 use App\Models\Website;
 use App\Models\WebsiteCheck;
 use Illuminate\Support\Carbon;
@@ -35,6 +36,12 @@ use Illuminate\Support\Carbon;
  * `metadata.website_id → website → project → owner_user_id` (since
  * monitoring rows have `repository_id = null` and would otherwise
  * silently fail to broadcast). Realtime fan-out reaches the right rail.
+ *
+ * Spec 025: dispatches `WebsiteCheckRecorded` after every persisted
+ * check (steady-state runs included, not just transitions) so the
+ * per-website Show page reflects every probe in realtime — the
+ * transition path above only fires on healthy↔failed swings, which
+ * leaves "still up, response time changed" updates invisible.
  */
 class RecordWebsiteCheckAction
 {
@@ -72,6 +79,17 @@ class RecordWebsiteCheckAction
         $website->forceFill($updates)->save();
 
         $this->maybeEmitTransitionActivity($website, $previousStatus, $result, $checkedAt);
+
+        // Spec 025 — broadcast every persisted check so the Show page
+        // reflects steady-state runs too. Pre-resolve the owner id
+        // here so the event's broadcaster doesn't lazy-load
+        // website→project relations during fan-out.
+        $website->loadMissing('project:id,owner_user_id');
+        WebsiteCheckRecorded::dispatch(
+            $check->id,
+            $website->id,
+            $website->project?->owner_user_id,
+        );
 
         return $check;
     }

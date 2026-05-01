@@ -149,18 +149,28 @@ class GetOverviewDashboardQueryTest extends TestCase
 
     public function test_mock_kpis_remain_consistent_with_phase_0_values(): void
     {
-        // Deployments graduated to a real query in spec 022; remaining
-        // mocked slices (services/alerts/uptime) still pin to the
-        // phase-0 fixture values.
+        // Deployments graduated to a real query in spec 022 and uptime
+        // graduated in spec 025; remaining mocked slices (services /
+        // alerts) still pin to the phase-0 fixture values.
         $payload = (new GetOverviewDashboardQuery)->handle();
 
         $this->assertSame(47, $payload['dashboard']['services']['running']);
         $this->assertSame(3, $payload['dashboard']['alerts']['active']);
         $this->assertSame('danger', $payload['dashboard']['alerts']['status']);
-        $this->assertSame(99.98, $payload['dashboard']['uptime']['overall']);
 
         $this->assertCount(7, $payload['activityHeatmap']);
         $this->assertCount(6, $payload['activityHeatmap'][0]);
+    }
+
+    public function test_uptime_kpi_is_wired_to_the_real_query(): void
+    {
+        // No checks anywhere → muted + null overall (matches the
+        // GetMonitoringUptimeKpiQuery contract verified in its own test).
+        $payload = (new GetOverviewDashboardQuery)->handle();
+
+        $this->assertNull($payload['dashboard']['uptime']['overall']);
+        $this->assertSame('muted', $payload['dashboard']['uptime']['status']);
+        $this->assertCount(12, $payload['dashboard']['uptime']['sparkline']);
     }
 
     // ────────────────────────────────────────────────────────────────

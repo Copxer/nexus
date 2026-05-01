@@ -1,8 +1,10 @@
 <script setup lang="ts">
+import Sparkline from '@/Components/Dashboard/Sparkline.vue';
 import StatusBadge from '@/Components/Dashboard/StatusBadge.vue';
 import { websiteStatusTone as statusTone } from '@/lib/websiteStyles';
 import AppLayout from '@/Layouts/AppLayout.vue';
-import { Head, Link, router } from '@inertiajs/vue3';
+import type { PageProps } from '@/types';
+import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import {
     AlertTriangle,
     ChevronLeft,
@@ -10,7 +12,9 @@ import {
     Pencil,
     Play,
     Trash2,
+    WifiOff,
 } from 'lucide-vue-next';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 
 interface ProjectChip {
     id: number;
@@ -61,6 +65,11 @@ const props = defineProps<{
     canProbe: boolean;
 }>();
 
+// `usePage` is a setup-time composition hook; calling it inside
+// `onMounted` works today but is idiomatically wrong (Inertia could
+// validate the call site at any release).
+const page = usePage<PageProps>();
+
 const formatUptime = (rate: number | null): string =>
     rate === null ? '—%' : `${rate}%`;
 
@@ -99,6 +108,106 @@ const confirmDelete = () => {
     }
     router.delete(route('monitoring.websites.destroy', props.website.id));
 };
+
+// ─── Response-time Sparkline (spec 025) ──────────────────────────────
+// Render the last 50 checks' `response_time_ms` as a tiny line chart.
+// `props.checks` is ordered newest-first by the controller; reverse
+// it so the line reads left → right oldest → newest.
+//
+// Null handling: a null `response_time_ms` (Error rows where the
+// probe never got a response) is rare. We skip leading nulls — a 0ms
+// floor at the chart's left edge would make the Sparkline's
+// min/max-normalized rendering pull the whole line to the baseline
+// and misrepresent the data. Once we have a real point, subsequent
+// nulls inherit the previous value to keep the line continuous.
+const responseTimeSeries = computed<number[]>(() => {
+    const ordered = [...props.checks].reverse();
+    const points: number[] = [];
+    let last: number | null = null;
+    for (const check of ordered) {
+        if (check.response_time_ms !== null) {
+            last = check.response_time_ms;
+        }
+        if (last === null) continue; // skip leading nulls
+        points.push(last);
+    }
+    return points;
+});
+
+// ─── Reverb subscription (spec 025) ──────────────────────────────────
+// Listen for `WebsiteCheckRecorded` pulses on the user's monitoring
+// channel. Filter client-side by website_id so we only react to pulses
+// for the page's own monitor. Each matching pulse triggers a partial
+// reload of the website / summary / checks props — server-side aggregate
+// re-applies naturally, no JS-side merge.
+const realtimeConnected = ref<boolean | null>(null);
+let teardown: (() => void) | null = null;
+
+onMounted(() => {
+    if (typeof window === 'undefined' || !window.Echo) {
+        return;
+    }
+    const userId = page.props.auth?.user?.id;
+    if (userId == null) return;
+
+    const channelName = `users.${userId}.monitoring`;
+    const channel = window.Echo.private(channelName);
+
+    channel.listen(
+        '.WebsiteCheckRecorded',
+        (payload: { check_id: number; website_id: number }) => {
+            // Only react to pulses for our own website. Other monitors'
+            // pulses arrive on the same channel.
+            if (payload.website_id !== props.website.id) return;
+            router.reload({ only: ['website', 'summary', 'checks'] });
+        },
+    );
+
+    const connector = window.Echo.connector;
+    const pusher = (
+        connector as {
+            pusher?: {
+                connection?: {
+                    state?: string;
+                    bind: (e: string, cb: () => void) => void;
+                    unbind: (e: string, cb: () => void) => void;
+                };
+            };
+        }
+    )?.pusher;
+
+    const onConnect = () => {
+        realtimeConnected.value = true;
+    };
+    const onDisconnect = () => {
+        realtimeConnected.value = false;
+    };
+
+    if (pusher?.connection) {
+        if (pusher.connection.state === 'connected') {
+            realtimeConnected.value = true;
+        }
+        pusher.connection.bind('connected', onConnect);
+        pusher.connection.bind('disconnected', onDisconnect);
+        pusher.connection.bind('unavailable', onDisconnect);
+        pusher.connection.bind('failed', onDisconnect);
+    }
+
+    teardown = () => {
+        channel.stopListening('.WebsiteCheckRecorded');
+        window.Echo?.leave(`users.${userId}.monitoring`);
+        if (pusher?.connection) {
+            pusher.connection.unbind('connected', onConnect);
+            pusher.connection.unbind('disconnected', onDisconnect);
+            pusher.connection.unbind('unavailable', onDisconnect);
+            pusher.connection.unbind('failed', onDisconnect);
+        }
+    };
+});
+
+onBeforeUnmount(() => {
+    teardown?.();
+});
 </script>
 
 <template>
@@ -151,6 +260,14 @@ const confirmDelete = () => {
                         </a>
                     </div>
                     <div class="flex items-center gap-2">
+                        <span
+                            v-if="realtimeConnected === false"
+                            class="inline-flex items-center gap-1.5 rounded-full border border-status-warning/40 bg-status-warning/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-status-warning"
+                            title="Live updates offline. Probes still record on the schedule; refresh to see them."
+                        >
+                            <WifiOff class="h-3 w-3" aria-hidden="true" />
+                            Live offline
+                        </span>
                         <button
                             v-if="canProbe"
                             type="button"
@@ -282,6 +399,31 @@ const confirmDelete = () => {
                         Up to 50 most recent
                     </span>
                 </header>
+
+                <div
+                    v-if="responseTimeSeries.length >= 2"
+                    class="mt-4 flex flex-col gap-2"
+                >
+                    <div
+                        class="flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted"
+                    >
+                        <span>Response time · last 50 probes</span>
+                        <span class="text-text-secondary">
+                            {{ responseTimeSeries[responseTimeSeries.length - 1] }}ms
+                        </span>
+                    </div>
+                    <Sparkline
+                        :points="responseTimeSeries"
+                        accent="cyan"
+                        :height="48"
+                    />
+                </div>
+                <p
+                    v-else-if="checks.length > 0"
+                    class="mt-4 text-xs text-text-muted"
+                >
+                    Not enough data points for a chart yet.
+                </p>
 
                 <ul
                     v-if="checks.length > 0"
