@@ -22,49 +22,28 @@ import {
     ShieldCheck,
 } from 'lucide-vue-next';
 
+interface TopWorkItem {
+    id: string;
+    kind: 'issue' | 'pull_request' | string;
+    number: number;
+    title: string;
+    state: string | null;
+    author_login: string | null;
+    updated_at_github: string | null;
+    html_url: string | null;
+    repository: { id: number; full_name: string; name: string } | null;
+}
+
 defineProps<{
     dashboard: DashboardPayload;
     activityHeatmap: ActivityHeatmapPayload;
+    topWorkItems: TopWorkItem[];
 }>();
 
 // ----- Hardcoded mock data for the populated stub widgets -----
 // These widgets each have their own dedicated spec in later phases. The
 // mock data here exists only so the page looks intentional, not skeletal —
 // each stub footer points at the phase that will replace it.
-
-const stubIssues = [
-    {
-        title: 'Login flow rejects valid 2FA codes intermittently',
-        repo: 'nexus-web',
-        time: '12 min',
-        priority: 'critical' as const,
-    },
-    {
-        title: 'Migrate analytics events to BigQuery sink',
-        repo: 'nexus-api',
-        time: '3 h',
-        priority: 'high' as const,
-    },
-    {
-        title: 'Add dark-mode tokens to email templates',
-        repo: 'nexus-mail',
-        time: '1 d',
-        priority: 'medium' as const,
-    },
-    {
-        title: 'Expose feature-flag SDK in the JS bundle',
-        repo: 'nexus-flags',
-        time: '2 d',
-        priority: 'low' as const,
-    },
-];
-
-const priorityToneMap = {
-    critical: 'danger',
-    high: 'warning',
-    medium: 'info',
-    low: 'muted',
-} as const;
 
 const stubHosts = [
     { name: 'prod-web-01', region: 'us-east', cpu: 0.42, mem: 0.61, status: 'success' as const },
@@ -96,12 +75,16 @@ const stubServices = [
     },
 ];
 
+// Stubs only list widgets whose owning phase hasn't shipped yet.
+// `Deployment timeline` graduated when Phase 4 (specs 020–022) shipped
+// — its real surface is the `Deployments` sidebar entry / `/deployments`
+// page. `Website performance` stays here until spec 025 lands the
+// dedicated Overview widget on top of the spec-023 monitor data.
 const visualizationStubs = [
     { label: 'World map', icon: Globe, phase: 'Phase 8' },
     { label: 'Resource utilization', icon: Activity, phase: 'Phase 6' },
-    { label: 'Website performance', icon: LineChart, phase: 'Phase 5' },
+    { label: 'Website performance', icon: LineChart, phase: 'Phase 5 · spec 025' },
     { label: 'System metrics', icon: Gauge, phase: 'Phase 8' },
-    { label: 'Deployment timeline', icon: Rocket, phase: 'Phase 4' },
 ] as const;
 </script>
 
@@ -224,7 +207,10 @@ const visualizationStubs = [
             <!-- Each card below is a populated placeholder. The canonical
                  implementation ships with the phase named in the footer. -->
             <div class="grid grid-cols-1 gap-4 lg:grid-cols-12">
-                <!-- Issues & PRs -->
+                <!-- Issues & PRs — real data from `WorkItemsForUserQuery`
+                     (spec 016). Top 4 open work items across the user's
+                     repos; the wider `/work-items` page hosts the full
+                     queue + filters. -->
                 <section
                     aria-label="Issues & PRs"
                     class="glass-card flex flex-col gap-4 p-5 lg:col-span-7"
@@ -240,32 +226,62 @@ const visualizationStubs = [
                             </h2>
                         </div>
                         <span class="hidden font-mono text-[11px] text-text-muted sm:inline">
-                            {{ stubIssues.length }} open · mock
+                            {{ topWorkItems.length }} open
                         </span>
                     </header>
-                    <ul class="flex flex-col gap-2">
+                    <ul
+                        v-if="topWorkItems.length > 0"
+                        class="flex flex-col gap-2"
+                    >
                         <li
-                            v-for="issue in stubIssues"
-                            :key="issue.title"
-                            class="flex items-center gap-3 rounded-lg border border-border-subtle bg-background-panel-hover/40 p-3"
+                            v-for="item in topWorkItems"
+                            :key="item.id"
                         >
-                            <StatusBadge :tone="priorityToneMap[issue.priority]">
-                                {{ issue.priority }}
-                            </StatusBadge>
-                            <div class="min-w-0 flex-1">
-                                <p class="truncate text-sm text-text-primary">
-                                    {{ issue.title }}
-                                </p>
-                                <p
-                                    class="truncate font-mono text-[11px] text-text-muted"
+                            <a
+                                :href="item.html_url ?? '#'"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class="flex items-center gap-3 rounded-lg border border-border-subtle bg-background-panel-hover/40 p-3 transition hover:border-accent-cyan/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
+                            >
+                                <StatusBadge
+                                    :tone="item.kind === 'pull_request' ? 'info' : 'muted'"
                                 >
-                                    {{ issue.repo }} · {{ issue.time }} ago
-                                </p>
-                            </div>
+                                    {{ item.kind === 'pull_request' ? 'PR' : 'Issue' }}
+                                </StatusBadge>
+                                <div class="min-w-0 flex-1">
+                                    <p class="truncate text-sm text-text-primary">
+                                        <span class="font-mono text-text-muted">
+                                            #{{ item.number }}
+                                        </span>
+                                        {{ item.title }}
+                                    </p>
+                                    <p
+                                        class="truncate font-mono text-[11px] text-text-muted"
+                                    >
+                                        <span v-if="item.repository">
+                                            {{ item.repository.full_name }}
+                                            <span v-if="item.author_login">
+                                                · @{{ item.author_login }}
+                                            </span>
+                                        </span>
+                                        <span v-if="item.updated_at_github">
+                                            · Updated {{ item.updated_at_github }}
+                                        </span>
+                                    </p>
+                                </div>
+                            </a>
                         </li>
                     </ul>
+                    <p
+                        v-else
+                        class="rounded-lg border border-dashed border-border-subtle bg-background-panel-hover/30 p-4 text-sm text-text-muted"
+                    >
+                        No open issues or pull requests yet — connect a
+                        GitHub repository to start syncing them.
+                    </p>
                     <footer class="text-[11px] text-text-muted">
-                        Full widget lands with phase 2 — Issues &amp; PRs sync.
+                        Showing the most recent open items. The full queue
+                        lives at <span class="font-mono">/work-items</span>.
                     </footer>
                 </section>
 
@@ -454,7 +470,7 @@ const visualizationStubs = [
                         </li>
                     </ul>
                     <footer class="text-[11px] text-text-muted">
-                        Full widget lands with phase 5 — Website Monitoring.
+                        Full widget lands with phase 6 — Docker Host Agent.
                     </footer>
                 </section>
 
@@ -474,7 +490,7 @@ const visualizationStubs = [
                             </h2>
                         </div>
                         <span class="hidden font-mono text-[11px] text-text-muted sm:inline">
-                            7 days · 4-hour buckets · mock
+                            7 days · 4-hour buckets · last 90 days
                         </span>
                     </header>
                     <ActivityHeatmap :data="activityHeatmap" />
