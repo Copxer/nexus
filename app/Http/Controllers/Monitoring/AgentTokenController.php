@@ -6,10 +6,10 @@ use App\Domain\Docker\Actions\IssueAgentTokenAction;
 use App\Domain\Docker\Actions\RevokeAgentTokenAction;
 use App\Domain\Docker\Actions\RotateAgentTokenAction;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Monitoring\StoreAgentTokenRequest;
 use App\Models\AgentToken;
 use App\Models\Host;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 
 /**
  * Lifecycle endpoints for a host's agent token. Plaintext travels via
@@ -19,18 +19,11 @@ use Illuminate\Http\Request;
  */
 class AgentTokenController extends Controller
 {
-    public function store(Request $request, Host $host, IssueAgentTokenAction $issue): RedirectResponse
+    public function store(StoreAgentTokenRequest $request, Host $host, IssueAgentTokenAction $issue): RedirectResponse
     {
-        $this->authorize('manageTokens', $host);
-
-        $name = $request->input('name');
-        if ($name !== null && ! is_string($name)) {
-            $name = null;
-        }
-
         $result = $issue->execute(
             $host,
-            $name !== null ? mb_substr($name, 0, 80) : null,
+            $request->validated()['name'] ?? null,
             $request->user(),
         );
 
@@ -40,19 +33,13 @@ class AgentTokenController extends Controller
             ->with('agentTokenPlaintext', $result->plaintext);
     }
 
-    public function rotate(Request $request, Host $host, AgentToken $token, RotateAgentTokenAction $rotate): RedirectResponse
+    public function rotate(StoreAgentTokenRequest $request, Host $host, AgentToken $token, RotateAgentTokenAction $rotate): RedirectResponse
     {
-        $this->authorize('manageTokens', $host);
         $this->ensureBelongs($host, $token);
-
-        $name = $request->input('name');
-        if ($name !== null && ! is_string($name)) {
-            $name = null;
-        }
 
         $result = $rotate->execute(
             $host,
-            $name !== null ? mb_substr($name, 0, 80) : null,
+            $request->validated()['name'] ?? null,
             $request->user(),
         );
 

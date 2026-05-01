@@ -144,7 +144,7 @@ class AgentTokenLifecycleTest extends TestCase
         $this->assertNotNull($token->revoked_at);
     }
 
-    public function test_token_endpoints_404_on_mismatched_pair(): void
+    public function test_destroy_endpoint_404s_on_mismatched_pair(): void
     {
         $user = $this->verifiedUser();
         $project = Project::factory()->create(['owner_user_id' => $user->id]);
@@ -155,6 +155,43 @@ class AgentTokenLifecycleTest extends TestCase
         $this->actingAs($user)
             ->delete(route('monitoring.hosts.tokens.destroy', [$hostA, $tokenForB]))
             ->assertNotFound();
+
+        // The mismatched token must not have been touched.
+        $tokenForB->refresh();
+        $this->assertNull($tokenForB->revoked_at);
+    }
+
+    public function test_rotate_endpoint_404s_on_mismatched_pair(): void
+    {
+        $user = $this->verifiedUser();
+        $project = Project::factory()->create(['owner_user_id' => $user->id]);
+        $hostA = Host::factory()->create(['project_id' => $project->id]);
+        $hostB = Host::factory()->create(['project_id' => $project->id]);
+        $tokenForB = AgentToken::factory()->create(['host_id' => $hostB->id]);
+
+        $this->actingAs($user)
+            ->post(route('monitoring.hosts.tokens.rotate', [$hostA, $tokenForB]))
+            ->assertNotFound();
+
+        $tokenForB->refresh();
+        $this->assertNull($tokenForB->revoked_at);
+        // No new token should have been minted on either host.
+        $this->assertSame(1, AgentToken::query()->count());
+    }
+
+    public function test_store_endpoint_rejects_overlong_name(): void
+    {
+        $user = $this->verifiedUser();
+        $project = Project::factory()->create(['owner_user_id' => $user->id]);
+        $host = Host::factory()->create(['project_id' => $project->id]);
+
+        $this->actingAs($user)
+            ->post(route('monitoring.hosts.tokens.store', $host), [
+                'name' => str_repeat('a', 81),
+            ])
+            ->assertSessionHasErrors('name');
+
+        $this->assertSame(0, AgentToken::query()->count());
     }
 
     public function test_token_endpoints_blocked_for_non_owner(): void

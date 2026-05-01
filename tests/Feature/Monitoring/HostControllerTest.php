@@ -197,4 +197,91 @@ class HostControllerTest extends TestCase
         $this->assertNotNull($host->archived_at);
         $this->assertNotNull($token->revoked_at);
     }
+
+    public function test_destroy_is_idempotent_and_does_not_overwrite_archived_at(): void
+    {
+        $user = $this->verifiedUser();
+        $project = Project::factory()->create(['owner_user_id' => $user->id]);
+        $host = Host::factory()->create(['project_id' => $project->id]);
+
+        $this->actingAs($user)->delete(route('monitoring.hosts.destroy', $host));
+        $host->refresh();
+        $firstArchivedAt = $host->archived_at;
+        $this->assertNotNull($firstArchivedAt);
+
+        $this->travel(5)->minutes();
+
+        $this->actingAs($user)->delete(route('monitoring.hosts.destroy', $host));
+        $host->refresh();
+
+        // archived_at should be pinned to the first archive, not the
+        // second call's `now()`.
+        $this->assertTrue($host->archived_at->equalTo($firstArchivedAt));
+    }
+
+    public function test_show_blocked_for_unrelated_user(): void
+    {
+        $owner = $this->verifiedUser();
+        $other = $this->verifiedUser();
+        $project = Project::factory()->create(['owner_user_id' => $owner->id]);
+        $host = Host::factory()->create(['project_id' => $project->id]);
+
+        // `view` policy is open in phase-1 (mirrors WebsitePolicy), but
+        // `canUpdate` / `canDelete` / `canManageTokens` must be false
+        // for a non-owner — that's what gates the buttons.
+        $this->actingAs($other)
+            ->get(route('monitoring.hosts.show', $host))
+            ->assertSuccessful()
+            ->assertInertia(
+                fn (AssertableInertia $page) => $page
+                    ->component('Monitoring/Hosts/Show')
+                    ->where('canUpdate', false)
+                    ->where('canDelete', false)
+                    ->where('canManageTokens', false)
+            );
+    }
+
+    public function test_edit_blocked_for_unrelated_user(): void
+    {
+        $owner = $this->verifiedUser();
+        $other = $this->verifiedUser();
+        $project = Project::factory()->create(['owner_user_id' => $owner->id]);
+        $host = Host::factory()->create(['project_id' => $project->id]);
+
+        $this->actingAs($other)
+            ->get(route('monitoring.hosts.edit', $host))
+            ->assertForbidden();
+    }
+
+    public function test_update_blocked_for_unrelated_user(): void
+    {
+        $owner = $this->verifiedUser();
+        $other = $this->verifiedUser();
+        $project = Project::factory()->create(['owner_user_id' => $owner->id]);
+        $host = Host::factory()->create(['project_id' => $project->id, 'name' => 'kept']);
+
+        $this->actingAs($other)
+            ->patch(route('monitoring.hosts.update', $host), [
+                'name' => 'hijacked',
+                'provider' => null,
+                'endpoint_url' => null,
+            ])
+            ->assertForbidden();
+
+        $this->assertSame('kept', $host->fresh()->name);
+    }
+
+    public function test_destroy_blocked_for_unrelated_user(): void
+    {
+        $owner = $this->verifiedUser();
+        $other = $this->verifiedUser();
+        $project = Project::factory()->create(['owner_user_id' => $owner->id]);
+        $host = Host::factory()->create(['project_id' => $project->id]);
+
+        $this->actingAs($other)
+            ->delete(route('monitoring.hosts.destroy', $host))
+            ->assertForbidden();
+
+        $this->assertNull($host->fresh()->archived_at);
+    }
 }

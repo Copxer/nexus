@@ -87,7 +87,7 @@ Roadmap refs: §8.7 Docker Hosts, §9.1 Core Tables, §16.5 Agent Security.
    - `resources/js/Pages/Monitoring/Hosts/Index.vue` — table with name, project, status badge, last seen, agent token state.
    - `resources/js/Pages/Monitoring/Hosts/Create.vue` + `Edit.vue` — forms (mirrors `Monitoring/Websites/{Create,Edit}.vue`).
    - `resources/js/Pages/Monitoring/Hosts/Show.vue` — detail page for the host card + token panel. Metric rendering is intentionally deferred to 028; this page exists so the post-create redirect target is real.
-   - `resources/js/Components/Hosts/HostStatusBadge.vue`.
+   - `resources/js/lib/hostStyles.ts` — `hostStatusTone()` helper consumed by the existing shared `Components/Dashboard/StatusBadge.vue`. Mirrors `websiteStyles.ts`; avoids spinning up a host-specific badge wrapper for one tone map.
    - `resources/js/Components/Hosts/AgentTokenPanel.vue` — handles "show once" plaintext reveal (driven by `flash('agentTokenPlaintext')`) + copy-to-clipboard + rotate confirmation.
    - The project detail page already has a Hosts tab placeholder (verified in `resources/js/Pages/Projects/Show.vue:170`). No change needed here in 026 — the placeholder already shows "Phase 6" pending state.
    - Sidebar: `Hosts` link **stays disabled** until 028 wires it to `monitoring.hosts.index`.
@@ -125,10 +125,14 @@ Fill in as work progresses.
 - `app/Policies/AgentTokenPolicy.php` — new
 - `app/Http/Controllers/Monitoring/HostController.php` — new
 - `app/Http/Controllers/Monitoring/AgentTokenController.php` — new
-- `app/Http/Requests/Monitoring/{StoreHostRequest,UpdateHostRequest}.php` — new
+- `app/Http/Requests/Monitoring/{StoreHostRequest,UpdateHostRequest,StoreAgentTokenRequest}.php` — new
+- `app/Http/Middleware/HandleInertiaRequests.php` — share `flash.agentTokenPlaintext`
+- `app/Providers/AppServiceProvider.php` — register HostPolicy + AgentTokenPolicy
 - `routes/web.php` — register new routes
 - `resources/js/Pages/Monitoring/Hosts/{Index,Create,Edit,Show}.vue` — new
-- `resources/js/Components/Hosts/{HostStatusBadge,AgentTokenPanel}.vue` — new
+- `resources/js/Components/Hosts/AgentTokenPanel.vue` — new
+- `resources/js/lib/hostStyles.ts` — new (replaces planned HostStatusBadge.vue)
+- `resources/js/types/index.d.ts` — extend `flash` with `agentTokenPlaintext`
 - `tests/Feature/Monitoring/HostControllerTest.php` — new
 - `tests/Feature/Monitoring/HostPolicyTest.php` — new
 - `tests/Feature/Monitoring/AgentTokenLifecycleTest.php` — new
@@ -138,6 +142,9 @@ Fill in as work progresses.
 ### 2026-05-01
 - Spec drafted.
 - Issue [#78](https://github.com/Copxer/nexus/issues/78) opened, branch `spec/026-hosts-and-agent-tokens` cut off `main`.
+- Implementation landed in one commit: 5 migrations, 5 models, 2 enums, 7 actions (incl. DTO), 2 policies, 2 controllers, 3 form requests, 4 Vue pages + 1 component + 1 style helper, route registrations, Inertia flash plumbing.
+- Self-review pass via `superpowers:code-reviewer` surfaced 4 should-fix items: (1) rotate mismatched-pair test missing, (2) sibling-isolation feature tests missing for show/edit/update/destroy, (3) token name length silently truncated instead of validated, (4) `ArchiveHostAction` not idempotent on `archived_at`. All four addressed in a follow-up commit.
+- Tests grew 20 → 27 (added rotate-mismatch, store-overlong-name, archive-idempotent, sibling-blocked × 4). Full suite 434 passing, Pint clean, build green.
 
 ## Open questions / blockers
 - Are agent tokens scoped per-host (current plan) or per-team? Per-host is more secure and matches §16.5; sticking with per-host unless we change our minds.

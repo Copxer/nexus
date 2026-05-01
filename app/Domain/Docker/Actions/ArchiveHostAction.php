@@ -16,6 +16,14 @@ class ArchiveHostAction
 {
     public function execute(Host $host): Host
     {
+        // Idempotent: a second archive call leaves `archived_at`
+        // pinned to the original timestamp instead of overwriting it.
+        // Active tokens still get a revoke pass — there should be none
+        // by then, but the `whereNull` filter makes that a no-op.
+        if ($host->archived_at !== null) {
+            return $host;
+        }
+
         return DB::transaction(function () use ($host): Host {
             $host->forceFill([
                 'status' => HostStatus::Archived->value,
