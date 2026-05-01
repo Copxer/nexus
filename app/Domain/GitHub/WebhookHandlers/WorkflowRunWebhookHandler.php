@@ -6,6 +6,7 @@ use App\Domain\Activity\Actions\CreateActivityEventAction;
 use App\Domain\GitHub\Actions\NormalizeGitHubWorkflowRunAction;
 use App\Enums\ActivitySeverity;
 use App\Enums\WebhookDeliveryStatus;
+use App\Events\WorkflowRunUpserted;
 use App\Models\Repository;
 use App\Models\WebhookDelivery;
 use App\Models\WorkflowRun;
@@ -140,6 +141,11 @@ class WorkflowRunWebhookHandler
      * sync job (`SyncRepositoryWorkflowRunsJob`) lands on the same key,
      * so live deliveries + REST backfill cleanly converge.
      *
+     * After the upsert lands we dispatch `WorkflowRunUpserted` so the
+     * `/deployments` page (spec 021) reflects the delivery without a
+     * manual reload. Bulk REST backfills deliberately do NOT broadcast
+     * — only live webhook deliveries should appear in real-time.
+     *
      * Returns silently if the normalizer rejects the payload — bad
      * deliveries shouldn't break the activity-event path that follows.
      *
@@ -153,12 +159,25 @@ class WorkflowRunWebhookHandler
             return;
         }
 
-        WorkflowRun::query()->updateOrCreate(
+        $workflowRun = WorkflowRun::query()->updateOrCreate(
             [
                 'repository_id' => $repository->id,
                 'github_id' => $normalized['github_id'],
             ],
             $normalized,
+        );
+
+        // Resolve the owner here — the handler already has the loaded
+        // repository / project relations, so passing the int to the
+        // event avoids the event class lazy-loading the relations and
+        // re-querying for every broadcast.
+        $repository->loadMissing('project:id,owner_user_id');
+        $ownerUserId = $repository->project?->owner_user_id;
+
+        WorkflowRunUpserted::dispatch(
+            $workflowRun->id,
+            $workflowRun->repository_id,
+            $ownerUserId,
         );
     }
 

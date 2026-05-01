@@ -1,7 +1,7 @@
 ---
 spec: deployment-timeline-ui
 phase: 4-deployments-cicd
-status: in-progress
+status: done
 owner: yoany
 created: 2026-04-30
 updated: 2026-04-30
@@ -163,6 +163,10 @@ Dated notes as work progresses.
 - Spec drafted.
 - User asked to add real-time refresh — added Reverb broadcast (`WorkflowRunUpserted`) dispatched from the webhook handler upsert path; bulk REST sync deliberately does NOT broadcast to avoid channel flooding on backfill. Vue listens via Echo and triggers a partial Inertia reload, letting server-side filter logic re-apply.
 - Opened issue [#63](https://github.com/Copxer/nexus/issues/63) and branch `spec/021-deployment-timeline-ui` off `main`.
+- Implementation complete: `DeploymentTimelineQuery` (cross-repo, scoped, 5 filters, capped 100, project chip eager-loaded), `DeploymentController::index` with `Rule::exists` scope-guarded id validation, `/deployments` route, `WorkflowRunUpserted` broadcast event (constructor takes pre-resolved owner id rather than walking relations on each dispatch — matches spec decision), `users.{userId}.deployments` channel auth, webhook handler dispatches the event after upsert, sidebar `Deployments` enabled, `Pages/Deployments/Index.vue` (filter strip, day-grouped timeline, empty states, Echo subscription triggering partial reload of `deployments + filterOptions`), `Pages/Deployments/DeploymentDrawer.vue` (slide overlay with Esc/backdrop/close, focus management, computed duration).
+- 32 net new passing tests across 5 files. Full suite: 271 passed (was 239). Pint + build clean.
+- Self-review pass via `superpowers:code-reviewer`; addressed both material findings (unified the `only:` arrays so the dropdown also updates on real-time pulses; pre-resolved the project owner in the handler so the event class no longer lazy-loads relations) plus the recommended `Rule::exists` validation tightening.
+- Day grouping uses UTC date — flagged as a phase-1 limitation. Two runs on the same local-day but different UTC days would land in different group headers. Acceptable for now; switch to `toLocaleDateString` if a real user complains.
 
 ## Decisions (locked 2026-04-30)
 - **`Deployments` sidebar entry, not `Pipelines`.** The sidebar already reserves both. Pipelines stays disabled as a CI-only future filter view.

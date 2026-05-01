@@ -41,7 +41,7 @@ const nav: NavItem[] = [
     { label: 'Repositories', icon: GitBranch, routeName: 'repositories.index' },
     { label: 'Issues & PRs', icon: GitPullRequest, routeName: 'work-items.index' },
     { label: 'Pipelines', icon: Activity, disabled: true, soonLabel: 'Phase 4' },
-    { label: 'Deployments', icon: Rocket, disabled: true, soonLabel: 'Phase 4' },
+    { label: 'Deployments', icon: Rocket, routeName: 'deployments.index' },
     { label: 'Hosts', icon: Server, disabled: true, soonLabel: 'Phase 6' },
     { label: 'Monitoring', icon: Globe, disabled: true, soonLabel: 'Phase 5' },
     { label: 'Analytics', icon: BarChart3, disabled: true, soonLabel: 'Phase 8' },

@@ -13,3 +13,11 @@ Broadcast::channel('App.Models.User.{id}', function ($user, $id) {
 Broadcast::channel('users.{userId}.activity', function ($user, $userId) {
     return (int) $user->id === (int) $userId;
 });
+
+// Spec 021 — per-user deployments channel. `WorkflowRunUpserted`
+// broadcasts here when the GitHub webhook handler upserts a workflow
+// run. The Vue page partial-reloads on receipt; bulk REST sync does
+// NOT broadcast (would flood the channel on backfill).
+Broadcast::channel('users.{userId}.deployments', function ($user, $userId) {
+    return (int) $user->id === (int) $userId;
+});

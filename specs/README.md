@@ -39,7 +39,7 @@ Status legend: ⬜ not started · 🟡 in progress · 🟢 done · 🔴 blocked
 | 1 | Projects & Repositories | 🟢 | 3/3 specs done (010–012). Phase complete. |
 | 2 | GitHub Integration MVP | 🟢 | 4/4 specs done (013–016). Phase complete. |
 | 3 | GitHub Webhooks & Activity Feed | 🟢 | 3/3 specs done (017–019). Phase complete. |
-| 4 | Deployments & CI/CD | 🟡 | 1/3 specs done (020). 021–022 next. |
+| 4 | Deployments & CI/CD | 🟡 | 2/3 specs done (020–021). 022 next. |
 | 5 | Website Monitoring | ⬜ | — |
 | 6 | Docker Host Agent MVP | ⬜ | — |
 | 7 | Alerts Engine | ⬜ | — |

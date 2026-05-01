@@ -7,6 +7,7 @@ use App\Domain\GitHub\Actions\NormalizeGitHubWorkflowRunAction;
 use App\Domain\GitHub\WebhookHandlers\WorkflowRunWebhookHandler;
 use App\Enums\WebhookDeliveryStatus;
 use App\Events\ActivityEventCreated;
+use App\Events\WorkflowRunUpserted;
 use App\Models\ActivityEvent;
 use App\Models\Project;
 use App\Models\Repository;
@@ -204,5 +205,65 @@ class WorkflowRunWebhookHandlerTest extends TestCase
         $this->handler()->handle($delivery);
 
         $this->assertSame(1, WorkflowRun::query()->where('github_id', 1234)->count());
+    }
+
+    public function test_dispatches_workflow_run_upserted_event_on_upsert(): void
+    {
+        Event::fake([WorkflowRunUpserted::class]);
+        $repository = $this->importedRepository();
+        $delivery = $this->deliveryFor('completed', 'success');
+
+        $this->handler()->handle($delivery);
+
+        $run = WorkflowRun::query()->where('github_id', 1234)->firstOrFail();
+
+        Event::assertDispatched(
+            WorkflowRunUpserted::class,
+            fn (WorkflowRunUpserted $event) => $event->runId === $run->id
+                && $event->repositoryId === $repository->id
+                && $event->ownerUserId === $repository->project->owner_user_id,
+        );
+    }
+
+    public function test_dispatches_event_for_in_progress_runs_too(): void
+    {
+        Event::fake([WorkflowRunUpserted::class]);
+        $this->importedRepository();
+        $delivery = WebhookDelivery::factory()->create([
+            'event' => 'workflow_run',
+            'action' => 'in_progress',
+            'repository_full_name' => 'octocat/hello-world',
+            'payload_json' => [
+                'action' => 'in_progress',
+                'repository' => ['full_name' => 'octocat/hello-world'],
+                'workflow_run' => [
+                    'id' => 5678,
+                    'name' => 'Deploy',
+                    'head_branch' => 'main',
+                    'head_sha' => 'b'.str_repeat('2', 39),
+                    'event' => 'workflow_dispatch',
+                    'run_number' => 1,
+                    'status' => 'in_progress',
+                    'conclusion' => null,
+                    'run_started_at' => '2026-04-29T11:55:00Z',
+                    'updated_at' => '2026-04-29T11:56:00Z',
+                    'html_url' => 'https://github.com/octocat/hello-world/actions/runs/5678',
+                ],
+            ],
+        ]);
+
+        $this->handler()->handle($delivery);
+
+        Event::assertDispatched(WorkflowRunUpserted::class);
+    }
+
+    public function test_does_not_dispatch_event_when_repository_not_imported(): void
+    {
+        Event::fake([WorkflowRunUpserted::class]);
+        $delivery = $this->deliveryFor('completed', 'success', 'octocat/uh-oh');
+
+        $this->handler()->handle($delivery);
+
+        Event::assertNotDispatched(WorkflowRunUpserted::class);
     }
 }
