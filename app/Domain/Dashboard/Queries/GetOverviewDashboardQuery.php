@@ -4,7 +4,9 @@ namespace App\Domain\Dashboard\Queries;
 
 use App\Models\Project;
 use App\Models\Repository;
+use App\Models\WorkflowRun;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
 /**
@@ -20,12 +22,16 @@ use Illuminate\Support\Collection;
  *     (Repository::count() acts as a proxy until phase 6 ships actual
  *      hosts; the card label keeps "Hosts" so the visual doesn't shift,
  *      but the value reflects what we have data for.)
+ *   - dashboard.deployments.{successful_24h,success_rate_24h,change_percent,sparkline,status}
+ *     (Spec 022 — aggregates `workflow_runs` over 24h and prior-24h
+ *      windows; sparkline counts daily completed runs across the last
+ *      12 days.)
  *   - dashboard.topRepositories[] — ordered by stars_count desc, default
  *     limit 4. `commits` proxies via stars_count until phase 2 syncs
  *     real commit counts from GitHub.
  *
  * Still mock (extracted to MOCK_* constants — clearly marked):
- *   - dashboard.{deployments,services,alerts,uptime}  → MOCK_KPIS
+ *   - dashboard.{services,alerts,uptime}              → MOCK_KPIS
  *   - activityHeatmap                                 → MOCK_HEATMAP
  *
  * The right-rail activity feed is no longer surfaced from this query —
@@ -53,6 +59,7 @@ class GetOverviewDashboardQuery
             'dashboard' => array_merge(self::MOCK_KPIS, [
                 'projects' => $this->projects(),
                 'hosts' => $this->hosts(),
+                'deployments' => $this->deploymentsKpi(),
                 'topRepositories' => $this->topRepositories(),
             ]),
             'activityHeatmap' => self::MOCK_HEATMAP,
@@ -74,6 +81,144 @@ class GetOverviewDashboardQuery
             'sparkline' => $sparkline,
             'status' => $active >= 1 ? 'success' : 'muted',
         ];
+    }
+
+    /**
+     * Spec 022 — real Deployments KpiCard slice. Aggregates the
+     * `workflow_runs` table over the last 24h (vs the prior 24h) for
+     * the headline numbers, plus a 12-day daily-count sparkline.
+     *
+     * Window keys on `run_completed_at` so a long-running job lands in
+     * the bucket where it actually completed — keeps the metric honest
+     * about "what happened in the last 24h."
+     *
+     * `success_rate_24h` is null when no completed runs landed in the
+     * window. The Vue layer renders that as `—% success` so the card
+     * doesn't pretend to know quality on no data.
+     *
+     * `change_percent` clamps to `[-100, +999]` — without the cap, a
+     * single-deploy account going from 0 → 1 successes would render
+     * "+∞%" which reads broken.
+     *
+     * Status thresholds match the spec's "muted floor" rule: empty
+     * window → muted (no signal); ≥95% → success; ≥80% → warning;
+     * else → danger.
+     *
+     * @return array{
+     *     successful_24h: int,
+     *     success_rate_24h: int|null,
+     *     change_percent: int,
+     *     sparkline: array<int, int>,
+     *     status: 'success'|'warning'|'danger'|'muted',
+     * }
+     */
+    private function deploymentsKpi(): array
+    {
+        $now = now();
+        $currentStart = $now->copy()->subDay();
+        $previousStart = $now->copy()->subDays(2);
+
+        $currentTotal = $this->completedRunCount($currentStart, $now);
+        $currentSuccess = $this->successfulRunCount($currentStart, $now);
+        $previousSuccess = $this->successfulRunCount($previousStart, $currentStart);
+
+        $successRate = $currentTotal === 0
+            ? null
+            : (int) round(($currentSuccess / $currentTotal) * 100);
+
+        // Cap the change pill so a 0 → 1 jump doesn't render `+∞%` on
+        // a quiet account. Lower bound `-100` covers the all-disappeared
+        // case (1 → 0 reads as `-100%`).
+        $changePercent = (int) round(
+            (($currentSuccess - $previousSuccess) / max($previousSuccess, 1)) * 100,
+        );
+        $changePercent = max(-100, min(999, $changePercent));
+
+        return [
+            'successful_24h' => $currentSuccess,
+            'success_rate_24h' => $successRate,
+            'change_percent' => $changePercent,
+            'sparkline' => $this->workflowRunSparkline(self::SPARKLINE_DAYS),
+            'status' => $this->deploymentsStatus($currentTotal, $successRate),
+        ];
+    }
+
+    /**
+     * Completed runs (any conclusion) whose `run_completed_at` falls in
+     * the half-open window `[from, to)`.
+     */
+    private function completedRunCount(Carbon $from, Carbon $to): int
+    {
+        return WorkflowRun::query()
+            ->where('status', 'completed')
+            ->where('run_completed_at', '>=', $from)
+            ->where('run_completed_at', '<', $to)
+            ->count();
+    }
+
+    /**
+     * Successful subset of `completedRunCount()` — same window semantics.
+     */
+    private function successfulRunCount(Carbon $from, Carbon $to): int
+    {
+        return WorkflowRun::query()
+            ->where('status', 'completed')
+            ->where('conclusion', 'success')
+            ->where('run_completed_at', '>=', $from)
+            ->where('run_completed_at', '<', $to)
+            ->count();
+    }
+
+    /**
+     * Daily completed-run counts (success + failure + every other
+     * terminal conclusion) over the last `$days`, oldest-first. Mirrors
+     * `dailyCounts()` but keys on `run_completed_at` and filters to
+     * status = 'completed' so only finished runs land in the buckets.
+     *
+     * @return array<int, int>
+     */
+    private function workflowRunSparkline(int $days): array
+    {
+        $start = now()->startOfDay()->subDays($days - 1);
+
+        /** @var Collection<int, object{date: string, total: int}> $rows */
+        $rows = WorkflowRun::query()
+            ->where('status', 'completed')
+            ->where('run_completed_at', '>=', $start)
+            ->selectRaw('DATE(run_completed_at) as date, COUNT(*) as total')
+            ->groupBy('date')
+            ->get()
+            ->keyBy(fn ($row) => (string) $row->date);
+
+        $series = [];
+        for ($i = 0; $i < $days; $i++) {
+            $day = $start->copy()->addDays($i)->toDateString();
+            $series[] = (int) ($rows->get($day)->total ?? 0);
+        }
+
+        return $series;
+    }
+
+    /**
+     * Map (sample size, success rate) → KpiCard status tone.
+     * `muted` floor on empty windows prevents quiet weekends from
+     * flashing red on low-traffic accounts.
+     *
+     * @return 'success'|'warning'|'danger'|'muted'
+     */
+    private function deploymentsStatus(int $completedTotal, ?int $successRate): string
+    {
+        if ($completedTotal === 0 || $successRate === null) {
+            return 'muted';
+        }
+        if ($successRate >= 95) {
+            return 'success';
+        }
+        if ($successRate >= 80) {
+            return 'warning';
+        }
+
+        return 'danger';
     }
 
     /** Hosts proxy (Repository count) until phase 6 ships real hosts. */
@@ -165,14 +310,8 @@ class GetOverviewDashboardQuery
     // that ships the real source.
     // ──────────────────────────────────────────────────────────────────
 
-    /** Phase 4 (Deployments), phase 5/6 (Services/Hosts), phase 7 (Alerts), phase 8 (Uptime). */
+    /** Phase 5/6 (Services/Hosts), phase 7 (Alerts), phase 8 (Uptime). */
     private const MOCK_KPIS = [
-        'deployments' => [
-            'successful_24h' => 24,
-            'change_percent' => 18,
-            'sparkline' => [12, 14, 13, 16, 18, 20, 19, 22, 21, 23, 24, 24],
-            'status' => 'success',
-        ],
         'services' => [
             'running' => 47,
             'health_percent' => 100,

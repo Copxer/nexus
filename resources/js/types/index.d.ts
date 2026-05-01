@@ -46,6 +46,13 @@ export interface DashboardPayload {
     };
     deployments: {
         successful_24h: number;
+        /**
+         * Integer percent (0–100) of completed runs that succeeded in
+         * the 24h window. `null` when no completed runs landed — the
+         * UI renders that as `—% success` instead of `0%` so an empty
+         * window doesn't read as a failure.
+         */
+        success_rate_24h: number | null;
         change_percent: number;
         sparkline: number[];
         status: DashboardStatus;

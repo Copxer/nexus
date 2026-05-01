@@ -1,7 +1,7 @@
 ---
 spec: overview-success-rate-widget
 phase: 4-deployments-cicd
-status: in-progress
+status: done
 owner: yoany
 created: 2026-04-30
 updated: 2026-04-30
@@ -107,6 +107,10 @@ Dated notes as work progresses.
 ### 2026-04-30
 - Spec drafted.
 - Opened issue [#66](https://github.com/Copxer/nexus/issues/66) and branch `spec/022-overview-success-rate-widget` off `main`.
+- Implementation complete. `GetOverviewDashboardQuery::deploymentsKpi()` aggregates `workflow_runs` over the 24h window (keyed on `run_completed_at`) and the prior 24h for `change_percent`. Three small helpers — `completedRunCount`, `successfulRunCount`, `workflowRunSparkline` — keep the main method readable. `MOCK_KPIS['deployments']` removed; class doc-comment lists the slice under "Real today."
+- 14 net new passing tests covering the zero state, 24h window scoping, change-percent vs prior 24h, +999 cap, -100 floor, threshold boundaries at 95% / 80%, the warning + danger bands, sparkline daily counts (success + failure + cancelled all land), and sparkline excluding in-progress runs.
+- Self-review pass via `superpowers:code-reviewer`; addressed both substantive findings — added the boundary + cap-floor tests; documented the index-deferral checkpoint here (see below) instead of silently dropping the spec's "EXPLAIN first" line.
+- **`run_completed_at` index — deferred.** The new aggregate has three predicates (`status`, `conclusion`, `run_completed_at`); the existing `(repository_id, run_started_at)` index doesn't cover them. At phase-1 scale (low row count) the planner will scan; that's fine for now. Revisit once a real account crosses ~5–10k workflow runs and the dashboard load shows up in slow-query logs. A composite `(status, conclusion, run_completed_at)` would be optimal when needed.
 
 ## Decisions (locked 2026-04-30)
 - **Secondary line shows `92% success` (option B).** Static "Successful" carries no signal; rate is the roadmap's stated deliverable. Primary stays the count for grid consistency with the other 5 KpiCards.

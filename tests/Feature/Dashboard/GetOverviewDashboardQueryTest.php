@@ -6,6 +6,7 @@ use App\Domain\Dashboard\Queries\GetOverviewDashboardQuery;
 use App\Models\Project;
 use App\Models\Repository;
 use App\Models\User;
+use App\Models\WorkflowRun;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -146,9 +147,11 @@ class GetOverviewDashboardQueryTest extends TestCase
 
     public function test_mock_kpis_remain_consistent_with_phase_0_values(): void
     {
+        // Deployments graduated to a real query in spec 022; remaining
+        // mocked slices (services/alerts/uptime) still pin to the
+        // phase-0 fixture values.
         $payload = (new GetOverviewDashboardQuery)->handle();
 
-        $this->assertSame(24, $payload['dashboard']['deployments']['successful_24h']);
         $this->assertSame(47, $payload['dashboard']['services']['running']);
         $this->assertSame(3, $payload['dashboard']['alerts']['active']);
         $this->assertSame('danger', $payload['dashboard']['alerts']['status']);
@@ -156,5 +159,276 @@ class GetOverviewDashboardQueryTest extends TestCase
 
         $this->assertCount(7, $payload['activityHeatmap']);
         $this->assertCount(6, $payload['activityHeatmap'][0]);
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    // Spec 022 — Deployments KPI (real query against `workflow_runs`).
+    // ────────────────────────────────────────────────────────────────
+
+    private function setUpRepository(): Repository
+    {
+        $owner = User::factory()->create();
+        $project = Project::factory()->create(['owner_user_id' => $owner->id]);
+
+        return Repository::factory()->create(['project_id' => $project->id]);
+    }
+
+    public function test_deployments_kpi_returns_zero_state_with_no_runs(): void
+    {
+        $payload = (new GetOverviewDashboardQuery)->handle();
+
+        $this->assertSame(0, $payload['dashboard']['deployments']['successful_24h']);
+        $this->assertNull($payload['dashboard']['deployments']['success_rate_24h']);
+        $this->assertSame(0, $payload['dashboard']['deployments']['change_percent']);
+        $this->assertSame('muted', $payload['dashboard']['deployments']['status']);
+        $this->assertCount(12, $payload['dashboard']['deployments']['sparkline']);
+    }
+
+    public function test_deployments_kpi_counts_successful_runs_in_24h_window(): void
+    {
+        $repository = $this->setUpRepository();
+
+        WorkflowRun::factory()->count(3)->create([
+            'repository_id' => $repository->id,
+            'status' => 'completed',
+            'conclusion' => 'success',
+            'run_completed_at' => now()->subHours(2),
+        ]);
+
+        $payload = (new GetOverviewDashboardQuery)->handle();
+
+        $this->assertSame(3, $payload['dashboard']['deployments']['successful_24h']);
+        $this->assertSame(100, $payload['dashboard']['deployments']['success_rate_24h']);
+        $this->assertSame('success', $payload['dashboard']['deployments']['status']);
+    }
+
+    public function test_deployments_kpi_excludes_runs_outside_24h_window(): void
+    {
+        $repository = $this->setUpRepository();
+
+        WorkflowRun::factory()->create([
+            'repository_id' => $repository->id,
+            'status' => 'completed',
+            'conclusion' => 'success',
+            // Just outside the 24h window.
+            'run_completed_at' => now()->subHours(25),
+        ]);
+
+        $payload = (new GetOverviewDashboardQuery)->handle();
+
+        $this->assertSame(0, $payload['dashboard']['deployments']['successful_24h']);
+    }
+
+    public function test_deployments_kpi_change_percent_compares_to_previous_24h(): void
+    {
+        $repository = $this->setUpRepository();
+
+        // Previous window (-48h..-24h): 2 successes.
+        WorkflowRun::factory()->count(2)->create([
+            'repository_id' => $repository->id,
+            'status' => 'completed',
+            'conclusion' => 'success',
+            'run_completed_at' => now()->subHours(36),
+        ]);
+        // Current window: 4 successes — 100% growth.
+        WorkflowRun::factory()->count(4)->create([
+            'repository_id' => $repository->id,
+            'status' => 'completed',
+            'conclusion' => 'success',
+            'run_completed_at' => now()->subHours(2),
+        ]);
+
+        $payload = (new GetOverviewDashboardQuery)->handle();
+
+        $this->assertSame(4, $payload['dashboard']['deployments']['successful_24h']);
+        $this->assertSame(100, $payload['dashboard']['deployments']['change_percent']);
+    }
+
+    public function test_deployments_kpi_change_percent_caps_at_999_with_zero_previous(): void
+    {
+        $repository = $this->setUpRepository();
+
+        // No prior-window successes; 12 in the current window. Without
+        // the cap this would render as +∞%.
+        WorkflowRun::factory()->count(12)->create([
+            'repository_id' => $repository->id,
+            'status' => 'completed',
+            'conclusion' => 'success',
+            'run_completed_at' => now()->subHours(2),
+        ]);
+
+        $payload = (new GetOverviewDashboardQuery)->handle();
+
+        $this->assertLessThanOrEqual(999, $payload['dashboard']['deployments']['change_percent']);
+    }
+
+    public function test_deployments_kpi_status_threshold_at_95_is_success(): void
+    {
+        // Exactly at the 95% boundary — `>=` semantics mean this lands
+        // in the success band, not warning.
+        $repository = $this->setUpRepository();
+
+        WorkflowRun::factory()->count(19)->create([
+            'repository_id' => $repository->id,
+            'status' => 'completed',
+            'conclusion' => 'success',
+            'run_completed_at' => now()->subHours(2),
+        ]);
+        WorkflowRun::factory()->create([
+            'repository_id' => $repository->id,
+            'status' => 'completed',
+            'conclusion' => 'failure',
+            'run_completed_at' => now()->subHours(2),
+        ]);
+
+        $payload = (new GetOverviewDashboardQuery)->handle();
+
+        $this->assertSame(95, $payload['dashboard']['deployments']['success_rate_24h']);
+        $this->assertSame('success', $payload['dashboard']['deployments']['status']);
+    }
+
+    public function test_deployments_kpi_status_threshold_at_80_is_warning(): void
+    {
+        // Exactly at the 80% boundary — `>=` semantics mean this lands
+        // in the warning band, not danger.
+        $repository = $this->setUpRepository();
+
+        WorkflowRun::factory()->count(8)->create([
+            'repository_id' => $repository->id,
+            'status' => 'completed',
+            'conclusion' => 'success',
+            'run_completed_at' => now()->subHours(2),
+        ]);
+        WorkflowRun::factory()->count(2)->create([
+            'repository_id' => $repository->id,
+            'status' => 'completed',
+            'conclusion' => 'failure',
+            'run_completed_at' => now()->subHours(2),
+        ]);
+
+        $payload = (new GetOverviewDashboardQuery)->handle();
+
+        $this->assertSame(80, $payload['dashboard']['deployments']['success_rate_24h']);
+        $this->assertSame('warning', $payload['dashboard']['deployments']['status']);
+    }
+
+    public function test_deployments_kpi_change_percent_floors_at_negative_100(): void
+    {
+        // Previous window: 3 successes. Current window: 0 successes.
+        // (0 - 3) / max(3, 1) * 100 = -100 — already at the floor; this
+        // test pins the lower-bound clamp behavior.
+        $repository = $this->setUpRepository();
+
+        WorkflowRun::factory()->count(3)->create([
+            'repository_id' => $repository->id,
+            'status' => 'completed',
+            'conclusion' => 'success',
+            'run_completed_at' => now()->subHours(36),
+        ]);
+
+        $payload = (new GetOverviewDashboardQuery)->handle();
+
+        $this->assertSame(0, $payload['dashboard']['deployments']['successful_24h']);
+        $this->assertSame(-100, $payload['dashboard']['deployments']['change_percent']);
+    }
+
+    public function test_deployments_kpi_status_threshold_warning(): void
+    {
+        $repository = $this->setUpRepository();
+
+        // 17 successes / 20 completed = 85% → warning band.
+        WorkflowRun::factory()->count(17)->create([
+            'repository_id' => $repository->id,
+            'status' => 'completed',
+            'conclusion' => 'success',
+            'run_completed_at' => now()->subHours(2),
+        ]);
+        WorkflowRun::factory()->count(3)->create([
+            'repository_id' => $repository->id,
+            'status' => 'completed',
+            'conclusion' => 'failure',
+            'run_completed_at' => now()->subHours(2),
+        ]);
+
+        $payload = (new GetOverviewDashboardQuery)->handle();
+
+        $this->assertSame(85, $payload['dashboard']['deployments']['success_rate_24h']);
+        $this->assertSame('warning', $payload['dashboard']['deployments']['status']);
+    }
+
+    public function test_deployments_kpi_status_threshold_danger(): void
+    {
+        $repository = $this->setUpRepository();
+
+        // 1 success / 2 completed = 50% → danger band.
+        WorkflowRun::factory()->create([
+            'repository_id' => $repository->id,
+            'status' => 'completed',
+            'conclusion' => 'success',
+            'run_completed_at' => now()->subHours(2),
+        ]);
+        WorkflowRun::factory()->create([
+            'repository_id' => $repository->id,
+            'status' => 'completed',
+            'conclusion' => 'failure',
+            'run_completed_at' => now()->subHours(2),
+        ]);
+
+        $payload = (new GetOverviewDashboardQuery)->handle();
+
+        $this->assertSame(50, $payload['dashboard']['deployments']['success_rate_24h']);
+        $this->assertSame('danger', $payload['dashboard']['deployments']['status']);
+    }
+
+    public function test_deployments_kpi_sparkline_counts_daily_completed_runs(): void
+    {
+        $repository = $this->setUpRepository();
+
+        // 1 today, 2 three days ago, 1 eleven days ago.
+        WorkflowRun::factory()->create([
+            'repository_id' => $repository->id,
+            'status' => 'completed',
+            'conclusion' => 'success',
+            'run_completed_at' => now()->startOfDay()->addHours(10),
+        ]);
+        WorkflowRun::factory()->count(2)->create([
+            'repository_id' => $repository->id,
+            'status' => 'completed',
+            'conclusion' => 'failure',
+            'run_completed_at' => now()->startOfDay()->subDays(3)->addHours(10),
+        ]);
+        WorkflowRun::factory()->create([
+            'repository_id' => $repository->id,
+            'status' => 'completed',
+            'conclusion' => 'cancelled',
+            'run_completed_at' => now()->startOfDay()->subDays(11)->addHours(10),
+        ]);
+
+        $sparkline = (new GetOverviewDashboardQuery)
+            ->handle()['dashboard']['deployments']['sparkline'];
+
+        $this->assertCount(12, $sparkline);
+        // Oldest at index 0 (11 days ago), today at index 11.
+        $this->assertSame(1, $sparkline[0]);
+        $this->assertSame(2, $sparkline[8]);
+        $this->assertSame(1, $sparkline[11]);
+        $this->assertSame(4, array_sum($sparkline));
+    }
+
+    public function test_deployments_kpi_sparkline_excludes_in_progress_runs(): void
+    {
+        $repository = $this->setUpRepository();
+
+        WorkflowRun::factory()->create([
+            'repository_id' => $repository->id,
+            'status' => 'in_progress',
+            'conclusion' => null,
+            'run_completed_at' => null,
+        ]);
+
+        $sparkline = (new GetOverviewDashboardQuery)
+            ->handle()['dashboard']['deployments']['sparkline'];
+
+        $this->assertSame(array_fill(0, 12, 0), $sparkline);
     }
 }
