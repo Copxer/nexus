@@ -9,6 +9,7 @@ use App\Enums\ActivitySeverity;
 use App\Enums\WebsiteCheckStatus;
 use App\Enums\WebsiteStatus;
 use App\Events\ActivityEventCreated;
+use App\Events\WebsiteCheckRecorded;
 use App\Models\ActivityEvent;
 use App\Models\Project;
 use App\Models\User;
@@ -265,5 +266,43 @@ class RecordWebsiteCheckActionTest extends TestCase
         );
 
         $this->assertSame(0, ActivityEvent::query()->count());
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    // Spec 025 — WebsiteCheckRecorded broadcasts on every persisted check.
+    // ────────────────────────────────────────────────────────────────
+
+    public function test_dispatches_website_check_recorded_on_every_persisted_check(): void
+    {
+        Event::fake([WebsiteCheckRecorded::class]);
+        $website = $this->makeWebsite(WebsiteStatus::Up);
+
+        // Steady-state run (Up → Up). No transition activity, but the
+        // realtime pulse must still fire.
+        $check = $this->action()->execute(
+            $website,
+            new WebsiteProbeResult(WebsiteCheckStatus::Up, 200, 100, null),
+        );
+
+        Event::assertDispatched(
+            WebsiteCheckRecorded::class,
+            fn (WebsiteCheckRecorded $event) => $event->checkId === $check->id
+                && $event->websiteId === $website->id
+                && $event->ownerUserId === $website->project->owner_user_id,
+        );
+    }
+
+    public function test_dispatches_website_check_recorded_on_transitions_too(): void
+    {
+        Event::fake([WebsiteCheckRecorded::class]);
+        $website = $this->makeWebsite(WebsiteStatus::Up);
+
+        // Healthy → Failed transition.
+        $this->action()->execute(
+            $website,
+            new WebsiteProbeResult(WebsiteCheckStatus::Down, 500, 200, 'HTTP 500'),
+        );
+
+        Event::assertDispatched(WebsiteCheckRecorded::class);
     }
 }
