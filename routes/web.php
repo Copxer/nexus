@@ -4,6 +4,8 @@ use App\Http\Controllers\ActivityController;
 use App\Http\Controllers\DeploymentController;
 use App\Http\Controllers\GithubConnectionController;
 use App\Http\Controllers\GithubRepositoryImportController;
+use App\Http\Controllers\Monitoring\AgentTokenController;
+use App\Http\Controllers\Monitoring\HostController;
 use App\Http\Controllers\Monitoring\WebsiteController;
 use App\Http\Controllers\Monitoring\WebsiteProbeController;
 use App\Http\Controllers\OverviewController;
@@ -98,6 +100,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->names('monitoring.websites');
     Route::post('/monitoring/websites/{website}/probe', WebsiteProbeController::class)
         ->name('monitoring.websites.probe');
+
+    // Spec 026 — Docker hosts CRUD + agent token lifecycle. Telemetry
+    // ingestion arrives in spec 027; the UI metric rendering in 028.
+    Route::resource('monitoring/hosts', HostController::class)
+        ->parameters(['hosts' => 'host'])
+        ->names('monitoring.hosts');
+    Route::post('/monitoring/hosts/{host}/tokens', [AgentTokenController::class, 'store'])
+        ->name('monitoring.hosts.tokens.store');
+    Route::post('/monitoring/hosts/{host}/tokens/{token}/rotate', [AgentTokenController::class, 'rotate'])
+        ->name('monitoring.hosts.tokens.rotate');
+    Route::delete('/monitoring/hosts/{host}/tokens/{token}', [AgentTokenController::class, 'destroy'])
+        ->name('monitoring.hosts.tokens.destroy');
 });
 
 // Spec 017 — GitHub webhooks (no auth/CSRF; signature-verified inside).

@@ -2,9 +2,13 @@
 
 namespace App\Providers;
 
+use App\Models\AgentToken;
+use App\Models\Host;
 use App\Models\Project;
 use App\Models\Repository;
 use App\Models\Website;
+use App\Policies\AgentTokenPolicy;
+use App\Policies\HostPolicy;
 use App\Policies\ProjectPolicy;
 use App\Policies\RepositoryPolicy;
 use App\Policies\WebsitePolicy;
@@ -33,6 +37,8 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Project::class, ProjectPolicy::class);
         Gate::policy(Repository::class, RepositoryPolicy::class);
         Gate::policy(Website::class, WebsitePolicy::class);
+        Gate::policy(Host::class, HostPolicy::class);
+        Gate::policy(AgentToken::class, AgentTokenPolicy::class);
 
         // Force https URL generation when APP_URL is https. Required for
         // Cloudflare/ngrok tunnels: TLS terminates at the tunnel and

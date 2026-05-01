@@ -14,6 +14,12 @@ export type PageProps<
     flash?: {
         status?: string | null;
         error?: string | null;
+        /**
+         * Spec 026 — plaintext agent token surfaced once after issue or
+         * rotate. Read by `Components/Hosts/AgentTokenPanel.vue`. Never
+         * persisted on the client; the next page load drops it.
+         */
+        agentTokenPlaintext?: string | null;
     };
     /**
      * Right-rail activity feed shared by `HandleInertiaRequests::share()`
