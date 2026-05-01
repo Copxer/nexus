@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Activity\Queries\RecentActivityForProjectQuery;
+use App\Domain\GitHub\Queries\DeploymentTimelineQuery;
 use App\Enums\ProjectPriority;
 use App\Enums\ProjectStatus;
 use App\Http\Requests\Projects\StoreProjectRequest;
@@ -53,12 +55,38 @@ class ProjectController extends Controller
             ->with('status', 'Project created.');
     }
 
-    public function show(Request $request, Project $project): Response
-    {
+    public function show(
+        Request $request,
+        Project $project,
+        RecentActivityForProjectQuery $activityQuery,
+        DeploymentTimelineQuery $deploymentsQuery,
+    ): Response {
         $this->authorize('view', $project);
 
         $project->loadMissing('owner:id,name,email');
         $project->loadMissing(['repositories' => fn ($q) => $q->latest('last_pushed_at')->latest()]);
+
+        // Per-project Activity tab — feed events from this project's
+        // repositories. Reuses `<ActivityFeed>` so we don't drift from
+        // the right-rail / `/activity` page renderers.
+        $projectActivity = $activityQuery->handle($project);
+
+        // Per-project Deployments tab — recent workflow runs across the
+        // project's repos. Powered by the cross-repo
+        // `DeploymentTimelineQuery` filtered to `project_id`. The tab's
+        // "View all" CTA links out to `/deployments?project_id={id}`
+        // for the wider view + filters, so we only need the first 10
+        // here — the underlying query caps at 100 and the Vue tab
+        // already slices to 10, but slicing here keeps ~70 KB off the
+        // wire for a tab that may never open.
+        $projectDeployments = array_slice(
+            $deploymentsQuery->execute(
+                $request->user(),
+                ['project_id' => $project->id],
+            ),
+            0,
+            10,
+        );
 
         return Inertia::render('Projects/Show', [
             'project' => $this->transform($project),
@@ -79,6 +107,8 @@ class ProjectController extends Controller
                 'last_pushed_at' => $repo->last_pushed_at?->diffForHumans(),
                 'sync_status' => $repo->sync_status?->value,
             ])->all(),
+            'projectActivity' => $projectActivity,
+            'projectDeployments' => $projectDeployments,
         ]);
     }
 

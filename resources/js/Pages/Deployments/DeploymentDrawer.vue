@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import StatusBadge from '@/Components/Dashboard/StatusBadge.vue';
 import {
+    conclusionLabel,
+    conclusionTone,
+    runStatusTone as statusTone,
+} from '@/lib/workflowRunStyles';
+import {
     ExternalLink,
     GitBranch,
     GitCommit,
@@ -23,35 +28,6 @@ const isOpen = computed(() => props.run !== null);
 
 const closeButtonRef = ref<HTMLButtonElement | null>(null);
 const drawerRef = ref<HTMLDivElement | null>(null);
-
-// Mirror tone helpers from Index.vue. Duplicated rather than hoisted
-// so the drawer is portable as a self-contained component for now.
-// If a third consumer arrives we'll extract.
-const conclusionTone = (conclusion: string | null) =>
-    (
-        ({
-            success: 'success',
-            failure: 'danger',
-            cancelled: 'warning',
-            timed_out: 'warning',
-            action_required: 'warning',
-            stale: 'muted',
-            neutral: 'muted',
-            skipped: 'muted',
-        }) as const
-    )[conclusion ?? ''] ?? 'muted';
-
-const statusTone = (status: string | null) =>
-    (
-        ({
-            queued: 'muted',
-            in_progress: 'info',
-            completed: 'success',
-        }) as const
-    )[status ?? ''] ?? 'muted';
-
-const conclusionLabel = (conclusion: string | null) =>
-    conclusion === null ? '—' : conclusion.replace(/_/g, ' ');
 
 // `4m 12s` / `1h 03m 14s` style duration. Bounded by `duration_seconds`
 // from the controller payload (server already abs'd it).
