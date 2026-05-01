@@ -111,11 +111,11 @@ class SyncGitHubRepositoryJob implements ShouldQueue
             $this->markFailed($repository, $e->getMessage() !== '' ? $e->getMessage() : $e::class);
         }
 
-        // Chain spec 015's issues sync and spec 016's PRs sync. Both
-        // dispatches sit outside the try/catch above so a transient
-        // queue failure here doesn't flip a freshly-synced repo back
-        // to `failed` — both child syncs carry their own independent
-        // statuses on the repo row.
+        // Chain spec 015's issues sync, spec 016's PRs sync, and spec
+        // 020's workflow runs sync. All three dispatches sit outside
+        // the try/catch above so a transient queue failure here doesn't
+        // flip a freshly-synced repo back to `failed` — each child sync
+        // carries its own independent status on the repo row.
         if ($metadataSynced) {
             $this->dispatchChildSync(
                 fn () => SyncRepositoryIssuesJob::dispatch($repository->id),
@@ -127,6 +127,12 @@ class SyncGitHubRepositoryJob implements ShouldQueue
                 fn () => SyncRepositoryPullRequestsJob::dispatch($repository->id),
                 $repository,
                 'pulls',
+            );
+
+            $this->dispatchChildSync(
+                fn () => SyncRepositoryWorkflowRunsJob::dispatch($repository->id),
+                $repository,
+                'workflow runs',
             );
         }
     }

@@ -33,11 +33,12 @@ class RepositorySyncController extends Controller
         $this->authorize('update', $repository->project);
 
         // Clear the metadata error and the child-sync errors as well —
-        // the metadata job chains issues + PRs syncs on success, so the
-        // user's mental model is "Run sync re-runs all three." If we
-        // cleared only the metadata error, the page would briefly show
-        // "Syncing…" at the top while stale red error alerts on the
-        // Issues / PRs tabs persisted until those child jobs picked up.
+        // the metadata job chains issues + PRs + workflow runs syncs on
+        // success, so the user's mental model is "Run sync re-runs all
+        // four." If we cleared only the metadata error, the page would
+        // briefly show "Syncing…" at the top while stale red error
+        // alerts on the Issues / PRs / Workflow Runs tabs persisted
+        // until those child jobs picked up.
         $repository->update([
             'sync_status' => RepositorySyncStatus::Syncing->value,
             'sync_error' => null,
@@ -46,6 +47,8 @@ class RepositorySyncController extends Controller
             'issues_sync_failed_at' => null,
             'prs_sync_error' => null,
             'prs_sync_failed_at' => null,
+            'workflow_runs_sync_error' => null,
+            'workflow_runs_sync_failed_at' => null,
         ]);
 
         SyncGitHubRepositoryJob::dispatch($repository->id);

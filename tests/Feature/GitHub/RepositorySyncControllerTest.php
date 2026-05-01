@@ -81,7 +81,7 @@ class RepositorySyncControllerTest extends TestCase
         Queue::assertNotPushed(SyncGitHubRepositoryJob::class);
     }
 
-    public function test_dispatch_clears_stale_sync_errors_across_all_three_flows(): void
+    public function test_dispatch_clears_stale_sync_errors_across_all_four_flows(): void
     {
         Queue::fake();
         $owner = User::factory()->create(['email_verified_at' => now()]);
@@ -98,6 +98,9 @@ class RepositorySyncControllerTest extends TestCase
             'prs_sync_status' => 'failed',
             'prs_sync_error' => 'PRs sync errored',
             'prs_sync_failed_at' => now()->subMinutes(5),
+            'workflow_runs_sync_status' => 'failed',
+            'workflow_runs_sync_error' => 'Workflow runs sync errored',
+            'workflow_runs_sync_failed_at' => now()->subMinutes(5),
         ]);
 
         $this->actingAs($owner)
@@ -105,10 +108,10 @@ class RepositorySyncControllerTest extends TestCase
             ->post(route('repositories.sync', $repository->full_name))
             ->assertRedirect(route('repositories.show', $repository->full_name));
 
-        // The metadata job re-runs both child syncs on success, so the
-        // controller clears all six error columns up-front. Otherwise
-        // the page would briefly show "Syncing…" at the top while
-        // stale red error alerts persisted on the Issues / PRs tabs.
+        // The metadata job re-runs all three child syncs on success, so
+        // the controller clears all eight error columns up-front. Otherwise
+        // the page would briefly show "Syncing…" at the top while stale
+        // red error alerts persisted on the per-tab views.
         $repo = $repository->fresh();
         $this->assertNull($repo->sync_error);
         $this->assertNull($repo->sync_failed_at);
@@ -116,6 +119,8 @@ class RepositorySyncControllerTest extends TestCase
         $this->assertNull($repo->issues_sync_failed_at);
         $this->assertNull($repo->prs_sync_error);
         $this->assertNull($repo->prs_sync_failed_at);
+        $this->assertNull($repo->workflow_runs_sync_error);
+        $this->assertNull($repo->workflow_runs_sync_failed_at);
     }
 
     public function test_unknown_repository_returns_404(): void

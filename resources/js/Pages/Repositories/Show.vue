@@ -17,6 +17,7 @@ import {
     RefreshCcw,
     Star,
     Trash2,
+    Workflow,
 } from 'lucide-vue-next';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 
@@ -73,6 +74,36 @@ interface PullRequestRow {
     html_url: string;
 }
 
+interface WorkflowRunRow {
+    id: number;
+    run_number: number;
+    name: string;
+    event: string;
+    status:
+        | 'queued'
+        | 'in_progress'
+        | 'completed'
+        | string
+        | null;
+    conclusion:
+        | 'success'
+        | 'failure'
+        | 'cancelled'
+        | 'timed_out'
+        | 'action_required'
+        | 'stale'
+        | 'neutral'
+        | 'skipped'
+        | string
+        | null;
+    head_branch: string | null;
+    head_sha: string;
+    actor_login: string | null;
+    html_url: string;
+    run_started_at: string | null;
+    run_updated_at: string | null;
+}
+
 interface SyncShape {
     status: string | null;
     synced_at: string | null;
@@ -88,9 +119,11 @@ const props = defineProps<{
     issuesSync: SyncShape;
     pullRequests: PullRequestRow[];
     pullRequestsSync: SyncShape;
+    workflowRuns: WorkflowRunRow[];
+    workflowRunsSync: SyncShape;
 }>();
 
-const tab = ref<'overview' | 'issues' | 'pulls'>('overview');
+const tab = ref<'overview' | 'issues' | 'pulls' | 'workflow-runs'>('overview');
 
 const syncStatusTone = (status: string | null) =>
     (
@@ -114,6 +147,38 @@ const prStateTone = (state: string | null) =>
         }) as const
     )[state ?? ''] ?? 'muted';
 
+const workflowConclusionTone = (conclusion: string | null) =>
+    (
+        ({
+            success: 'success',
+            failure: 'danger',
+            cancelled: 'warning',
+            timed_out: 'warning',
+            action_required: 'warning',
+            stale: 'muted',
+            neutral: 'muted',
+            skipped: 'muted',
+        }) as const
+    )[conclusion ?? ''] ?? 'muted';
+
+// Tone for the run-status badge shown when a run has no conclusion
+// yet — `WorkflowRunConclusion` is null pre-completion. Keys match
+// `WorkflowRunStatus::badgeTone()` on the PHP side so the two
+// renderers agree.
+const workflowStatusTone = (status: string | null) =>
+    (
+        ({
+            queued: 'muted',
+            in_progress: 'info',
+            completed: 'success',
+        }) as const
+    )[status ?? ''] ?? 'muted';
+
+// Display label for the conclusion badge — `timed_out` reads cleaner
+// as `timed out`, etc. Falls back to a humanized form for unknowns.
+const workflowConclusionLabel = (conclusion: string | null) =>
+    conclusion === null ? '—' : conclusion.replace(/_/g, ' ');
+
 const projectAccentClass = (color: string | null) =>
     (
         ({
@@ -128,9 +193,13 @@ const projectAccentClass = (color: string | null) =>
 
 const issuesCount = computed(() => props.issues.length);
 const pullRequestsCount = computed(() => props.pullRequests.length);
+const workflowRunsCount = computed(() => props.workflowRuns.length);
 const isIssuesSyncing = computed(() => props.issuesSync.status === 'syncing');
 const isPullRequestsSyncing = computed(
     () => props.pullRequestsSync.status === 'syncing',
+);
+const isWorkflowRunsSyncing = computed(
+    () => props.workflowRunsSync.status === 'syncing',
 );
 const isRepositorySyncing = computed(
     () => props.repository.sync_status === 'syncing',
@@ -166,6 +235,15 @@ const runPullRequestsSync = () => {
     );
 };
 
+const runWorkflowRunsSync = () => {
+    if (!props.canSync) return;
+    router.post(
+        route('repositories.workflow-runs.sync', props.repository.full_name),
+        {},
+        { preserveScroll: true },
+    );
+};
+
 const runRepositorySync = () => {
     if (!props.canSync) return;
     router.post(
@@ -175,12 +253,12 @@ const runRepositorySync = () => {
     );
 };
 
-// While ANY of the three sync flows (repository / issues / PRs) is in
-// `syncing` state, poll the controller every 2.5s for the latest status —
-// a partial Inertia reload that re-fetches just the three sync-related
-// props so the page updates without flashing or losing scroll. Stops on
-// its own as soon as all three flip out of `syncing`. Spec 019 will
-// replace this with Reverb broadcasts.
+// While ANY of the four sync flows (repository / issues / PRs / workflow
+// runs) is in `syncing` state, poll the controller every 2.5s for the
+// latest status — a partial Inertia reload that re-fetches just the
+// sync-related props so the page updates without flashing or losing
+// scroll. Stops on its own as soon as all four flip out of `syncing`.
+// Spec 019 will replace this with Reverb broadcasts.
 const POLL_INTERVAL_MS = 2500;
 let pollHandle: ReturnType<typeof setInterval> | null = null;
 
@@ -188,7 +266,8 @@ const anySyncing = computed(
     () =>
         isRepositorySyncing.value ||
         isIssuesSyncing.value ||
-        isPullRequestsSyncing.value,
+        isPullRequestsSyncing.value ||
+        isWorkflowRunsSyncing.value,
 );
 
 const stopPolling = () => {
@@ -203,9 +282,16 @@ const startPolling = () => {
     pollHandle = setInterval(() => {
         // `router.reload` is a same-route partial fetch — no navigation, so
         // scroll + component state are preserved by default. `only` keeps
-        // the payload tiny (just the three sync-related props).
+        // the payload tiny (just the sync-related props plus the lists
+        // they affect once the sync lands).
         router.reload({
-            only: ['repository', 'issuesSync', 'pullRequestsSync'],
+            only: [
+                'repository',
+                'issuesSync',
+                'pullRequestsSync',
+                'workflowRunsSync',
+                'workflowRuns',
+            ],
         });
     }, POLL_INTERVAL_MS);
 };
@@ -455,6 +541,25 @@ onBeforeUnmount(stopPolling);
                         {{ pullRequestsCount }}
                     </span>
                 </button>
+                <button
+                    type="button"
+                    :class="[
+                        'inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] transition focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60',
+                        tab === 'workflow-runs'
+                            ? 'border-accent-cyan/60 bg-accent-cyan/15 text-accent-cyan'
+                            : 'border-border-subtle bg-background-panel-hover text-text-secondary hover:text-text-primary',
+                    ]"
+                    @click="tab = 'workflow-runs'"
+                >
+                    <Workflow class="h-3.5 w-3.5" aria-hidden="true" />
+                    Workflow Runs
+                    <span
+                        v-if="workflowRunsCount > 0"
+                        class="rounded-full border border-current/40 px-1.5 py-0.5 text-[10px] font-mono"
+                    >
+                        {{ workflowRunsCount }}
+                    </span>
+                </button>
             </nav>
 
             <!-- Overview panel -->
@@ -689,7 +794,7 @@ onBeforeUnmount(stopPolling);
             </template>
 
             <!-- Pull Requests panel -->
-            <template v-else>
+            <template v-else-if="tab === 'pulls'">
                 <section aria-label="Pull Requests" class="glass-card p-6 sm:p-8">
                     <header
                         class="flex flex-wrap items-center justify-between gap-3 border-b border-border-subtle pb-4"
@@ -826,6 +931,163 @@ onBeforeUnmount(stopPolling);
                             The last pull requests sync failed.
                         </span>
                         <span v-else>No pull requests mirrored for this repository.</span>
+                        <span v-if="canSync"> Click <span class="font-mono">Run sync</span> to fetch from GitHub.</span>
+                    </p>
+                </section>
+            </template>
+
+            <!-- Workflow Runs panel -->
+            <template v-else-if="tab === 'workflow-runs'">
+                <section aria-label="Workflow Runs" class="glass-card p-6 sm:p-8">
+                    <header
+                        class="flex flex-wrap items-center justify-between gap-3 border-b border-border-subtle pb-4"
+                    >
+                        <div class="flex items-center gap-3">
+                            <h3 class="text-sm font-semibold text-text-primary">
+                                Workflow runs mirror
+                            </h3>
+                            <StatusBadge
+                                v-if="workflowRunsSync.status"
+                                :tone="syncStatusTone(workflowRunsSync.status)"
+                            >
+                                {{ workflowRunsSync.status }}
+                            </StatusBadge>
+                            <span
+                                v-if="workflowRunsSync.synced_at"
+                                class="text-xs text-text-muted"
+                            >
+                                Last sync
+                                <span class="font-mono text-text-secondary">{{ workflowRunsSync.synced_at }}</span>
+                            </span>
+                            <span
+                                v-else-if="workflowRunsSync.status === 'failed' && workflowRunsSync.failed_at"
+                                class="text-xs text-text-muted"
+                            >
+                                Failed
+                                <span class="font-mono text-status-danger">{{ workflowRunsSync.failed_at }}</span>
+                            </span>
+                        </div>
+                        <button
+                            v-if="canSync"
+                            type="button"
+                            class="inline-flex items-center gap-2 rounded-lg border border-accent-cyan/40 bg-accent-cyan/15 px-3 py-2 text-sm font-semibold text-accent-cyan transition hover:border-accent-cyan/60 disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
+                            :disabled="isWorkflowRunsSyncing"
+                            @click="runWorkflowRunsSync"
+                        >
+                            <RefreshCcw class="h-4 w-4" aria-hidden="true" />
+                            {{ isWorkflowRunsSyncing ? 'Syncing…' : 'Run sync' }}
+                        </button>
+                    </header>
+
+                    <p
+                        v-if="workflowRunsSync.status === 'failed' && workflowRunsSync.error"
+                        class="mt-4 flex items-start gap-2 rounded-lg border border-status-danger/40 bg-status-danger/10 p-3 text-xs"
+                    >
+                        <AlertTriangle
+                            class="mt-0.5 h-3.5 w-3.5 shrink-0 text-status-danger"
+                            aria-hidden="true"
+                        />
+                        <span class="break-words font-mono text-text-secondary">
+                            {{ workflowRunsSync.error }}
+                        </span>
+                    </p>
+
+                    <ul
+                        v-if="workflowRuns.length > 0"
+                        class="mt-2 divide-y divide-border-subtle"
+                    >
+                        <li
+                            v-for="run in workflowRuns"
+                            :key="run.id"
+                            class="flex flex-col gap-2 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+                        >
+                            <div class="flex min-w-0 items-start gap-3">
+                                <Workflow
+                                    class="mt-1 h-4 w-4 shrink-0"
+                                    :class="{
+                                        'text-status-success':
+                                            run.conclusion === 'success',
+                                        'text-status-danger':
+                                            run.conclusion === 'failure',
+                                        'text-status-warning':
+                                            run.conclusion === 'cancelled' ||
+                                            run.conclusion === 'timed_out' ||
+                                            run.conclusion === 'action_required',
+                                        'text-accent-cyan':
+                                            run.status === 'in_progress',
+                                        'text-text-muted':
+                                            !run.conclusion &&
+                                            run.status !== 'in_progress',
+                                    }"
+                                    aria-hidden="true"
+                                />
+                                <div class="flex min-w-0 flex-col gap-1">
+                                    <a
+                                        :href="run.html_url"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        class="truncate text-sm font-semibold text-text-primary transition hover:text-accent-cyan"
+                                    >
+                                        <span class="font-mono text-text-muted">#{{ run.run_number }}</span>
+                                        {{ run.name }}
+                                    </a>
+                                    <p class="text-xs text-text-muted">
+                                        <span v-if="run.actor_login">
+                                            <span class="font-mono text-text-secondary">@{{ run.actor_login }}</span>
+                                            ·
+                                        </span>
+                                        <span class="font-mono text-text-secondary">
+                                            {{ run.event }}
+                                        </span>
+                                        <span v-if="run.head_branch">
+                                            ·
+                                            <span class="font-mono text-text-secondary">
+                                                {{ run.head_branch }}
+                                            </span>
+                                        </span>
+                                        · Started {{ run.run_started_at ?? '—' }}
+                                    </p>
+                                </div>
+                            </div>
+                            <div
+                                class="flex flex-shrink-0 items-center gap-3 text-xs text-text-muted"
+                            >
+                                <StatusBadge
+                                    v-if="run.conclusion"
+                                    :tone="workflowConclusionTone(run.conclusion)"
+                                >
+                                    {{ workflowConclusionLabel(run.conclusion) }}
+                                </StatusBadge>
+                                <StatusBadge
+                                    v-else
+                                    :tone="workflowStatusTone(run.status)"
+                                >
+                                    {{ run.status }}
+                                </StatusBadge>
+                                <a
+                                    :href="run.html_url"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    class="text-text-muted transition hover:text-accent-cyan"
+                                    :aria-label="`Open workflow run #${run.run_number} on GitHub`"
+                                >
+                                    <ExternalLink class="h-4 w-4" aria-hidden="true" />
+                                </a>
+                            </div>
+                        </li>
+                    </ul>
+
+                    <p
+                        v-else
+                        class="mt-6 rounded-lg border border-dashed border-border-subtle bg-background-panel-hover/30 p-4 text-sm text-text-muted"
+                    >
+                        <span v-if="workflowRunsSync.status === 'pending'">
+                            Workflow runs haven't been synced yet.
+                        </span>
+                        <span v-else-if="workflowRunsSync.status === 'failed'">
+                            The last workflow runs sync failed.
+                        </span>
+                        <span v-else>No workflow runs mirrored for this repository.</span>
                         <span v-if="canSync"> Click <span class="font-mono">Run sync</span> to fetch from GitHub.</span>
                     </p>
                 </section>

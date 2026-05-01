@@ -5,6 +5,7 @@ namespace Tests\Feature\GitHub;
 use App\Domain\GitHub\Jobs\SyncGitHubRepositoryJob;
 use App\Domain\GitHub\Jobs\SyncRepositoryIssuesJob;
 use App\Domain\GitHub\Jobs\SyncRepositoryPullRequestsJob;
+use App\Domain\GitHub\Jobs\SyncRepositoryWorkflowRunsJob;
 use App\Enums\RepositorySyncStatus;
 use App\Models\GithubConnection;
 use App\Models\Project;
@@ -162,7 +163,7 @@ class SyncGitHubRepositoryJobTest extends TestCase
         $this->assertSame(0, Repository::query()->count());
     }
 
-    public function test_handle_dispatches_both_child_syncs_on_happy_path(): void
+    public function test_handle_dispatches_all_three_child_syncs_on_happy_path(): void
     {
         Queue::fake();
         $context = $this->setUpProjectWithConnection();
@@ -187,6 +188,10 @@ class SyncGitHubRepositoryJobTest extends TestCase
             SyncRepositoryPullRequestsJob::class,
             fn (SyncRepositoryPullRequestsJob $job) => $job->repositoryId === $context['repository']->id,
         );
+        Queue::assertPushed(
+            SyncRepositoryWorkflowRunsJob::class,
+            fn (SyncRepositoryWorkflowRunsJob $job) => $job->repositoryId === $context['repository']->id,
+        );
     }
 
     public function test_handle_does_not_dispatch_child_syncs_on_failure(): void
@@ -205,6 +210,7 @@ class SyncGitHubRepositoryJobTest extends TestCase
 
         Queue::assertNotPushed(SyncRepositoryIssuesJob::class);
         Queue::assertNotPushed(SyncRepositoryPullRequestsJob::class);
+        Queue::assertNotPushed(SyncRepositoryWorkflowRunsJob::class);
     }
 
     public function test_handle_persists_sync_error_and_failed_at_on_api_failure(): void
