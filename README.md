@@ -22,8 +22,8 @@ Status legend: ⬜ not started · 🟡 in progress · 🟢 done · 🔴 blocked
 | 1 | Projects & Repositories | 🟢 | 3/3 specs done. |
 | 2 | GitHub Integration MVP | 🟢 | 4/4 specs done — connection, repository import + sync, issues sync, PRs + unified Work Items page. |
 | 3 | GitHub Webhooks & Activity Feed | 🟢 | 3/3 specs done (017–019). Phase complete. |
-| 4 | Deployments & CI/CD | ⬜ | — |
-| 5 | Website Monitoring | ⬜ | — |
+| 4 | Deployments & CI/CD | 🟢 | 3/3 specs done (020–022) — workflow runs storage + sync, cross-repo timeline UI with realtime, Overview success-rate widget. |
+| 5 | Website Monitoring | 🟢 | 3/3 specs done (023–025) — monitor MVP + manual probe, scheduled checks + uptime calc + activity events, Overview uptime KPI + Reverb live updates + perf chart. |
 | 6 | Docker Host Agent MVP | ⬜ | — |
 | 7 | Alerts Engine | ⬜ | — |
 | 8 | Analytics & Health Scores | ⬜ | — |
@@ -49,6 +49,16 @@ After Phase 3 (complete):
 - Spec 018 (done) — Activity Feed UI. `RecentActivityForUserQuery` powers a shared `activity.recent` Inertia prop registered in `HandleInertiaRequests::share()`, so every authenticated page lights up the right rail with the latest events without per-controller plumbing. New `/activity` page (linked from the sidebar between Alerts and Settings) shows up to 100 events.
 - Spec 019 (done) — Real-time broadcasting via Reverb. `CreateActivityEventAction` dispatches `ActivityEventCreated` (a `ShouldBroadcastNow` event on a private `users.{id}.activity` channel) every time a row lands. Echo + Pusher are wired in `bootstrap.ts`; the `useActivityFeed` composable (`resources/js/lib/`) seeds from the shared prop and prepends broadcast events into the rail and the `/activity` page in real time. Three new webhook handlers (`workflow_run`, `push`, `release`) extend the spec-017 ingestion: workflow runs surface as `workflow.{succeeded,failed}`, releases as `release.published`, and pushes silently update `repositories.last_pushed_at` (no activity row — too noisy). When the websocket isn't connected the rail and the activity page show a small "Live updates offline" pill; page-load reads still surface the latest data.
 
+After Phase 4 (complete):
+- Spec 020 (done) — Workflow runs storage + sync. `workflow_runs` table with FK to `repositories` and the same six-column sync pattern as issues / PRs. `SyncRepositoryWorkflowRunsAction` upserts on `(repository_id, github_id)`; the matching `Job` chains off `SyncGitHubRepositoryJob` so importing a repo backfills its run history. Per-repo Workflow Runs tab on the show page lists status, conclusion, branch, run number, actor, started-at; rows link out to the GitHub Actions run. Spec 019's `WorkflowRunWebhookHandler` now upserts into the new table for every `workflow_run` delivery (queued / in_progress / completed) so the timeline reflects in-flight states.
+- Spec 021 (done) — Deployment timeline UI. New `/deployments` page renders the cross-repo workflow runs as a chronological timeline. URL-bound filters (project / repository / status / conclusion / branch) survive reload; the repository dropdown narrows client-side based on the selected project. Per-run detail drawer (`Teleport` overlay, slide-from-right, Esc / backdrop / close-button dismiss with focus restoration) shows head SHA, duration, actor, conclusion, and a CTA out to GitHub. Real-time updates via a new `WorkflowRunUpserted` event broadcast on a private `users.{id}.deployments` channel — fires from the webhook handler upsert path (not from bulk REST sync, which would flood the channel). Sidebar `Deployments` entry replaces the Phase 4 placeholder; `Pipelines` stays disabled as a future filter view.
+- Spec 022 (done) — Overview success-rate widget. `GetOverviewDashboardQuery::deploymentsKpi()` aggregates `workflow_runs` over the last 24h (vs the prior 24h) for the headline numbers plus a 12-day daily completed-run sparkline. Returns `successful_24h` (primary value), `success_rate_24h` (integer percent or null when no completed runs landed), `change_percent` (capped `[-100, +999]`), `sparkline`, and a status enum. Window keys on `run_completed_at` (not `run_started_at`) so long-running jobs land in the bucket where they actually completed. The Overview's Deployments KPI card secondary line now reads `92% success` (or `—% success` for empty windows) instead of the static "Successful" placeholder.
+
+After Phase 5 (complete):
+- Spec 023 (done) — Website monitor MVP. `websites` + `website_checks` tables with `WebsiteStatus` (`pending|up|down|slow|error`) and `WebsiteCheckStatus` enums. `RunWebsiteProbeAction` is a pure HTTP probe (no DB writes) classifying the response into up / slow (>3000ms hard threshold) / down / error; `RecordWebsiteCheckAction` persists the check + updates `Website.{status,last_checked_at,last_success_at,last_failure_at}`. CRUD pages live under `/monitoring/websites/*`; per-site show page hosts a manual "Probe now" button (sync request → instant feedback ≤ `timeout_ms`). Sidebar `Monitoring` entry replaces the Phase 5 placeholder.
+- Spec 024 (done) — Scheduled checks + uptime calc + activity events. `DispatchDueWebsiteChecksJob` runs every minute (`Schedule::job(...)->everyMinute()->withoutOverlapping()` in `routes/console.php`), filters due websites in PHP (cross-DB compat), and dispatches `RunWebsiteCheckJob` per row. The per-website job reuses the spec-023 actions so manual probes and scheduled probes never drift. `RecordWebsiteCheckAction` detects healthy↔failed category transitions and emits `website.down` / `website.up` activity events on swings (steady-state runs stay silent). Spec 019's `ActivityEventCreated::broadcastOn()` was extended to resolve recipient channels for `source: monitoring` rows via `metadata.website_id → website → project → owner_user_id` so monitoring incidents broadcast in realtime. `GetWebsitePerformanceSummaryQuery` returns count-based uptime % over 24h / 7d / 30d windows + last-incident timestamp; the show page renders a 4-tile uptime stats strip. `RecentActivityForUserQuery` extended to surface monitoring events alongside repo events on the right rail.
+- Spec 025 (done) — Overview uptime KPI + Reverb live updates + perf chart. `GetMonitoringUptimeKpiQuery` aggregates `website_checks` volume-weighted across **all** the user's monitors over 24h (vs prior 24h) plus a 12-day daily sparkline; replaces the long-standing `MOCK_KPIS['uptime']` on Overview. Empty 24h window → null overall + muted status; status thresholds at 99 / 95. New `WebsiteCheckRecorded` event (`ShouldBroadcastNow`, pre-resolved owner id, `users.{id}.monitoring` channel, light-weight `{check_id, website_id}` pulse) fires from `RecordWebsiteCheckAction` on every persisted check (steady-state runs included; transition events stay separate). The website show page subscribes via Echo, filters client-side by `website_id`, and partial-reloads `website + summary + checks` on each pulse. Response-time `Sparkline` of the last 50 `response_time_ms` values renders in the recent-checks card with leading-null skip + carry-forward fill; `<2 data points` renders a "not enough data" placeholder.
+
 ## Local development
 
 ```bash
@@ -67,7 +77,7 @@ php artisan storage:link
 composer dev
 ```
 
-`composer dev` runs Laravel, Vite, the queue worker, and the scheduler in parallel via concurrently. For real-time/websocket testing, use `composer dev:horizon` (also runs Reverb + Horizon).
+`composer dev` runs Laravel, Vite, the queue worker, and the scheduler in parallel via concurrently. For real-time/websocket testing, use `composer dev:horizon` (also runs Reverb + Horizon). The scheduler tick is what drives spec 024's website-monitor probes — without `composer dev` (or a real cron in prod), `DispatchDueWebsiteChecksJob` never fires and monitors stay on whatever state the last manual "Probe now" left them in.
 
 ### GitHub App setup
 
@@ -189,21 +199,39 @@ Full workflow: [`.claude/skills/nexus-spec-workflow/SKILL.md`](.claude/skills/ne
 
 ```
 app/
-    Domain/                 — bounded contexts (GitHub, Repositories, Activity, …)
+    Domain/                 — bounded contexts (Activity, Dashboard, GitHub, Monitoring, Repositories, …)
         {Context}/
             Actions/        — invokable use-cases
             Jobs/           — ShouldQueue background work
             Services/       — external API wrappers
             WebhookHandlers/— per-event handlers (spec 017+)
+            Probes/         — value objects for probe results (Monitoring)
             Queries/        — read-side query classes
             Exceptions/
     Enums/                  — string-backed PHP enums (status, severity, …)
+    Events/                 — broadcast events (ActivityEventCreated, WorkflowRunUpserted, WebsiteCheckRecorded)
     Http/Controllers/
+    Http/Controllers/Monitoring/
     Http/Controllers/Webhooks/
     Models/
+    Policies/               — Gate policies (Project, Repository, Website)
 resources/js/
-    Pages/                  — Inertia page components (Overview, Projects, Repositories, WorkItems, Settings)
-    Components/             — shared UI (Sidebar, StatusBadge, ActivityFeed once spec 018 lands)
+    Pages/                  — Inertia page components
+        Activity/
+        Deployments/        — cross-repo timeline + drawer (spec 021)
+        Monitoring/Websites/— monitor CRUD + show (specs 023–025)
+        Projects/
+        Repositories/
+        WorkItems/
+        Overview.vue · Settings/Index.vue · Welcome.vue
+    Components/
+        Activity/           — ActivityFeed, ActivityFeedItem, ActivityHeatmap
+        Dashboard/          — KpiCard, Sparkline, StatusBadge
+        Sidebar/
+    lib/
+        useActivityFeed.ts  — Echo composable for the right rail (spec 019)
+        workflowRunStyles.ts — shared tone/label maps for workflow runs
+        websiteStyles.ts    — shared tone maps for website status
     Layouts/AppLayout.vue   — primary chrome (sidebar + topbar + right rail)
 specs/
     README.md               — phase tracker + per-spec links
