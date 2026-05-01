@@ -1,7 +1,7 @@
 ---
 spec: hosts-and-agent-tokens
 phase: 6
-status: in-progress
+status: done
 owner: Yoany
 created: 2026-05-01
 updated: 2026-05-01

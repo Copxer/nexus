@@ -41,7 +41,7 @@ Status legend: ⬜ not started · 🟡 in progress · 🟢 done · 🔴 blocked
 | 3 | GitHub Webhooks & Activity Feed | 🟢 | 3/3 specs done (017–019). Phase complete. |
 | 4 | Deployments & CI/CD | 🟢 | 3/3 specs done (020–022). Phase complete. |
 | 5 | Website Monitoring | 🟢 | 3/3 specs done (023–025). Phase complete. |
-| 6 | Docker Host Agent MVP | 🟡 | 0/4 specs done (026–029). Folder + spec 026 drafted. |
+| 6 | Docker Host Agent MVP | 🟡 | 1/4 specs done (026–029). 026 shipped. |
 | 7 | Alerts Engine | ⬜ | — |
 | 8 | Analytics & Health Scores | ⬜ | — |
 | 9 | Polish & Production Readiness | ⬜ | — |
