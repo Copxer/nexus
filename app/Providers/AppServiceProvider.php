@@ -40,6 +40,13 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Host::class, HostPolicy::class);
         Gate::policy(AgentToken::class, AgentTokenPolicy::class);
 
+        // Per-token rate limiting on `/agent/telemetry` lives inside
+        // `AuthenticateAgent` middleware (spec 027). Keeping it there
+        // — rather than as a Laravel `throttle:` named limiter — lets
+        // the limit fire after token resolution, which a named limiter
+        // can't do because Laravel's default middleware priority runs
+        // ThrottleRequests before unlisted custom middleware.
+
         // Force https URL generation when APP_URL is https. Required for
         // Cloudflare/ngrok tunnels: TLS terminates at the tunnel and
         // `php artisan serve` only sees plain HTTP locally, so without

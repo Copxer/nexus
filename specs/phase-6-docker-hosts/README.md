@@ -10,7 +10,7 @@ Stand up Docker host + container monitoring end-to-end via a pull-from-agent mod
 | # | Task | Status |
 |---|------|--------|
 | 026 | Hosts + agent tokens scaffolding (CRUD + token rotation) | 🟢 |
-| 027 | Telemetry ingestion endpoint + reference agent script | ⬜ |
+| 027 | Telemetry ingestion endpoint + reference agent script | 🟢 |
 | 028 | Hosts UI (index + show + project Hosts tab) | ⬜ |
 | 029 | Host offline detection + activity events + Overview KPI wiring | ⬜ |
 
