@@ -50,13 +50,22 @@ const nav: NavItem[] = [
     { label: 'Settings', icon: SettingsIcon, routeName: 'settings.index' },
 ];
 
-// Match the route exactly OR any sibling under the same resource family
-// (so `/projects/foo` keeps the Projects nav lit). For non-resourceful
-// routes like `overview` the wildcard match harmlessly returns false.
+// Match the route exactly OR any sibling under the same resource family.
+//
+// "Family" = the route name minus its action segment. For
+// `projects.index` that's `projects.*`. For nested resources like
+// `monitoring.hosts.index` it's `monitoring.hosts.*` — important so
+// the Hosts and Monitoring sidebar entries don't both light up at the
+// same time (they'd collide on a naive `monitoring.*` prefix).
+//
+// Single-segment routes like `overview` only match exactly; the
+// `*` fallback returns false harmlessly.
 const isActive = (item: NavItem): boolean => {
     if (!item.routeName) return false;
     if (route().current(item.routeName)) return true;
-    const family = item.routeName.split('.')[0];
+    const segments = item.routeName.split('.');
+    if (segments.length < 2) return false;
+    const family = segments.slice(0, -1).join('.');
     return route().current(`${family}.*`);
 };
 
