@@ -5,7 +5,6 @@ import SidebarSystemStatus from '@/Components/Sidebar/SidebarSystemStatus.vue';
 import SidebarUserCard from '@/Components/Sidebar/SidebarUserCard.vue';
 import { Link } from '@inertiajs/vue3';
 import {
-    Activity,
     BarChart3,
     Bell,
     FolderKanban,
@@ -30,19 +29,20 @@ interface NavItem {
     soonLabel?: string;
 }
 
-// Order locked to roadmap §7.6 (with Activity inserted between Alerts and
-// Settings as the 12th slot — spec 018). Only Overview, Projects,
-// Repositories, Issues & PRs, Activity, and Settings are wired this phase;
-// the rest carry a "Soon" pill until their owning spec lands. The phase
-// pill text helps readers see which spec will activate each item.
+// Order follows roadmap §7.6 with two practical adjustments:
+// (1) Activity sits between Alerts and Settings (spec 018).
+// (2) The roadmap's separate "Pipelines" entry was folded into
+//     Deployments — GitHub workflow runs are both — so we ship one
+//     entry rather than maintain two views of the same data.
+// Disabled entries carry a "Soon" pill labelled with the phase that
+// activates them.
 const nav: NavItem[] = [
     { label: 'Overview', icon: LayoutDashboard, routeName: 'overview' },
     { label: 'Projects', icon: FolderKanban, routeName: 'projects.index' },
     { label: 'Repositories', icon: GitBranch, routeName: 'repositories.index' },
     { label: 'Issues & PRs', icon: GitPullRequest, routeName: 'work-items.index' },
-    { label: 'Pipelines', icon: Activity, disabled: true, soonLabel: 'Phase 4' },
     { label: 'Deployments', icon: Rocket, routeName: 'deployments.index' },
-    { label: 'Hosts', icon: Server, disabled: true, soonLabel: 'Phase 6' },
+    { label: 'Hosts', icon: Server, routeName: 'monitoring.hosts.index' },
     { label: 'Monitoring', icon: Globe, routeName: 'monitoring.websites.index' },
     { label: 'Analytics', icon: BarChart3, disabled: true, soonLabel: 'Phase 8' },
     { label: 'Alerts', icon: Bell, disabled: true, soonLabel: 'Phase 7' },
@@ -50,13 +50,22 @@ const nav: NavItem[] = [
     { label: 'Settings', icon: SettingsIcon, routeName: 'settings.index' },
 ];
 
-// Match the route exactly OR any sibling under the same resource family
-// (so `/projects/foo` keeps the Projects nav lit). For non-resourceful
-// routes like `overview` the wildcard match harmlessly returns false.
+// Match the route exactly OR any sibling under the same resource family.
+//
+// "Family" = the route name minus its action segment. For
+// `projects.index` that's `projects.*`. For nested resources like
+// `monitoring.hosts.index` it's `monitoring.hosts.*` — important so
+// the Hosts and Monitoring sidebar entries don't both light up at the
+// same time (they'd collide on a naive `monitoring.*` prefix).
+//
+// Single-segment routes like `overview` only match exactly; the
+// `*` fallback returns false harmlessly.
 const isActive = (item: NavItem): boolean => {
     if (!item.routeName) return false;
     if (route().current(item.routeName)) return true;
-    const family = item.routeName.split('.')[0];
+    const segments = item.routeName.split('.');
+    if (segments.length < 2) return false;
+    const family = segments.slice(0, -1).join('.');
     return route().current(`${family}.*`);
 };
 

@@ -12,6 +12,7 @@ import {
     runStatusDotClass,
     runStatusTone,
 } from '@/lib/workflowRunStyles';
+import { hostStatusTone } from '@/lib/hostStyles';
 import { websiteStatusTone as monitorStatusTone } from '@/lib/websiteStyles';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import type { ActivityEvent } from '@/types';
@@ -99,6 +100,24 @@ interface MonitorRow {
     last_checked_at: string | null;
 }
 
+interface HostRow {
+    id: number;
+    name: string;
+    slug: string;
+    provider: string | null;
+    connection_type: string | null;
+    status:
+        | 'pending'
+        | 'online'
+        | 'offline'
+        | 'degraded'
+        | 'archived'
+        | string
+        | null;
+    last_seen_at: string | null;
+    has_active_token: boolean;
+}
+
 const props = defineProps<{
     project: ProjectShape;
     canUpdate: boolean;
@@ -108,6 +127,7 @@ const props = defineProps<{
     projectActivity: ActivityEvent[];
     projectDeployments: DeploymentRow[];
     projectMonitors: MonitorRow[];
+    projectHosts: HostRow[];
 }>();
 
 const linkForm = useForm({
@@ -167,7 +187,7 @@ const tabs: { key: TabKey; label: string; icon: LucideIcon; pendingPhase: string
     { key: 'overview', label: 'Overview', icon: BarChart3, pendingPhase: null },
     { key: 'repositories', label: 'Repositories', icon: GitBranch, pendingPhase: null },
     { key: 'deployments', label: 'Deployments', icon: Rocket, pendingPhase: null },
-    { key: 'hosts', label: 'Hosts', icon: Server, pendingPhase: 'phase 6' },
+    { key: 'hosts', label: 'Hosts', icon: Server, pendingPhase: null },
     { key: 'monitoring', label: 'Monitoring', icon: Globe, pendingPhase: null },
     { key: 'activity', label: 'Activity', icon: Activity, pendingPhase: null },
     { key: 'settings', label: 'Settings', icon: Settings, pendingPhase: null },
@@ -907,7 +927,130 @@ const confirmDelete = () => {
                 </div>
             </section>
 
-            <!-- Phase-pending placeholder for hosts / monitoring tabs. -->
+            <!-- Hosts panel — Docker hosts under this project (specs 026 + 027). -->
+            <section
+                v-else-if="activeTab === 'hosts'"
+                aria-label="Hosts"
+                class="glass-card p-6 sm:p-8"
+            >
+                <header class="mb-4 flex items-center justify-between gap-3">
+                    <div class="flex flex-col gap-1">
+                        <h3 class="text-sm font-semibold text-text-primary">
+                            Project hosts
+                        </h3>
+                        <p class="text-xs text-text-muted">
+                            Docker hosts running the Nexus agent under
+                            this project. Up to 20 shown — full list at
+                            <span class="font-mono">/monitoring/hosts</span>.
+                        </p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <Link
+                            v-if="canUpdate"
+                            :href="
+                                route('monitoring.hosts.create', {
+                                    project_id: project.id,
+                                })
+                            "
+                            class="inline-flex items-center gap-1.5 rounded-md border border-accent-cyan/40 bg-accent-cyan/15 px-2.5 py-1.5 text-xs font-semibold text-accent-cyan transition hover:border-accent-cyan/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
+                        >
+                            <Plus class="h-3.5 w-3.5" aria-hidden="true" />
+                            Add host
+                        </Link>
+                        <Link
+                            :href="route('monitoring.hosts.index')"
+                            class="inline-flex items-center gap-1.5 rounded-md border border-border-subtle bg-background-panel-hover px-2.5 py-1.5 text-xs font-semibold text-text-secondary transition hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
+                        >
+                            Browse all
+                            <ArrowRight class="h-3.5 w-3.5" aria-hidden="true" />
+                        </Link>
+                    </div>
+                </header>
+
+                <ul
+                    v-if="projectHosts.length > 0"
+                    class="divide-y divide-border-subtle"
+                >
+                    <li
+                        v-for="host in projectHosts"
+                        :key="host.id"
+                        class="flex items-center gap-4 py-3"
+                    >
+                        <Server
+                            class="h-4 w-4 shrink-0 text-text-muted"
+                            aria-hidden="true"
+                        />
+                        <Link
+                            :href="route('monitoring.hosts.show', host.id)"
+                            class="flex min-w-0 flex-1 flex-col gap-1 transition hover:text-accent-cyan"
+                        >
+                            <span class="truncate text-sm font-semibold text-text-primary">
+                                {{ host.name }}
+                            </span>
+                            <p
+                                class="flex flex-wrap items-center gap-x-2 truncate text-xs text-text-muted"
+                            >
+                                <span
+                                    v-if="host.provider"
+                                    class="font-mono text-text-secondary"
+                                >
+                                    {{ host.provider }}
+                                </span>
+                                <span
+                                    v-if="host.connection_type"
+                                    class="font-mono uppercase"
+                                >
+                                    {{ host.connection_type }}
+                                </span>
+                                <span v-if="host.last_seen_at">
+                                    · Last seen {{ host.last_seen_at }}
+                                </span>
+                                <span
+                                    v-else
+                                    class="text-text-muted/70"
+                                >
+                                    · Awaiting first telemetry
+                                </span>
+                                <span
+                                    v-if="!host.has_active_token"
+                                    class="text-status-warning"
+                                >
+                                    · No active agent token
+                                </span>
+                            </p>
+                        </Link>
+                        <StatusBadge :tone="hostStatusTone(host.status)">
+                            {{ host.status }}
+                        </StatusBadge>
+                    </li>
+                </ul>
+
+                <div
+                    v-else
+                    class="flex flex-col items-center justify-center gap-3 px-6 py-12 text-center"
+                >
+                    <span
+                        class="flex h-12 w-12 items-center justify-center rounded-full border border-border-subtle bg-slate-950/60"
+                    >
+                        <Server
+                            class="h-5 w-5 text-text-muted"
+                            aria-hidden="true"
+                        />
+                    </span>
+                    <p class="text-sm font-medium text-text-secondary">
+                        No hosts yet
+                    </p>
+                    <p class="max-w-sm text-xs text-text-muted">
+                        Add a Docker host to start tracking container
+                        health, CPU, and memory under this project.
+                    </p>
+                </div>
+            </section>
+
+            <!-- Phase-pending placeholder for any tab still flagged as
+                 not-yet-shipped. With Hosts wired in this fix, no tab
+                 carries `pendingPhase` today; the block stays so future
+                 tabs (e.g. health-score in phase 8) can drop in cheaply. -->
             <section
                 v-else
                 :aria-label="`${activeTab} (coming soon)`"

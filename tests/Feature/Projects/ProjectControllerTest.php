@@ -3,6 +3,7 @@
 namespace Tests\Feature\Projects;
 
 use App\Models\ActivityEvent;
+use App\Models\Host;
 use App\Models\Project;
 use App\Models\Repository;
 use App\Models\User;
@@ -97,6 +98,7 @@ class ProjectControllerTest extends TestCase
                     ->has('projectActivity')
                     ->has('projectDeployments')
                     ->has('projectMonitors')
+                    ->has('projectHosts')
             );
     }
 
@@ -123,6 +125,33 @@ class ProjectControllerTest extends TestCase
                 fn (AssertableInertia $page) => $page
                     ->has('projectMonitors', 1)
                     ->where('projectMonitors.0.name', 'Project monitor')
+            );
+    }
+
+    public function test_show_scopes_hosts_to_this_project(): void
+    {
+        $user = $this->verifiedUser();
+        $project = Project::factory()->create(['owner_user_id' => $user->id]);
+        Host::factory()->create([
+            'project_id' => $project->id,
+            'name' => 'project-host-01',
+        ]);
+
+        // Sibling project's host must NOT leak.
+        $sibling = Project::factory()->create(['owner_user_id' => $user->id]);
+        Host::factory()->create([
+            'project_id' => $sibling->id,
+            'name' => 'sibling-host-01',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('projects.show', $project))
+            ->assertSuccessful()
+            ->assertInertia(
+                fn (AssertableInertia $page) => $page
+                    ->has('projectHosts', 1)
+                    ->where('projectHosts.0.name', 'project-host-01')
+                    ->where('projectHosts.0.has_active_token', false)
             );
     }
 
