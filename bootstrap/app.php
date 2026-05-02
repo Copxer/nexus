@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\AuthenticateAgent;
 use App\Http\Middleware\HandleInertiaRequests;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -19,13 +20,19 @@ return Application::configure(basePath: dirname(__DIR__))
             AddLinkHeadersForPreloadedAssets::class,
         ]);
 
-        // GitHub webhooks don't carry session cookies / CSRF tokens —
-        // they're authenticated via `X-Hub-Signature-256` (verified in
-        // GitHubWebhookController). Excluding here prevents Laravel from
-        // 419'ing the unauthenticated POST before our signature check
-        // runs.
+        // GitHub webhooks + the agent telemetry endpoint don't carry
+        // session cookies / CSRF tokens — they're authenticated via
+        // signed body (GitHub) or `Authorization: Bearer` (agent).
+        // Excluding here prevents Laravel from 419'ing the
+        // unauthenticated POST before our auth check runs.
         $middleware->preventRequestForgery(except: [
             'webhooks/github',
+            'agent/telemetry',
+        ]);
+
+        // Spec 027 — bearer-token auth for the agent telemetry endpoint.
+        $middleware->alias([
+            'agent.auth' => AuthenticateAgent::class,
         ]);
 
         // Trust loopback proxies. Required for cloudflared / ngrok dev

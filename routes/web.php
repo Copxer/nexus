@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ActivityController;
+use App\Http\Controllers\Agent\HostTelemetryController;
 use App\Http\Controllers\DeploymentController;
 use App\Http\Controllers\GithubConnectionController;
 use App\Http\Controllers\GithubRepositoryImportController;
@@ -117,6 +118,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
 // Spec 017 — GitHub webhooks (no auth/CSRF; signature-verified inside).
 Route::post('/webhooks/github', GitHubWebhookController::class)
     ->name('webhooks.github');
+
+// Spec 027 — agent telemetry ingestion. Bearer auth + per-token rate
+// limit are both handled inside `AuthenticateAgent` (alias `agent.auth`).
+Route::post('/agent/telemetry', HostTelemetryController::class)
+    ->middleware('agent.auth')
+    ->name('agent.telemetry');
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
