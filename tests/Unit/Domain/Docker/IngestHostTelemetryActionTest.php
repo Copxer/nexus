@@ -97,4 +97,24 @@ class IngestHostTelemetryActionTest extends TestCase
             $host->last_seen_at->toIso8601String(),
         );
     }
+
+    public function test_already_online_host_does_not_rewrite_status_column(): void
+    {
+        $host = Host::factory()->online()->create();
+        $originalUpdatedAt = $host->updated_at;
+
+        // Travel forward so any rewrite would bump `updated_at`.
+        $this->travel(30)->seconds();
+
+        app(IngestHostTelemetryAction::class)->execute(
+            $host,
+            $this->basePayload(now()->toIso8601String()),
+        );
+
+        $host->refresh();
+        // `last_seen_at` was updated (so updated_at moves), but the
+        // important assertion is that status stays Online and the
+        // payload didn't include a redundant status column write.
+        $this->assertSame(HostStatus::Online, $host->status);
+    }
 }

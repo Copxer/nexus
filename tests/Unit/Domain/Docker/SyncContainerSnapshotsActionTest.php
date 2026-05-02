@@ -98,4 +98,26 @@ class SyncContainerSnapshotsActionTest extends TestCase
         $container = Container::query()->firstOrFail();
         $this->assertNull($container->memory_percent);
     }
+
+    public function test_same_container_id_on_two_hosts_creates_two_distinct_rows(): void
+    {
+        $hostA = Host::factory()->create();
+        $hostB = Host::factory()->create();
+        $sync = app(SyncContainerSnapshotsAction::class);
+
+        // Both hosts run a container with the literal id 'abc'. The
+        // unique index on (host_id, container_id) means each gets its
+        // own row and snapshot — host A's data must not bleed into
+        // host B's.
+        $sync->execute($hostA, CarbonImmutable::now(), [
+            $this->payload('abc', ['name' => 'host-a-web']),
+        ]);
+        $sync->execute($hostB, CarbonImmutable::now(), [
+            $this->payload('abc', ['name' => 'host-b-web']),
+        ]);
+
+        $this->assertSame(2, Container::query()->count());
+        $this->assertSame('host-a-web', Container::query()->where('host_id', $hostA->id)->value('name'));
+        $this->assertSame('host-b-web', Container::query()->where('host_id', $hostB->id)->value('name'));
+    }
 }

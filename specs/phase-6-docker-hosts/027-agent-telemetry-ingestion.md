@@ -1,7 +1,7 @@
 ---
 spec: agent-telemetry-ingestion
 phase: 6
-status: in-progress
+status: done
 owner: Yoany
 created: 2026-05-01
 updated: 2026-05-01
@@ -148,32 +148,31 @@ Roadmap refs: §8.7 Docker Hosts, §16.5 Agent Security, §17 Observability for 
    - `tests/Unit/Domain/Docker/SyncContainerSnapshotsActionTest.php` — first call inserts container + 1 snapshot; second call updates container + appends a 2nd snapshot; missing container in payload doesn't drop existing rows.
 
 ## Acceptance criteria
-- [ ] `POST /agent/telemetry` with a valid bearer + payload returns `204` and persists host metadata + 1 host snapshot + N container snapshots.
-- [ ] Endpoint rejects: missing bearer (401), wrong-format bearer (401), revoked token (401), token belonging to an archived host (401), unknown token (401).
-- [ ] Token's `last_used_at` is stamped on each successful request.
-- [ ] First successful telemetry from a `pending` host flips status to `online` and stamps `last_seen_at`.
-- [ ] Per-token rate limit: 61st request inside 60 s returns `429` with `Retry-After`.
-- [ ] Payload outside the skew window (older than 1 h or further than 5 min in the future) is rejected with a 422.
-- [ ] Reference agent script + README live under `agent/`. Manual smoke: pointing `NEXUS_URL` at `composer run dev` + a real token causes telemetry rows to appear within one interval.
-- [ ] Pint clean, tests green (target +12 to +18 new tests), `npm run build` clean.
+- [x] `POST /agent/telemetry` with a valid bearer + payload returns `204` and persists host metadata + 1 host snapshot + N container snapshots.
+- [x] Endpoint rejects: missing bearer (401), wrong-format bearer (401), revoked token (401), token belonging to an archived host (401), unknown token (401).
+- [x] Token's `last_used_at` is stamped on each successful request.
+- [x] First successful telemetry from a `pending` host flips status to `online` and stamps `last_seen_at`.
+- [x] Per-token rate limit: 61st request inside 60 s returns `429` with `Retry-After`.
+- [x] Payload outside the skew window (older than 1 h or further than 5 min in the future) is rejected with a 422.
+- [x] Reference agent script + README live under `agent/`. Manual smoke: pointing `NEXUS_URL` at `composer run dev` + a real token causes telemetry rows to appear within one interval.
+- [x] Pint clean, tests green (26 new), `npm run build` clean.
 
 ## Files touched
-Fill in as work progresses.
 
-- `app/Http/Middleware/AuthenticateAgent.php` — new
+- `app/Http/Middleware/AuthenticateAgent.php` — new (auth + per-token rate limit)
 - `bootstrap/app.php` — register `agent.auth` alias + CSRF exclusion for `/agent/telemetry`
 - `app/Http/Controllers/Agent/HostTelemetryController.php` — new
 - `app/Http/Requests/Agent/IngestTelemetryRequest.php` — new
 - `app/Domain/Docker/Actions/IngestHostTelemetryAction.php` — new
 - `app/Domain/Docker/Actions/SyncContainerSnapshotsAction.php` — new
-- `app/Providers/AppServiceProvider.php` — `RateLimiter::for('agent-telemetry', ...)`
-- `routes/web.php` — `/agent/telemetry` route
+- `app/Providers/AppServiceProvider.php` — comment-only stub (rate limiting moved into middleware; see Work log)
+- `routes/web.php` — `/agent/telemetry` route + `withoutMiddleware` to strip session/cookie/Inertia chain
 - `agent/reference-agent.mjs` — new
 - `agent/README.md` — new
-- `tests/Feature/Agent/AuthenticateAgentMiddlewareTest.php` — new
-- `tests/Feature/Agent/HostTelemetryControllerTest.php` — new
-- `tests/Unit/Domain/Docker/IngestHostTelemetryActionTest.php` — new
-- `tests/Unit/Domain/Docker/SyncContainerSnapshotsActionTest.php` — new
+- `tests/Feature/Agent/AuthenticateAgentMiddlewareTest.php` — new (7 cases)
+- `tests/Feature/Agent/HostTelemetryControllerTest.php` — new (10 cases)
+- `tests/Unit/Domain/Docker/IngestHostTelemetryActionTest.php` — new (5 cases)
+- `tests/Unit/Domain/Docker/SyncContainerSnapshotsActionTest.php` — new (5 cases)
 
 ## Work log
 

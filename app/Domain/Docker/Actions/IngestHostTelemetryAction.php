@@ -68,7 +68,14 @@ class IngestHostTelemetryAction
             }
         }
 
-        if ($host->status !== HostStatus::Archived) {
+        // Only write `status` when it actually changes — every healthy
+        // tick would otherwise issue a no-op `UPDATE` (50 hosts × 30 s
+        // = 144k pointless writes per day) and fire any observers.
+        // Archived hosts stay archived; the middleware already blocks
+        // their tokens but defence in depth is cheap.
+        if ($host->status !== HostStatus::Archived
+            && $host->status !== HostStatus::Online
+        ) {
             $payload['status'] = HostStatus::Online->value;
         }
 

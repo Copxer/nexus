@@ -155,6 +155,47 @@ class HostTelemetryControllerTest extends TestCase
             ->assertJsonValidationErrors('recorded_at');
     }
 
+    public function test_validation_rejects_non_string_recorded_at(): void
+    {
+        // `0` could squeak past `date` in older Laravel versions and
+        // get parsed as the unix epoch, which would then bypass the
+        // skew window in a surprising way. Lock the contract: integer
+        // / boolean / array values for `recorded_at` are 422.
+        [, $plaintext] = $this->issuedToken();
+
+        foreach ([0, false, []] as $bad) {
+            $payload = $this->fullPayload();
+            $payload['recorded_at'] = $bad;
+
+            $this->postJson(
+                route('agent.telemetry'),
+                $payload,
+                ['Authorization' => 'Bearer '.$plaintext],
+            )->assertStatus(422);
+        }
+
+        $this->assertSame(0, HostMetricSnapshot::query()->count());
+    }
+
+    public function test_session_middleware_does_not_run_for_agent_requests(): void
+    {
+        // 50 hosts × 30 s heartbeat would otherwise spawn 144k orphan
+        // session rows per day. Verify by asserting no Set-Cookie
+        // header (StartSession would emit one) and no XSRF / session
+        // cookie names appear in the response cookie jar.
+        [, $plaintext] = $this->issuedToken();
+
+        $response = $this->postJson(
+            route('agent.telemetry'),
+            $this->fullPayload(),
+            ['Authorization' => 'Bearer '.$plaintext],
+        )->assertNoContent();
+
+        foreach ($response->headers->getCookies() as $cookie) {
+            $this->fail('agent endpoint set unexpected cookie: '.$cookie->getName());
+        }
+    }
+
     public function test_rate_limit_returns_429_with_retry_after(): void
     {
         [, $plaintext] = $this->issuedToken();

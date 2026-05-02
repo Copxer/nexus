@@ -20,7 +20,14 @@ use App\Http\Controllers\RepositoryWorkflowRunsSyncController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\Webhooks\GitHubWebhookController;
 use App\Http\Controllers\WorkItemController;
+use App\Http\Middleware\HandleInertiaRequests;
+use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
+use Illuminate\Cookie\Middleware\EncryptCookies;
+use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
+use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
+use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Route;
+use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Inertia\Inertia;
 
 Route::get('/', function () {
@@ -121,8 +128,28 @@ Route::post('/webhooks/github', GitHubWebhookController::class)
 
 // Spec 027 — agent telemetry ingestion. Bearer auth + per-token rate
 // limit are both handled inside `AuthenticateAgent` (alias `agent.auth`).
+//
+// `withoutMiddleware` strips the session/cookie/Inertia stack from the
+// `web` group: agents are non-browser JSON clients, so we don't want
+// every 30-second heartbeat from every host to spawn an orphan session
+// row, set a Set-Cookie header, or run Inertia's prop-sharing closures.
+// CSRF is already excluded for this path in bootstrap/app.php.
 Route::post('/agent/telemetry', HostTelemetryController::class)
     ->middleware('agent.auth')
+    ->withoutMiddleware([
+        EncryptCookies::class,
+        AddQueuedCookiesToResponse::class,
+        StartSession::class,
+        ShareErrorsFromSession::class,
+        HandleInertiaRequests::class,
+        AddLinkHeadersForPreloadedAssets::class,
+        // Skip the CSRF middleware too — the path is already in the
+        // except list (`bootstrap/app.php`), but the middleware still
+        // refreshes the XSRF cookie at response time, which calls
+        // `$request->session()` and explodes when StartSession isn't
+        // running.
+        PreventRequestForgery::class,
+    ])
     ->name('agent.telemetry');
 
 Route::middleware('auth')->group(function () {
