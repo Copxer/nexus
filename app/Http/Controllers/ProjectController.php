@@ -8,6 +8,7 @@ use App\Enums\ProjectPriority;
 use App\Enums\ProjectStatus;
 use App\Http\Requests\Projects\StoreProjectRequest;
 use App\Http\Requests\Projects\UpdateProjectRequest;
+use App\Models\Host;
 use App\Models\Project;
 use App\Models\Website;
 use App\Support\ProjectPalette;
@@ -110,6 +111,27 @@ class ProjectController extends Controller
             ])
             ->all();
 
+        // Per-project Hosts tab (spec 026 + 027) — Docker hosts
+        // registered under this project. Same 20-row cap pattern as the
+        // monitors list; the wider view lives at `/monitoring/hosts`.
+        $projectHosts = Host::query()
+            ->where('project_id', $project->id)
+            ->orderBy('name')
+            ->with('activeAgentToken')
+            ->limit(20)
+            ->get()
+            ->map(fn (Host $host) => [
+                'id' => $host->id,
+                'name' => $host->name,
+                'slug' => $host->slug,
+                'provider' => $host->provider,
+                'connection_type' => $host->connection_type?->value,
+                'status' => $host->status?->value,
+                'last_seen_at' => $host->last_seen_at?->diffForHumans(),
+                'has_active_token' => $host->activeAgentToken !== null,
+            ])
+            ->all();
+
         return Inertia::render('Projects/Show', [
             'project' => $this->transform($project),
             'canUpdate' => $request->user()?->can('update', $project) ?? false,
@@ -132,6 +154,7 @@ class ProjectController extends Controller
             'projectActivity' => $projectActivity,
             'projectDeployments' => $projectDeployments,
             'projectMonitors' => $projectMonitors,
+            'projectHosts' => $projectHosts,
         ]);
     }
 
