@@ -93,3 +93,20 @@ write_env VITE_REVERB_PORT         "443"
 write_env SESSION_DOMAIN           ""
 write_env SANCTUM_STATEFUL_DOMAINS "${LARAVEL_HOST},localhost,127.0.0.1"
 ok ".env updated"
+
+clear
+info "running php artisan optimize…"
+php artisan optimize
+
+cat <<EOF
+
+$(printf '\033[33m⚠ Reminder:\033[0m update your GitHub App OAuth callback URL to:')
+    ${LARAVEL_URL}/integrations/github/callback
+
+GitHub App settings: https://github.com/settings/developers (or your GitHub App
+settings page if you registered as a GitHub App rather than an OAuth App).
+
+EOF
+
+info "handing off to composer run dev — Ctrl+C to stop everything"
+composer run dev
