@@ -71,9 +71,12 @@ ok "Reverb   → $REVERB_URL"
 write_env() {
   local key=$1 val=$2
   if grep -qE "^${key}=" .env; then
-    # Use | as sed delimiter since URLs contain /
+    # Delimiter is | (URLs contain /). Safe from sed-injection because val is
+    # regex-constrained by wait_for_url — no |, &, \ possible.
     sed -i '' "s|^${key}=.*|${key}=${val}|" .env
   else
+    # Guarantee a trailing newline so the append can't merge onto the last line.
+    [[ -s .env && -z $(tail -c1 .env) ]] || printf '\n' >> .env
     printf '%s=%s\n' "$key" "$val" >> .env
   fi
 }
