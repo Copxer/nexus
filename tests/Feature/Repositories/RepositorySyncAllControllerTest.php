@@ -44,11 +44,17 @@ class RepositorySyncAllControllerTest extends TestCase
         $user = $this->verifiedUser();
         $otherUser = $this->verifiedUser();
         $otherProject = Project::factory()->create(['owner_user_id' => $otherUser->id]);
-        Repository::factory()->create(['project_id' => $otherProject->id]);
+        $otherRepository = Repository::factory()->create([
+            'project_id' => $otherProject->id,
+            'sync_status' => 'pending',
+        ]);
 
         $this->actingAs($user)->post(route('repositories.sync-all'));
 
         Queue::assertNotPushed(SyncGitHubRepositoryJob::class);
+        // The bulk status update is keyed to the user's own repos —
+        // a sibling's row must be left exactly as it was.
+        $this->assertSame('pending', $otherRepository->fresh()->sync_status->value);
     }
 
     public function test_it_flips_sync_status_to_syncing_and_clears_errors(): void

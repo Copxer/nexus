@@ -48,7 +48,11 @@ const applyFilter = () => {
     router.get(
         route('monitoring.websites.index'),
         statusFilter.value ? { status: statusFilter.value } : {},
-        { preserveScroll: true, preserveState: true },
+        {
+            preserveScroll: true,
+            preserveState: true,
+            only: ['websites', 'filters', 'filterOptions'],
+        },
     );
 };
 
