@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Monitoring;
 
 use App\Domain\Monitoring\Queries\GetWebsitePerformanceSummaryQuery;
+use App\Enums\WebsiteStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Monitoring\StoreWebsiteRequest;
 use App\Http\Requests\Monitoring\UpdateWebsiteRequest;
@@ -30,15 +31,30 @@ class WebsiteController extends Controller
 
         $user = $request->user();
 
+        // Status lives in the query string so a filtered view is
+        // shareable and survives reload — same shape as the Deployments
+        // timeline filters. Validated against the enum so a new
+        // WebsiteStatus case is the only edit a future filter needs.
+        $statusValues = array_map(fn (WebsiteStatus $status) => $status->value, WebsiteStatus::cases());
+
+        $validated = $request->validate([
+            'status' => 'sometimes|nullable|in:'.implode(',', $statusValues),
+        ]);
+
+        $status = $validated['status'] ?? null;
+
         $websites = Website::query()
             ->with('project:id,slug,name,color,icon,owner_user_id')
             ->whereHas('project', fn ($q) => $q->where('owner_user_id', $user->id))
+            ->when($status, fn ($q) => $q->where('status', $status))
             ->orderBy('name')
             ->get()
             ->map(fn (Website $website) => $this->transform($website));
 
         return Inertia::render('Monitoring/Websites/Index', [
             'websites' => $websites,
+            'filters' => ['status' => $status],
+            'filterOptions' => ['statuses' => $statusValues],
         ]);
     }
 

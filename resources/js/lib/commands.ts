@@ -110,8 +110,10 @@ export function getCommands(): Command[] {
             label: 'Go to Pipelines',
             group: 'navigation',
             icon: Activity,
+            // Pipelines is a planned nav view (roadmap §7.6/§8.6) with
+            // no assigned phase yet — stays inert like Analytics/Alerts.
             disabled: true,
-            soonLabel: 'Phase 4',
+            soonLabel: 'Planned',
         },
         {
             id: 'go-deployments',
@@ -126,8 +128,8 @@ export function getCommands(): Command[] {
             label: 'Go to Hosts',
             group: 'navigation',
             icon: Server,
-            disabled: true,
-            soonLabel: 'Phase 6',
+            keywords: ['docker', 'agents', 'servers', 'containers'],
+            run: () => router.visit(route('monitoring.hosts.index')),
         },
         {
             id: 'go-monitoring',
@@ -192,24 +194,26 @@ export function getCommands(): Command[] {
             label: 'Run sync',
             group: 'actions',
             icon: RefreshCw,
-            disabled: true,
-            soonLabel: 'Phase 2',
+            keywords: ['sync', 'refresh', 'github', 'repositories'],
+            run: () => router.post(route('repositories.sync-all')),
         },
         {
             id: 'view-failed-deployments',
             label: 'View failed deployments',
             group: 'actions',
             icon: Flame,
-            disabled: true,
-            soonLabel: 'Phase 4',
+            keywords: ['failed', 'deployments', 'broken', 'ci'],
+            run: () =>
+                router.visit(route('deployments.index', { conclusion: 'failure' })),
         },
         {
             id: 'view-slow-websites',
             label: 'View slow websites',
             group: 'actions',
             icon: Globe2,
-            disabled: true,
-            soonLabel: 'Phase 5',
+            keywords: ['slow', 'websites', 'monitoring', 'performance'],
+            run: () =>
+                router.visit(route('monitoring.websites.index', { status: 'slow' })),
         },
 
         // ────── System ────── //

@@ -15,6 +15,7 @@ use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\RepositoryController;
 use App\Http\Controllers\RepositoryIssuesSyncController;
 use App\Http\Controllers\RepositoryPullRequestsSyncController;
+use App\Http\Controllers\RepositorySyncAllController;
 use App\Http\Controllers\RepositorySyncController;
 use App\Http\Controllers\RepositoryWorkflowRunsSyncController;
 use App\Http\Controllers\SettingsController;
@@ -87,6 +88,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/repositories/{repository}/workflow-runs/sync', RepositoryWorkflowRunsSyncController::class)
         ->where('repository', '[\w.-]+/[\w.-]+')
         ->name('repositories.workflow-runs.sync');
+
+    // Global "Run sync" — the Cmd+K command-palette action. Bulk sibling
+    // of the per-repo sync above; re-syncs every repo under the user's
+    // projects. Literal path, so it never collides with the slash-keyed
+    // `{repository}` routes.
+    Route::post('/repositories/sync-all', RepositorySyncAllController::class)
+        ->name('repositories.sync-all');
 
     // Spec 016 — unified Work Items queue (issues + PRs).
     Route::get('/work-items', WorkItemController::class)->name('work-items.index');
