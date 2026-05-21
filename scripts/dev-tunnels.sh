@@ -94,17 +94,21 @@ write_env SESSION_DOMAIN           ""
 write_env SANCTUM_STATEFUL_DOMAINS "${LARAVEL_HOST},localhost,127.0.0.1"
 ok ".env updated"
 
-clear
+clear || true
 info "running php artisan optimize…"
 php artisan optimize
 
+warn "Reminder: update your GitHub App OAuth callback URL to:"
 cat <<EOF
-
-$(printf '\033[33m⚠ Reminder:\033[0m update your GitHub App OAuth callback URL to:')
     ${LARAVEL_URL}/integrations/github/callback
 
 GitHub App settings: https://github.com/settings/developers (or your GitHub App
 settings page if you registered as a GitHub App rather than an OAuth App).
+
+Tunnels (also written to .env):
+    Laravel  ${LARAVEL_URL}
+    Vite     ${VITE_URL}
+    Reverb   ${REVERB_URL}
 
 EOF
 
