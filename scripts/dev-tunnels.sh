@@ -67,3 +67,26 @@ VITE_URL=$(wait_for_url "$VITE_LOG") || die "Vite tunnel timed out — see $VITE
 ok "Vite     → $VITE_URL"
 REVERB_URL=$(wait_for_url "$REVERB_LOG") || die "Reverb tunnel timed out — see $REVERB_LOG"
 ok "Reverb   → $REVERB_URL"
+
+write_env() {
+  local key=$1 val=$2
+  if grep -qE "^${key}=" .env; then
+    # Use | as sed delimiter since URLs contain /
+    sed -i '' "s|^${key}=.*|${key}=${val}|" .env
+  else
+    printf '%s=%s\n' "$key" "$val" >> .env
+  fi
+}
+
+LARAVEL_HOST="${LARAVEL_URL#https://}"
+REVERB_HOST="${REVERB_URL#https://}"
+
+info "rewriting .env…"
+write_env APP_URL                  "$LARAVEL_URL"
+write_env VITE_DEV_SERVER_URL      "$VITE_URL"
+write_env VITE_REVERB_HOST         "$REVERB_HOST"
+write_env VITE_REVERB_SCHEME       "https"
+write_env VITE_REVERB_PORT         "443"
+write_env SESSION_DOMAIN           ""
+write_env SANCTUM_STATEFUL_DOMAINS "${LARAVEL_HOST},localhost,127.0.0.1"
+ok ".env updated"
