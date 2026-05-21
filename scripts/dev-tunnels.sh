@@ -24,10 +24,11 @@ preflight() {
 preflight
 
 TUNNEL_PIDS=()
-LOG_DIR=$(mktemp -d -t nexus-tunnels.XXXXXX)
+LOG_DIR=$(mktemp -d -t nexus-tunnels)
 info "tunnel logs: $LOG_DIR"
 
 cleanup() {
+  # Tunnel logs in $LOG_DIR are intentionally left for postmortem on timeout.
   if ((${#TUNNEL_PIDS[@]})); then
     kill "${TUNNEL_PIDS[@]}" 2>/dev/null || true
     wait 2>/dev/null || true
