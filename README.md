@@ -127,6 +127,12 @@ Spec 017's webhook ingestion needs GitHub to be able to reach your dev server. P
 
 ### Browsing the dev UI through a Cloudflare tunnel
 
+> **Shortcut:** `./scripts/dev-tunnels.sh` does all of the steps below in one
+> command — boots 3 cloudflared tunnels, rewrites `.env` (incl. `SESSION_DOMAIN`
+> and `SANCTUM_STATEFUL_DOMAINS`), runs `php artisan optimize`, then hands off to
+> `composer run dev`. Tunnels are killed on Ctrl+C; `.env` keeps the tunnel URLs.
+> Read on if you want to understand what it does, or you need named tunnels.
+
 Sometimes you want to browse the running app from a public URL — to demo the dashboard, hit it from another device, or run an OAuth callback that GitHub can reach. `composer run dev` boots two long-running HTTP servers — Laravel on `:8000` and Vite on `:5173` — and the browser needs to talk to **both**. Tunneling only port 8000 will load the HTML but every Vite asset (`@vite/client`, `app.ts`, …) will 404 / CORS-fail because the page tries to fetch them from `localhost:5173`.
 
 Set up two cloudflared tunnels and point Vite at its public URL:
