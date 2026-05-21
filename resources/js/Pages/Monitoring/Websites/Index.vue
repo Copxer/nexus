@@ -2,8 +2,9 @@
 import StatusBadge from '@/Components/Dashboard/StatusBadge.vue';
 import { websiteStatusTone as statusTone } from '@/lib/websiteStyles';
 import AppLayout from '@/Layouts/AppLayout.vue';
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, router } from '@inertiajs/vue3';
 import { ExternalLink, Globe, Plus } from 'lucide-vue-next';
+import { ref } from 'vue';
 
 interface ProjectChip {
     id: number;
@@ -30,12 +31,38 @@ interface WebsiteRow {
     project: ProjectChip | null;
 }
 
-defineProps<{
+const props = defineProps<{
     websites: WebsiteRow[];
+    filters: { status: string | null };
+    filterOptions: { statuses: string[] };
 }>();
 
 // `statusTone` re-exported from `@/lib/websiteStyles` above so the
 // four consumers stay in sync when the WebsiteStatus enum grows.
+
+const statusFilter = ref<string | null>(props.filters.status);
+
+// Status lives in the query string so a filtered view is shareable and
+// survives reload — same pattern as the Deployments timeline filters.
+const applyFilter = () => {
+    router.get(
+        route('monitoring.websites.index'),
+        statusFilter.value ? { status: statusFilter.value } : {},
+        {
+            preserveScroll: true,
+            preserveState: true,
+            only: ['websites', 'filters', 'filterOptions'],
+        },
+    );
+};
+
+const clearFilter = () => {
+    statusFilter.value = null;
+    applyFilter();
+};
+
+const statusLabel = (status: string) =>
+    status.charAt(0).toUpperCase() + status.slice(1);
 
 const projectAccentClass = (color: string | null) =>
     (
@@ -79,17 +106,43 @@ const projectAccentClass = (color: string | null) =>
                         every probe.
                     </p>
                 </div>
-                <Link
-                    :href="route('monitoring.websites.create')"
-                    class="inline-flex items-center gap-2 rounded-lg border border-accent-cyan/40 bg-accent-cyan/15 px-3 py-2 text-sm font-semibold text-accent-cyan transition hover:border-accent-cyan/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
-                >
-                    <Plus class="h-4 w-4" aria-hidden="true" />
-                    Add monitor
-                </Link>
+                <div class="flex items-end gap-3">
+                    <label
+                        v-if="websites.length > 0 || statusFilter"
+                        class="flex flex-col gap-1 text-xs"
+                    >
+                        <span
+                            class="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted"
+                        >
+                            Status
+                        </span>
+                        <select
+                            v-model="statusFilter"
+                            class="min-w-[120px] rounded-md border border-border-subtle bg-background-panel-hover px-2 py-1.5 text-sm text-text-primary focus:border-accent-cyan/60 focus:outline-none"
+                            @change="applyFilter"
+                        >
+                            <option :value="null">Any status</option>
+                            <option
+                                v-for="status in filterOptions.statuses"
+                                :key="status"
+                                :value="status"
+                            >
+                                {{ statusLabel(status) }}
+                            </option>
+                        </select>
+                    </label>
+                    <Link
+                        :href="route('monitoring.websites.create')"
+                        class="inline-flex items-center gap-2 rounded-lg border border-accent-cyan/40 bg-accent-cyan/15 px-3 py-2 text-sm font-semibold text-accent-cyan transition hover:border-accent-cyan/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
+                    >
+                        <Plus class="h-4 w-4" aria-hidden="true" />
+                        Add monitor
+                    </Link>
+                </div>
             </header>
 
             <div
-                v-if="websites.length === 0"
+                v-if="websites.length === 0 && !statusFilter"
                 class="glass-card flex flex-col items-center justify-center gap-3 px-6 py-16 text-center"
             >
                 <span
@@ -109,6 +162,30 @@ const projectAccentClass = (color: string | null) =>
                     use the manual "Probe now" button on the detail
                     page.
                 </p>
+            </div>
+
+            <div
+                v-else-if="websites.length === 0"
+                class="glass-card flex flex-col items-center justify-center gap-3 px-6 py-16 text-center"
+            >
+                <span
+                    class="flex h-12 w-12 items-center justify-center rounded-full border border-border-subtle bg-slate-950/60"
+                >
+                    <Globe
+                        class="h-5 w-5 text-text-muted"
+                        aria-hidden="true"
+                    />
+                </span>
+                <p class="text-sm font-medium text-text-secondary">
+                    No monitors match this filter
+                </p>
+                <button
+                    type="button"
+                    class="text-xs font-semibold text-accent-cyan transition hover:text-accent-cyan/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
+                    @click="clearFilter"
+                >
+                    Clear filter
+                </button>
             </div>
 
             <ul v-else class="flex flex-col gap-2">

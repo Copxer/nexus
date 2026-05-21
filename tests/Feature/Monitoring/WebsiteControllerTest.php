@@ -44,6 +44,59 @@ class WebsiteControllerTest extends TestCase
             );
     }
 
+    public function test_index_filters_by_status(): void
+    {
+        $user = $this->verifiedUser();
+        $project = Project::factory()->create(['owner_user_id' => $user->id]);
+        Website::factory()->create([
+            'project_id' => $project->id,
+            'name' => 'Slow site',
+            'status' => 'slow',
+        ]);
+        Website::factory()->create([
+            'project_id' => $project->id,
+            'name' => 'Healthy site',
+            'status' => 'up',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('monitoring.websites.index', ['status' => 'slow']))
+            ->assertSuccessful()
+            ->assertInertia(
+                fn (AssertableInertia $page) => $page
+                    ->component('Monitoring/Websites/Index')
+                    ->has('websites', 1)
+                    ->where('websites.0.name', 'Slow site')
+                    ->where('filters.status', 'slow')
+                    ->has('filterOptions.statuses', 5)
+            );
+    }
+
+    public function test_index_without_a_status_filter_lists_every_website(): void
+    {
+        $user = $this->verifiedUser();
+        $project = Project::factory()->create(['owner_user_id' => $user->id]);
+        Website::factory()->count(3)->create(['project_id' => $project->id]);
+
+        $this->actingAs($user)
+            ->get(route('monitoring.websites.index'))
+            ->assertSuccessful()
+            ->assertInertia(
+                fn (AssertableInertia $page) => $page
+                    ->has('websites', 3)
+                    ->where('filters.status', null)
+            );
+    }
+
+    public function test_index_rejects_an_unknown_status_filter(): void
+    {
+        $user = $this->verifiedUser();
+
+        $this->actingAs($user)
+            ->get(route('monitoring.websites.index', ['status' => 'bogus']))
+            ->assertSessionHasErrors('status');
+    }
+
     public function test_create_form_renders_with_owned_projects(): void
     {
         $user = $this->verifiedUser();
