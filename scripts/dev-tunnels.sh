@@ -28,10 +28,10 @@ LOG_DIR=$(mktemp -d -t nexus-tunnels)
 info "tunnel logs: $LOG_DIR"
 
 cleanup() {
-  # Tunnel logs in $LOG_DIR are intentionally left for postmortem on timeout.
+  # Tunnel logs in $LOG_DIR are intentionally left behind for postmortem.
   if ((${#TUNNEL_PIDS[@]})); then
     kill "${TUNNEL_PIDS[@]}" 2>/dev/null || true
-    wait 2>/dev/null || true
+    wait "${TUNNEL_PIDS[@]}" 2>/dev/null || true
   fi
 }
 trap cleanup INT TERM EXIT
