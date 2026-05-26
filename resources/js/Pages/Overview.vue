@@ -5,7 +5,7 @@ import Sparkline from '@/Components/Dashboard/Sparkline.vue';
 import StatusBadge from '@/Components/Dashboard/StatusBadge.vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import type { ActivityHeatmapPayload, DashboardPayload } from '@/types';
-import { Head } from '@inertiajs/vue3';
+import { Head, Link } from '@inertiajs/vue3';
 import {
     Activity,
     BarChart3,
@@ -45,12 +45,23 @@ defineProps<{
 // mock data here exists only so the page looks intentional, not skeletal —
 // each stub footer points at the phase that will replace it.
 
-const stubHosts = [
-    { name: 'prod-web-01', region: 'us-east', cpu: 0.42, mem: 0.61, status: 'success' as const },
-    { name: 'prod-api-02', region: 'us-east', cpu: 0.78, mem: 0.83, status: 'warning' as const },
-    { name: 'edge-eu-01', region: 'eu-west', cpu: 0.31, mem: 0.48, status: 'success' as const },
-    { name: 'edge-ap-01', region: 'ap-south', cpu: 0.55, mem: 0.69, status: 'success' as const },
-];
+// Container Hosts pulls live from `dashboard.hosts.cards` (spec 029);
+// `stubHosts` was retired when the phase-6 backend landed.
+
+// Map the four phase-6 statuses onto the Dashboard `StatusBadge` tones —
+// keeps Overview consistent with the website / host pages without
+// importing `hostStyles.ts` (Overview doesn't need the full enum value
+// type — just the tone).
+const hostCardTone = (status: string | null): 'success' | 'warning' | 'danger' | 'muted' =>
+    (
+        ({
+            online: 'success',
+            offline: 'danger',
+            degraded: 'warning',
+            pending: 'muted',
+            archived: 'muted',
+        }) as const
+    )[status ?? ''] ?? 'muted';
 
 const stubServices = [
     {
@@ -166,7 +177,11 @@ const visualizationStubs = [
                     :value="String(dashboard.hosts.online)"
                     secondary="Online"
                     :status="dashboard.hosts.status"
-                    status-label="Steady"
+                    :status-label="
+                        dashboard.hosts.offline > 0
+                            ? `${dashboard.hosts.offline} offline`
+                            : 'Steady'
+                    "
                     :trend="{
                         direction: dashboard.hosts.new > 0 ? 'up' : 'flat',
                         value: `+${dashboard.hosts.new} new`,
@@ -364,65 +379,104 @@ const visualizationStubs = [
                                 Container Hosts
                             </h2>
                         </div>
-                        <span class="hidden font-mono text-[11px] text-text-muted sm:inline">
-                            {{ stubHosts.length }} hosts · mock
+                        <span
+                            v-if="dashboard.hosts.cards.length > 0"
+                            class="hidden font-mono text-[11px] text-text-muted sm:inline"
+                        >
+                            {{ dashboard.hosts.online }} online ·
+                            {{ dashboard.hosts.offline }} offline
                         </span>
                     </header>
-                    <ul class="flex flex-col gap-3">
-                        <li
-                            v-for="host in stubHosts"
-                            :key="host.name"
-                            class="grid grid-cols-[auto_1fr_auto] items-center gap-3"
+
+                    <div
+                        v-if="dashboard.hosts.cards.length === 0"
+                        class="flex flex-col items-center gap-2 px-6 py-8 text-center text-xs text-text-muted"
+                    >
+                        <Server
+                            class="h-5 w-5 text-text-muted"
+                            aria-hidden="true"
+                        />
+                        <p class="text-text-secondary">
+                            No hosts yet
+                        </p>
+                        <Link
+                            :href="route('monitoring.hosts.create')"
+                            class="text-accent-cyan transition hover:text-accent-cyan/80"
                         >
-                            <StatusBadge :tone="host.status" dot-only />
-                            <div class="min-w-0">
-                                <p
-                                    class="truncate font-mono text-xs text-text-primary"
-                                >
-                                    {{ host.name }}
-                                </p>
-                                <p
-                                    class="truncate text-[11px] text-text-muted"
-                                >
-                                    {{ host.region }}
-                                </p>
-                            </div>
-                            <div class="flex flex-col gap-1 text-[10px]">
-                                <div
-                                    class="flex items-center gap-2 font-mono text-text-muted"
-                                >
-                                    <span class="w-6 shrink-0">CPU</span>
-                                    <span
-                                        class="relative h-1.5 w-20 overflow-hidden rounded-full bg-background-panel-hover"
+                            Connect your first host →
+                        </Link>
+                    </div>
+
+                    <ul v-else class="flex flex-col gap-3">
+                        <li
+                            v-for="host in dashboard.hosts.cards"
+                            :key="host.id"
+                        >
+                            <Link
+                                :href="route('monitoring.hosts.show', host.id)"
+                                class="grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-md px-1 py-1 transition hover:bg-background-panel-hover/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
+                            >
+                                <StatusBadge
+                                    :tone="hostCardTone(host.status)"
+                                    dot-only
+                                />
+                                <div class="min-w-0">
+                                    <p
+                                        class="truncate font-mono text-xs text-text-primary"
                                     >
-                                        <span
-                                            class="block h-full rounded-full bg-accent-cyan"
-                                            :style="{
-                                                width: `${Math.round(host.cpu * 100)}%`,
-                                            }"
-                                        />
-                                    </span>
-                                </div>
-                                <div
-                                    class="flex items-center gap-2 font-mono text-text-muted"
-                                >
-                                    <span class="w-6 shrink-0">MEM</span>
-                                    <span
-                                        class="relative h-1.5 w-20 overflow-hidden rounded-full bg-background-panel-hover"
+                                        {{ host.name }}
+                                    </p>
+                                    <p
+                                        class="truncate text-[11px] text-text-muted"
                                     >
-                                        <span
-                                            class="block h-full rounded-full bg-accent-purple"
-                                            :style="{
-                                                width: `${Math.round(host.mem * 100)}%`,
-                                            }"
-                                        />
-                                    </span>
+                                        {{ host.last_seen_at ?? 'Awaiting telemetry' }}
+                                    </p>
                                 </div>
-                            </div>
+                                <div class="flex flex-col gap-1 text-[10px]">
+                                    <div
+                                        class="flex items-center gap-2 font-mono text-text-muted"
+                                    >
+                                        <span class="w-6 shrink-0">CPU</span>
+                                        <span
+                                            class="relative h-1.5 w-20 overflow-hidden rounded-full bg-background-panel-hover"
+                                        >
+                                            <span
+                                                class="block h-full rounded-full bg-accent-cyan"
+                                                :style="{
+                                                    width: `${Math.min(Math.max(host.cpu_percent ?? 0, 0), 100)}%`,
+                                                }"
+                                            />
+                                        </span>
+                                    </div>
+                                    <div
+                                        class="flex items-center gap-2 font-mono text-text-muted"
+                                    >
+                                        <span class="w-6 shrink-0">MEM</span>
+                                        <span
+                                            class="relative h-1.5 w-20 overflow-hidden rounded-full bg-background-panel-hover"
+                                        >
+                                            <span
+                                                class="block h-full rounded-full bg-accent-purple"
+                                                :style="{
+                                                    width: `${Math.min(Math.max(host.memory_percent ?? 0, 0), 100)}%`,
+                                                }"
+                                            />
+                                        </span>
+                                    </div>
+                                </div>
+                            </Link>
                         </li>
                     </ul>
-                    <footer class="text-[11px] text-text-muted">
-                        Full widget lands with phase 6 — Docker Host Agent.
+                    <footer
+                        v-if="dashboard.hosts.cards.length > 0"
+                        class="text-[11px] text-text-muted"
+                    >
+                        <Link
+                            :href="route('monitoring.hosts.index')"
+                            class="text-text-secondary transition hover:text-accent-cyan"
+                        >
+                            Browse all hosts →
+                        </Link>
                     </footer>
                 </section>
 

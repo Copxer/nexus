@@ -3,7 +3,10 @@
 namespace App\Domain\Dashboard\Queries;
 
 use App\Domain\Monitoring\Queries\GetMonitoringUptimeKpiQuery;
+use App\Enums\HostStatus;
 use App\Models\ActivityEvent;
+use App\Models\Host;
+use App\Models\HostMetricSnapshot;
 use App\Models\Project;
 use App\Models\Repository;
 use App\Models\WorkflowRun;
@@ -20,10 +23,11 @@ use Illuminate\Support\Collection;
  *
  * Real today (database-backed):
  *   - dashboard.projects.{active,new_this_week,sparkline,status}
- *   - dashboard.hosts.{online,new,sparkline,status}
- *     (Repository::count() acts as a proxy until phase 6 ships actual
- *      hosts; the card label keeps "Hosts" so the visual doesn't shift,
- *      but the value reflects what we have data for.)
+ *   - dashboard.hosts.{online,offline,new,sparkline,status,cards}
+ *     (Spec 029 — real Host counts; `cards` carries up to 6 hosts for
+ *      the Overview "Container Hosts" detail card, ordered so problem
+ *      hosts surface first. Sparkline shows daily `host_metric_snapshots`
+ *      volume parallel to the deployments KPI.)
  *   - dashboard.deployments.{successful_24h,success_rate_24h,change_percent,sparkline,status}
  *     (Spec 022 — aggregates `workflow_runs` over 24h and prior-24h
  *      windows; sparkline counts daily completed runs across the last
@@ -281,21 +285,100 @@ class GetOverviewDashboardQuery
         return 'danger';
     }
 
-    /** Hosts proxy (Repository count) until phase 6 ships real hosts. */
+    /**
+     * Real Hosts KPI slice (spec 029 — replaces the Phase-6 Repository
+     * proxy). Counts come from the `hosts` table directly, the
+     * sparkline shows daily telemetry volume from
+     * `host_metric_snapshots` (parallels the deployments KPI's
+     * daily-run count), and `cards` carries up to 6 hosts for the
+     * Overview "Container Hosts" detail card. Archived hosts are
+     * excluded from every count.
+     *
+     * @return array{
+     *     online: int,
+     *     offline: int,
+     *     new: int,
+     *     sparkline: array<int, int>,
+     *     status: 'success'|'warning'|'danger'|'muted',
+     *     cards: list<array{
+     *         id: int,
+     *         name: string,
+     *         status: string|null,
+     *         cpu_percent: float|null,
+     *         memory_percent: float|null,
+     *         last_seen_at: string|null,
+     *     }>,
+     * }
+     */
     private function hosts(): array
     {
-        $online = Repository::query()->count();
-        $new = Repository::query()
+        $online = Host::query()->where('status', HostStatus::Online->value)->count();
+        $offline = Host::query()->where('status', HostStatus::Offline->value)->count();
+        $new = Host::query()
+            ->where('status', '!=', HostStatus::Archived->value)
             ->where('created_at', '>=', now()->subWeek())
             ->count();
-        $sparkline = $this->dailyCounts(Repository::class, self::SPARKLINE_DAYS);
+        $sparkline = $this->dailyCounts(HostMetricSnapshot::class, self::SPARKLINE_DAYS);
+
+        // Up to 6 hosts for the Overview detail card, sorted so problem
+        // hosts surface first (offline → degraded → online → pending).
+        // Archived hosts excluded. Sort happens in PHP so the
+        // status-priority ordering stays cross-DB; phase-1's host count
+        // is well below any size where SQL-side sort would matter.
+        $statusPriority = [
+            HostStatus::Offline->value => 0,
+            HostStatus::Degraded->value => 1,
+            HostStatus::Online->value => 2,
+            HostStatus::Pending->value => 3,
+        ];
+
+        $cards = Host::query()
+            ->with('latestMetricSnapshot')
+            ->where('status', '!=', HostStatus::Archived->value)
+            ->get()
+            ->sortBy(fn (Host $host): array => [
+                $statusPriority[$host->status?->value] ?? 4,
+                $host->name,
+            ])
+            ->take(6)
+            ->values()
+            ->map(fn (Host $host): array => [
+                'id' => $host->id,
+                'name' => $host->name,
+                'status' => $host->status?->value,
+                'cpu_percent' => $host->latestMetricSnapshot?->cpu_percent,
+                'memory_percent' => $host->latestMetricSnapshot?->memoryPercent(),
+                'last_seen_at' => $host->last_seen_at?->diffForHumans(),
+            ])
+            ->all();
 
         return [
             'online' => $online,
+            'offline' => $offline,
             'new' => $new,
             'sparkline' => $sparkline,
-            'status' => $online >= 1 ? 'info' : 'muted',
+            'status' => $this->hostsStatus($online, $offline),
+            'cards' => $cards,
         ];
+    }
+
+    /**
+     * Hosts KPI status tone. Empty fleet → muted (no signal); all
+     * offline → danger; mixed → warning; healthy → success.
+     */
+    private function hostsStatus(int $online, int $offline): string
+    {
+        if ($online === 0 && $offline === 0) {
+            return 'muted';
+        }
+        if ($offline === 0) {
+            return 'success';
+        }
+        if ($online === 0) {
+            return 'danger';
+        }
+
+        return 'warning';
     }
 
     /**
