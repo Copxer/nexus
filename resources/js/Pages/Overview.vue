@@ -4,6 +4,7 @@ import KpiCard from '@/Components/Dashboard/KpiCard.vue';
 import Sparkline from '@/Components/Dashboard/Sparkline.vue';
 import StatusBadge from '@/Components/Dashboard/StatusBadge.vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
+import { hostStatusTone } from '@/lib/hostStyles';
 import type { ActivityHeatmapPayload, DashboardPayload } from '@/types';
 import { Head, Link } from '@inertiajs/vue3';
 import {
@@ -46,22 +47,9 @@ defineProps<{
 // each stub footer points at the phase that will replace it.
 
 // Container Hosts pulls live from `dashboard.hosts.cards` (spec 029);
-// `stubHosts` was retired when the phase-6 backend landed.
-
-// Map the four phase-6 statuses onto the Dashboard `StatusBadge` tones —
-// keeps Overview consistent with the website / host pages without
-// importing `hostStyles.ts` (Overview doesn't need the full enum value
-// type — just the tone).
-const hostCardTone = (status: string | null): 'success' | 'warning' | 'danger' | 'muted' =>
-    (
-        ({
-            online: 'success',
-            offline: 'danger',
-            degraded: 'warning',
-            pending: 'muted',
-            archived: 'muted',
-        }) as const
-    )[status ?? ''] ?? 'muted';
+// `stubHosts` was retired when the phase-6 backend landed. Tone for
+// the card status dot comes from the shared `hostStatusTone` helper
+// so Overview / Hosts Index / Hosts Show never drift.
 
 const stubServices = [
     {
@@ -417,7 +405,7 @@ const visualizationStubs = [
                                 class="grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-md px-1 py-1 transition hover:bg-background-panel-hover/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
                             >
                                 <StatusBadge
-                                    :tone="hostCardTone(host.status)"
+                                    :tone="hostStatusTone(host.status)"
                                     dot-only
                                 />
                                 <div class="min-w-0">

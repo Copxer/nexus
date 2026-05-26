@@ -8,6 +8,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Scheduler-bound offline detector (spec 029). Bound in
@@ -29,6 +30,10 @@ class DetectOfflineHostsJob implements ShouldQueue
 
     public function handle(DetectOfflineHostsAction $detect): void
     {
-        $detect->execute();
+        $flipped = $detect->execute();
+
+        if ($flipped > 0) {
+            Log::info('hosts:detect-offline flipped hosts', ['count' => $flipped]);
+        }
     }
 }

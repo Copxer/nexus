@@ -9,6 +9,7 @@ use App\Models\Website;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
+use Illuminate\Contracts\Events\ShouldDispatchAfterCommit;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
@@ -24,7 +25,7 @@ use Illuminate\Queue\SerializesModels;
  * has no owning project (system-emitted events, future), we no-op
  * `broadcastOn()` and Laravel skips the publish.
  */
-class ActivityEventCreated implements ShouldBroadcastNow
+class ActivityEventCreated implements ShouldBroadcastNow, ShouldDispatchAfterCommit
 {
     use Dispatchable;
     use InteractsWithSockets;

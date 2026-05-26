@@ -1,6 +1,6 @@
 <?php
 
-namespace Tests\Feature\Monitoring;
+namespace Tests\Feature\Docker;
 
 use App\Domain\Docker\Actions\DetectOfflineHostsAction;
 use App\Domain\Docker\Jobs\DetectOfflineHostsJob;

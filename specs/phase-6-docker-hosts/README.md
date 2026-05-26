@@ -12,7 +12,7 @@ Stand up Docker host + container monitoring end-to-end via a pull-from-agent mod
 | 026 | Hosts + agent tokens scaffolding (CRUD + token rotation) | 🟢 |
 | 027 | Telemetry ingestion endpoint + reference agent script | 🟢 |
 | 028 | Hosts UI (index + show + project Hosts tab) | 🟢 |
-| 029 | Host offline detection + activity events + Overview KPI wiring | ⬜ |
+| 029 | Host offline detection + activity events + Overview KPI wiring | 🟢 |
 
 ## Acceptance criteria (phase-level)
 - [ ] User can create / edit / archive a host under a project.

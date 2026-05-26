@@ -1,7 +1,7 @@
 ---
 spec: host-offline-detection
 phase: 6
-status: in-progress   # not-started | in-progress | blocked | done
+status: done   # not-started | in-progress | blocked | done
 owner: Yoany
 created: 2026-05-26
 updated: 2026-05-26
@@ -200,21 +200,21 @@ phase-level "Host offline emits `host.offline`, recovery emits
     spec-024 tests do the latter — mirror).
 
 ## Acceptance criteria
-- [ ] A host whose `last_seen_at` is older than the configured timeout flips
+- [x] A host whose `last_seen_at` is older than the configured timeout flips
       from `online` to `offline` within ≤ 60 s of the threshold and a
       `host.offline` activity event lands.
-- [ ] The first telemetry tick after an offline host posts flips it to
+- [x] The first telemetry tick after an offline host posts flips it to
       `online` and emits exactly one `host.recovered` activity event.
-- [ ] Pending → online and online → online ingest paths emit no
+- [x] Pending → online and online → online ingest paths emit no
       `host.recovered` (silent first activation / steady-state).
-- [ ] `host.offline` and `host.recovered` rows broadcast on the project
+- [x] `host.offline` and `host.recovered` rows broadcast on the project
       owner's `users.{id}.activity` channel; the right-rail picks them up.
-- [ ] Overview Hosts KPI displays real online + offline counts (no
+- [x] Overview Hosts KPI displays real online + offline counts (no
       `Repository::count` proxy, no mocks); sibling-user hosts don't leak.
-- [ ] Overview "Container Hosts" card renders real hosts from
+- [x] Overview "Container Hosts" card renders real hosts from
       `dashboard.hosts.cards` (no `stubHosts`, no "· mock" header); empty
       state CTA points at `monitoring.hosts.create`.
-- [ ] Pint clean, `php artisan test` green (new tests added), `npm run build`
+- [x] Pint clean, `php artisan test` green (new tests added), `npm run build`
       clean.
 
 ## Files touched
@@ -242,6 +242,10 @@ Fill in as work progresses.
 ### 2026-05-26
 - Spec drafted for review.
 - Issue [#87](https://github.com/Copxer/nexus/issues/87) opened, branch `spec/029-host-offline-detection` cut off `main`.
+- Backend: `config/hosts.php`, `DetectOfflineHostsAction` + `DetectOfflineHostsJob` scheduled every minute, `IngestHostTelemetryAction` recovery emission on offline→online, `ActivityEventCreated` source-hosts routing, `GetOverviewDashboardQuery::hosts()` rewrite + `cards`, `HostFactory::offline()`.
+- Frontend: `Overview.vue` drops `stubHosts`, iterates `dashboard.hosts.cards`, Hosts KPI surfaces `N offline`; `types/index.d.ts` `hosts` shape extended.
+- Tests: 27 new, full suite 480 → 507 green, Pint clean, build clean.
+- Self-review via `superpowers:code-reviewer`. Addressed: (1) `ActivityEventCreated` now also implements `ShouldDispatchAfterCommit` (parity with `HostTelemetryRecorded`, defends every `CreateActivityEventAction` caller against future outer-transaction wrapping); (2) Overview replaces local `hostCardTone` with the shared `hostStatusTone` import so the tone map stays single-source; (3) `DetectOfflineHostsJob` logs the flipped count; (4) moved `DetectOfflineHostsJobTest` from `tests/Feature/Monitoring/` to `tests/Feature/Docker/` to match the action's domain.
 
 ## Open questions / blockers
 - **Heartbeat timeout: global vs per-host.** 029 ships a global 120s default
