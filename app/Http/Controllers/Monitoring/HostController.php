@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Monitoring;
 use App\Domain\Docker\Actions\ArchiveHostAction;
 use App\Domain\Docker\Actions\CreateHostAction;
 use App\Domain\Docker\Actions\UpdateHostAction;
+use App\Domain\Docker\Queries\GetHostTelemetryQuery;
 use App\Enums\HostConnectionType;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Monitoring\StoreHostRequest;
@@ -34,7 +35,11 @@ class HostController extends Controller
         $user = $request->user();
 
         $hosts = Host::query()
-            ->with(['project:id,slug,name,color,icon,owner_user_id', 'activeAgentToken'])
+            ->with([
+                'project:id,slug,name,color,icon,owner_user_id',
+                'activeAgentToken',
+                'latestMetricSnapshot',
+            ])
             ->whereHas('project', fn ($q) => $q->where('owner_user_id', $user->id))
             ->orderBy('name')
             ->get()
@@ -77,17 +82,19 @@ class HostController extends Controller
             ->with('status', "Host “{$host->name}” created. Mint an agent token to bring it online.");
     }
 
-    public function show(Request $request, Host $host): Response
+    public function show(Request $request, Host $host, GetHostTelemetryQuery $telemetry): Response
     {
         $this->authorize('view', $host);
 
         $host->loadMissing([
             'project:id,slug,name,color,icon,owner_user_id',
             'activeAgentToken',
+            'latestMetricSnapshot',
         ]);
 
         return Inertia::render('Monitoring/Hosts/Show', [
             'host' => $this->transform($host),
+            'telemetry' => $telemetry->execute($host),
             'canUpdate' => $request->user()?->can('update', $host) ?? false,
             'canDelete' => $request->user()?->can('delete', $host) ?? false,
             'canManageTokens' => $request->user()?->can('manageTokens', $host) ?? false,
@@ -98,7 +105,10 @@ class HostController extends Controller
     {
         $this->authorize('update', $host);
 
-        $host->loadMissing('project:id,slug,name,color,icon,owner_user_id');
+        $host->loadMissing([
+            'project:id,slug,name,color,icon,owner_user_id',
+            'latestMetricSnapshot',
+        ]);
 
         return Inertia::render('Monitoring/Hosts/Edit', [
             'host' => $this->transform($host),
@@ -133,6 +143,7 @@ class HostController extends Controller
     private function transform(Host $host): array
     {
         $activeToken = $host->activeAgentToken;
+        $latestSnapshot = $host->latestMetricSnapshot;
 
         return [
             'id' => $host->id,
@@ -149,6 +160,10 @@ class HostController extends Controller
             'disk_total_gb' => $host->disk_total_gb,
             'os' => $host->os,
             'docker_version' => $host->docker_version,
+            // Latest-snapshot glance for the index CPU / memory column.
+            // Null when the host has never reported telemetry.
+            'cpu_percent' => $latestSnapshot?->cpu_percent,
+            'memory_percent' => $latestSnapshot?->memoryPercent(),
             'archived_at' => $host->archived_at?->toIso8601String(),
             'project' => $host->project ? [
                 'id' => $host->project->id,

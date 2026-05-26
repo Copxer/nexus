@@ -78,4 +78,13 @@ class Host extends Model
     {
         return $this->hasMany(HostMetricSnapshot::class);
     }
+
+    /**
+     * The most recent telemetry snapshot. Eager-loaded on the hosts
+     * index so the CPU / memory column doesn't N+1 (spec 028).
+     */
+    public function latestMetricSnapshot(): HasOne
+    {
+        return $this->hasOne(HostMetricSnapshot::class)->latestOfMany('recorded_at');
+    }
 }

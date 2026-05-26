@@ -30,3 +30,11 @@ Broadcast::channel('users.{userId}.deployments', function ($user, $userId) {
 Broadcast::channel('users.{userId}.monitoring', function ($user, $userId) {
     return (int) $user->id === (int) $userId;
 });
+
+// Spec 028 — per-user hosts channel. `HostTelemetryRecorded`
+// broadcasts here on every agent telemetry tick so the Host Show
+// page reflects fresh CPU / memory / container stats without a
+// manual refresh. Mirrors the monitoring channel above.
+Broadcast::channel('users.{userId}.hosts', function ($user, $userId) {
+    return (int) $user->id === (int) $userId;
+});
