@@ -5,6 +5,7 @@ namespace App\Events;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
+use Illuminate\Contracts\Events\ShouldDispatchAfterCommit;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
@@ -20,11 +21,13 @@ use Illuminate\Queue\SerializesModels;
  * host / project relations during fan-out.
  *
  * `ShouldBroadcastNow` so the broadcast hits Reverb synchronously —
- * matches the rest of the event family. `IngestHostTelemetryAction`
- * dispatches it only after the telemetry transaction commits, so the
- * browser never partial-reloads ahead of the write.
+ * matches the rest of the event family. `ShouldDispatchAfterCommit`
+ * defends against any future caller that wraps the ingest action in an
+ * outer transaction: the broadcast then still waits for the outermost
+ * commit before it fires, so the Show page never partial-reloads ahead
+ * of the write.
  */
-class HostTelemetryRecorded implements ShouldBroadcastNow
+class HostTelemetryRecorded implements ShouldBroadcastNow, ShouldDispatchAfterCommit
 {
     use Dispatchable;
     use InteractsWithSockets;

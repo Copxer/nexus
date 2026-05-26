@@ -1,10 +1,10 @@
 ---
 spec: hosts-ui
 phase: 6
-status: in-progress   # not-started | in-progress | blocked | done
+status: done   # not-started | in-progress | blocked | done
 owner: Yoany
 created: 2026-05-21
-updated: 2026-05-21
+updated: 2026-05-26
 ---
 
 # 028 — Hosts UI (telemetry display)
@@ -191,24 +191,24 @@ list, container stats chart), §19 Phase 6.
       `HostTelemetryRecorded` on the host owner's `users.{id}.hosts` channel.
 
 ## Acceptance criteria
-- [ ] Host Show page renders current CPU / memory / disk / load / network from
+- [x] Host Show page renders current CPU / memory / disk / load / network from
       the latest snapshot, a CPU+memory history sparkline, and a container
       table — no placeholder card remains.
-- [ ] A host that has never reported telemetry shows a "Waiting for first
+- [x] A host that has never reported telemetry shows a "Waiting for first
       telemetry" state, not an error or empty crash.
-- [ ] A host with telemetry but no containers shows a "No containers reported"
+- [x] A host with telemetry but no containers shows a "No containers reported"
       state.
-- [ ] Host Index shows a CPU / memory glance per row; hosts with no telemetry
+- [x] Host Index shows a CPU / memory glance per row; hosts with no telemetry
       render a dash, not a crash.
-- [ ] No N+1 on the index (latest snapshot eager-loaded via `latestOfMany`).
-- [ ] A telemetry ingest broadcasts `HostTelemetryRecorded` on the host
+- [x] No N+1 on the index (latest snapshot eager-loaded via `latestOfMany`).
+- [x] A telemetry ingest broadcasts `HostTelemetryRecorded` on the host
       owner's `users.{id}.hosts` channel; the Show page partial-reloads
       `host` + `telemetry` on the pulse without a manual refresh.
-- [ ] Show page shows a "Live updates offline" pill when the socket is down;
+- [x] Show page shows a "Live updates offline" pill when the socket is down;
       page-load reads still surface the latest telemetry.
-- [ ] Sidebar `Hosts` and the project `Hosts` tab continue to work (regression
+- [x] Sidebar `Hosts` and the project `Hosts` tab continue to work (regression
       check — both were wired pre-028).
-- [ ] Pint clean, `php artisan test` green (new tests added), `npm run build`
+- [x] Pint clean, `php artisan test` green (new tests added), `npm run build`
       clean.
 
 ## Files touched
@@ -235,6 +235,12 @@ Fill in as work progresses.
 - Spec drafted for review.
 - Realtime (Reverb live updates) pulled into scope per review.
 - Issue [#85](https://github.com/Copxer/nexus/issues/85) opened, branch `spec/028-hosts-ui` cut off `main`.
+
+### 2026-05-26
+- Backend: `Host::latestMetricSnapshot` relation, `GetHostTelemetryQuery`, `HostMetricSnapshot::memoryPercent`, controller wiring, `HostTelemetryRecorded` (ShouldBroadcastNow + ShouldDispatchAfterCommit), channels.php auth.
+- Frontend: `HostMetricsPanel`, `ContainerTable`, full `Show.vue` rewrite (metrics + sparklines + container table + Echo + Live-offline pill + Waiting state), `Index.vue` CPU / MEM column, `hostStyles.ts` container tones.
+- Tests: 12 new (5 unit query, 2 broadcast feature, 4 controller telemetry, 1 event-surface). Full suite 480 green pre-fixes, 487 after, Pint clean, build clean.
+- Self-review via `superpowers:code-reviewer`. Addressed: (1) added dedicated `HostTelemetryRecordedTest` mirroring `WebsiteCheckRecordedTest`, (2) hardened `HostTelemetryRecorded` with `ShouldDispatchAfterCommit` to survive any future outer-transaction wrapping, (3) inline comment in `Show.vue` documenting the phase-1 viewer-==-owner realtime ACL assumption.
 
 ## Open questions / blockers
 - **Realtime — resolved (in scope).** Pulled into 028 per review: the Host

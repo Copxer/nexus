@@ -167,6 +167,12 @@ onMounted(() => {
     if (typeof window === 'undefined' || !window.Echo) {
         return;
     }
+    // Phase-1 owns the realtime ACL: the viewer of a host's Show page
+    // is the project owner, and `HostTelemetryRecorded` broadcasts on
+    // `users.{owner_user_id}.hosts`. Viewer === owner today, so the
+    // current user's id is the correct channel id. When multi-tenant
+    // ACL lands, swap this for an explicit owner-id prop passed by
+    // `HostController@show`.
     const userId = page.props.auth?.user?.id;
     if (userId == null) return;
 
