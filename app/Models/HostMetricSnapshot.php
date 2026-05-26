@@ -44,4 +44,21 @@ class HostMetricSnapshot extends Model
     {
         return $this->belongsTo(Host::class);
     }
+
+    /**
+     * Memory utilisation as a 0–100 percentage, or null when either
+     * side of the ratio is missing. `host_metric_snapshots` stores the
+     * raw used / total MB; the percentage is derived on read.
+     */
+    public function memoryPercent(): ?float
+    {
+        if ($this->memory_used_mb === null
+            || $this->memory_total_mb === null
+            || $this->memory_total_mb === 0
+        ) {
+            return null;
+        }
+
+        return round($this->memory_used_mb / $this->memory_total_mb * 100, 1);
+    }
 }

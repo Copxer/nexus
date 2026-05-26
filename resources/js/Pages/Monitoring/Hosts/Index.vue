@@ -35,6 +35,8 @@ interface HostRow {
         | string
         | null;
     last_seen_at: string | null;
+    cpu_percent: number | null;
+    memory_percent: number | null;
     project: ProjectChip | null;
     active_agent_token: ActiveAgentToken | null;
 }
@@ -54,6 +56,19 @@ const projectAccentClass = (color: string | null) =>
             warning: 'text-status-warning',
         }) as const
     )[color ?? ''] ?? 'text-text-muted';
+
+// At-a-glance utilisation tone for the CPU / memory column. <70 is
+// healthy, 70–90 warns, ≥90 alerts. Matches the bar thresholds in
+// `HostMetricsPanel`.
+const usageTextClass = (pct: number | null): string => {
+    if (pct === null) return 'text-text-muted';
+    if (pct >= 90) return 'text-status-danger';
+    if (pct >= 70) return 'text-status-warning';
+    return 'text-status-success';
+};
+
+const formatPercent = (pct: number | null): string =>
+    pct === null ? '—' : `${Math.round(pct)}%`;
 </script>
 
 <template>
@@ -82,8 +97,7 @@ const projectAccentClass = (color: string | null) =>
                     <p class="text-sm text-text-secondary">
                         Hosts running the Nexus agent. Mint a token,
                         install the agent, and the host's CPU, memory,
-                        and containers stream into Nexus. Telemetry
-                        ingestion lands in spec 027.
+                        and containers stream into Nexus.
                     </p>
                 </div>
                 <Link
@@ -162,6 +176,18 @@ const projectAccentClass = (color: string | null) =>
                                 </span>
                                 <span v-else class="text-text-muted/70">
                                     · Awaiting first telemetry
+                                </span>
+                                <span
+                                    class="font-mono text-[10px] tracking-[0.18em]"
+                                    :class="usageTextClass(host.cpu_percent)"
+                                >
+                                    · CPU {{ formatPercent(host.cpu_percent) }}
+                                </span>
+                                <span
+                                    class="font-mono text-[10px] tracking-[0.18em]"
+                                    :class="usageTextClass(host.memory_percent)"
+                                >
+                                    · MEM {{ formatPercent(host.memory_percent) }}
                                 </span>
                             </p>
                         </div>

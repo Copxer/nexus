@@ -3,6 +3,7 @@
 namespace App\Domain\Docker\Actions;
 
 use App\Enums\HostStatus;
+use App\Events\HostTelemetryRecorded;
 use App\Models\Host;
 use App\Models\HostMetricSnapshot;
 use Carbon\CarbonImmutable;
@@ -49,6 +50,12 @@ class IngestHostTelemetryAction
             $this->insertHostSnapshot($host, $recordedAt, $metrics);
             $this->syncContainers->execute($host, $recordedAt, $containers);
         });
+
+        // Dispatched after the transaction commits (not via DB::afterCommit
+        // — we're already past the transaction block) so the Host Show
+        // page never partial-reloads ahead of the write. `ShouldBroadcastNow`
+        // means the publish hits Reverb synchronously here. Spec 028.
+        HostTelemetryRecorded::dispatch($host->id, $host->project?->owner_user_id);
     }
 
     /**
