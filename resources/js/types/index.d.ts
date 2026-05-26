@@ -71,9 +71,18 @@ export interface DashboardPayload {
     };
     hosts: {
         online: number;
+        offline: number;
         new: number;
         sparkline: number[];
         status: DashboardStatus;
+        cards: Array<{
+            id: number;
+            name: string;
+            status: string | null;
+            cpu_percent: number | null;
+            memory_percent: number | null;
+            last_seen_at: string | null;
+        }>;
     };
     alerts: {
         active: number;

@@ -3,7 +3,9 @@
 namespace Tests\Unit\Domain\Docker;
 
 use App\Domain\Docker\Actions\IngestHostTelemetryAction;
+use App\Enums\ActivitySeverity;
 use App\Enums\HostStatus;
+use App\Models\ActivityEvent;
 use App\Models\Host;
 use App\Models\HostMetricSnapshot;
 use Carbon\CarbonImmutable;
@@ -116,5 +118,39 @@ class IngestHostTelemetryActionTest extends TestCase
         // important assertion is that status stays Online and the
         // payload didn't include a redundant status column write.
         $this->assertSame(HostStatus::Online, $host->status);
+    }
+
+    public function test_offline_to_online_emits_a_host_recovered_activity_event(): void
+    {
+        $host = Host::factory()->offline()->create();
+
+        app(IngestHostTelemetryAction::class)->execute($host, $this->basePayload());
+
+        $host->refresh();
+        $this->assertSame(HostStatus::Online, $host->status);
+
+        $event = ActivityEvent::query()->where('event_type', 'host.recovered')->firstOrFail();
+        $this->assertSame('hosts', $event->source);
+        $this->assertSame(ActivitySeverity::Success, $event->severity);
+        $this->assertSame("{$host->name} recovered", $event->title);
+        $this->assertSame($host->id, $event->metadata['host_id'] ?? null);
+    }
+
+    public function test_pending_to_online_does_not_emit_host_recovered(): void
+    {
+        $host = Host::factory()->create(); // pending
+
+        app(IngestHostTelemetryAction::class)->execute($host, $this->basePayload());
+
+        $this->assertSame(0, ActivityEvent::query()->where('event_type', 'host.recovered')->count());
+    }
+
+    public function test_online_to_online_does_not_emit_host_recovered(): void
+    {
+        $host = Host::factory()->online()->create();
+
+        app(IngestHostTelemetryAction::class)->execute($host, $this->basePayload());
+
+        $this->assertSame(0, ActivityEvent::query()->where('event_type', 'host.recovered')->count());
     }
 }

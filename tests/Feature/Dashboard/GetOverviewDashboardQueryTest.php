@@ -4,6 +4,8 @@ namespace Tests\Feature\Dashboard;
 
 use App\Domain\Dashboard\Queries\GetOverviewDashboardQuery;
 use App\Models\ActivityEvent;
+use App\Models\Host;
+use App\Models\HostMetricSnapshot;
 use App\Models\Project;
 use App\Models\Repository;
 use App\Models\User;
@@ -55,16 +57,140 @@ class GetOverviewDashboardQueryTest extends TestCase
         $this->assertSame('muted', $payload['dashboard']['projects']['status']);
     }
 
-    public function test_hosts_kpi_proxies_repository_count(): void
+    public function test_hosts_kpi_returns_zero_state_with_no_hosts(): void
     {
-        $owner = User::factory()->create();
-        $project = Project::factory()->create(['owner_user_id' => $owner->id]);
-        Repository::factory()->count(5)->create(['project_id' => $project->id]);
+        $payload = (new GetOverviewDashboardQuery)->handle();
+
+        $this->assertSame(0, $payload['dashboard']['hosts']['online']);
+        $this->assertSame(0, $payload['dashboard']['hosts']['offline']);
+        $this->assertSame(0, $payload['dashboard']['hosts']['new']);
+        $this->assertSame('muted', $payload['dashboard']['hosts']['status']);
+        $this->assertSame([], $payload['dashboard']['hosts']['cards']);
+    }
+
+    public function test_hosts_kpi_counts_real_online_and_offline_hosts(): void
+    {
+        $project = Project::factory()->create();
+        Host::factory()->online()->count(3)->create(['project_id' => $project->id]);
+        Host::factory()->offline()->create(['project_id' => $project->id]);
+        Host::factory()->archived()->create(['project_id' => $project->id]);
 
         $payload = (new GetOverviewDashboardQuery)->handle();
 
-        $this->assertSame(5, $payload['dashboard']['hosts']['online']);
-        $this->assertSame('info', $payload['dashboard']['hosts']['status']);
+        $this->assertSame(3, $payload['dashboard']['hosts']['online']);
+        $this->assertSame(1, $payload['dashboard']['hosts']['offline']);
+        // Mixed online + offline → warning.
+        $this->assertSame('warning', $payload['dashboard']['hosts']['status']);
+    }
+
+    public function test_hosts_kpi_status_is_success_when_no_hosts_offline(): void
+    {
+        $project = Project::factory()->create();
+        Host::factory()->online()->count(2)->create(['project_id' => $project->id]);
+
+        $payload = (new GetOverviewDashboardQuery)->handle();
+
+        $this->assertSame('success', $payload['dashboard']['hosts']['status']);
+    }
+
+    public function test_hosts_kpi_status_is_danger_when_every_host_is_offline(): void
+    {
+        $project = Project::factory()->create();
+        Host::factory()->offline()->count(2)->create(['project_id' => $project->id]);
+
+        $payload = (new GetOverviewDashboardQuery)->handle();
+
+        $this->assertSame('danger', $payload['dashboard']['hosts']['status']);
+    }
+
+    public function test_hosts_cards_order_offline_first_then_online_then_pending_then_name(): void
+    {
+        $project = Project::factory()->create();
+        Host::factory()->online()->create(['project_id' => $project->id, 'name' => 'b-online']);
+        Host::factory()->offline()->create(['project_id' => $project->id, 'name' => 'c-offline']);
+        Host::factory()->create(['project_id' => $project->id, 'name' => 'a-pending']);
+        Host::factory()->online()->create(['project_id' => $project->id, 'name' => 'a-online']);
+
+        $payload = (new GetOverviewDashboardQuery)->handle();
+        $names = array_column($payload['dashboard']['hosts']['cards'], 'name');
+
+        $this->assertSame(
+            ['c-offline', 'a-online', 'b-online', 'a-pending'],
+            $names,
+        );
+    }
+
+    public function test_hosts_cards_cap_at_six(): void
+    {
+        $project = Project::factory()->create();
+        Host::factory()->online()->count(10)->create(['project_id' => $project->id]);
+
+        $payload = (new GetOverviewDashboardQuery)->handle();
+
+        $this->assertCount(6, $payload['dashboard']['hosts']['cards']);
+    }
+
+    public function test_hosts_cards_exclude_archived_hosts(): void
+    {
+        $project = Project::factory()->create();
+        Host::factory()->online()->create(['project_id' => $project->id, 'name' => 'live-host']);
+        Host::factory()->archived()->create(['project_id' => $project->id, 'name' => 'archived-host']);
+
+        $payload = (new GetOverviewDashboardQuery)->handle();
+        $names = array_column($payload['dashboard']['hosts']['cards'], 'name');
+
+        $this->assertSame(['live-host'], $names);
+    }
+
+    public function test_hosts_cards_carry_latest_snapshot_metrics(): void
+    {
+        $project = Project::factory()->create();
+        $host = Host::factory()->online()->create(['project_id' => $project->id]);
+        HostMetricSnapshot::factory()->create([
+            'host_id' => $host->id,
+            'cpu_percent' => 42.5,
+            'memory_used_mb' => 500,
+            'memory_total_mb' => 1000,
+            'recorded_at' => now()->subMinute(),
+        ]);
+        HostMetricSnapshot::factory()->create([
+            'host_id' => $host->id,
+            'cpu_percent' => 18.0,
+            'memory_used_mb' => 200,
+            'memory_total_mb' => 1000,
+            'recorded_at' => now(),
+        ]);
+
+        $payload = (new GetOverviewDashboardQuery)->handle();
+        $card = $payload['dashboard']['hosts']['cards'][0];
+
+        // Latest snapshot wins.
+        $this->assertSame(18.0, $card['cpu_percent']);
+        // PHP-side `round()` keeps a float; this is direct PHP assertion
+        // (not JSON round-trip), so the trailing `.0` survives.
+        $this->assertSame(20.0, $card['memory_percent']); // 200/1000 = 20.0%
+    }
+
+    public function test_hosts_new_count_includes_hosts_created_in_the_last_week(): void
+    {
+        $project = Project::factory()->create();
+        Host::factory()->create([
+            'project_id' => $project->id,
+            'created_at' => now()->subDays(2),
+        ]);
+        Host::factory()->create([
+            'project_id' => $project->id,
+            'created_at' => now()->subDays(10),
+        ]);
+        // Archived hosts are excluded from `new` (no longer "part of the fleet").
+        Host::factory()->archived()->create([
+            'project_id' => $project->id,
+            'created_at' => now()->subDays(1),
+        ]);
+
+        $payload = (new GetOverviewDashboardQuery)->handle();
+
+        $this->assertSame(1, $payload['dashboard']['hosts']['new']);
     }
 
     public function test_sparklines_are_zero_padded_to_twelve_entries(): void

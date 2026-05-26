@@ -2,11 +2,14 @@
 
 namespace App\Domain\Docker\Actions;
 
+use App\Domain\Activity\Actions\CreateActivityEventAction;
+use App\Enums\ActivitySeverity;
 use App\Enums\HostStatus;
 use App\Events\HostTelemetryRecorded;
 use App\Models\Host;
 use App\Models\HostMetricSnapshot;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -31,6 +34,7 @@ class IngestHostTelemetryAction
 {
     public function __construct(
         private readonly SyncContainerSnapshotsAction $syncContainers,
+        private readonly CreateActivityEventAction $createActivity,
     ) {}
 
     /**
@@ -45,6 +49,12 @@ class IngestHostTelemetryAction
         $metrics = $hostPayload['metrics'] ?? [];
         $containers = $payload['containers'] ?? [];
 
+        // Capture pre-transaction status — `updateHost` will flip the
+        // row to `online` in the transaction below, so anything we need
+        // about the prior state has to be read now. Spec 029 uses this
+        // to detect the specific `offline → online` recovery transition.
+        $wasOffline = $host->status === HostStatus::Offline;
+
         DB::transaction(function () use ($host, $recordedAt, $facts, $metrics, $containers): void {
             $this->updateHost($host, $recordedAt, $facts);
             $this->insertHostSnapshot($host, $recordedAt, $metrics);
@@ -56,6 +66,25 @@ class IngestHostTelemetryAction
         // page never partial-reloads ahead of the write. `ShouldBroadcastNow`
         // means the publish hits Reverb synchronously here. Spec 028.
         HostTelemetryRecorded::dispatch($host->id, $host->project?->owner_user_id);
+
+        // Recovery (spec 029): only the explicit `offline → online`
+        // transition emits `host.recovered`. Pending → online is silent
+        // (first activation, mirrors spec 024's first-probe rule); online
+        // → online is silent (steady state, no transition).
+        if ($wasOffline) {
+            $this->createActivity->execute([
+                'event_type' => 'host.recovered',
+                'severity' => ActivitySeverity::Success,
+                'title' => "{$host->name} recovered",
+                'description' => 'Telemetry resumed at '.$recordedAt->toIso8601String(),
+                'occurred_at' => Carbon::now(),
+                'source' => 'hosts',
+                'metadata' => [
+                    'host_id' => $host->id,
+                    'recorded_at' => $recordedAt->toIso8601String(),
+                ],
+            ]);
+        }
     }
 
     /**

@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Docker\Jobs\DetectOfflineHostsJob;
 use App\Domain\Monitoring\Jobs\DispatchDueWebsiteChecksJob;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -29,4 +30,14 @@ Schedule::command('inspire')->hourly();
 Schedule::job(new DispatchDueWebsiteChecksJob)
     ->everyMinute()
     ->name('monitoring:dispatch-due-website-checks')
+    ->withoutOverlapping();
+
+// Spec 029 — every-minute offline detector for Docker hosts. Flips
+// `online` hosts past `config('hosts.heartbeat_timeout_seconds')`
+// (default 120 s) to `offline` and emits `host.offline` activity events.
+// Late telemetry flows through `IngestHostTelemetryAction` and flips
+// the host back to online, emitting `host.recovered`.
+Schedule::job(new DetectOfflineHostsJob)
+    ->everyMinute()
+    ->name('hosts:detect-offline')
     ->withoutOverlapping();

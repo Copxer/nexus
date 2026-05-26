@@ -4,10 +4,12 @@ namespace App\Events;
 
 use App\Domain\Activity\ActivityEventPresenter;
 use App\Models\ActivityEvent;
+use App\Models\Host;
 use App\Models\Website;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
+use Illuminate\Contracts\Events\ShouldDispatchAfterCommit;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
@@ -23,7 +25,7 @@ use Illuminate\Queue\SerializesModels;
  * has no owning project (system-emitted events, future), we no-op
  * `broadcastOn()` and Laravel skips the publish.
  */
-class ActivityEventCreated implements ShouldBroadcastNow
+class ActivityEventCreated implements ShouldBroadcastNow, ShouldDispatchAfterCommit
 {
     use Dispatchable;
     use InteractsWithSockets;
@@ -35,13 +37,16 @@ class ActivityEventCreated implements ShouldBroadcastNow
      * Broadcast on the project owner's private activity channel.
      * `users.{userId}.activity` is authorized in `routes/channels.php`.
      *
-     * Two scoping paths:
+     * Three scoping paths:
      *   1. **Repo-scoped events** (spec 017's webhook handlers,
      *      spec 020's deployments) — channel resolves through
      *      `repository → project → owner_user_id`.
      *   2. **Monitoring-scoped events** (spec 024 — `source: monitoring`,
      *      `repository_id` is null) — channel resolves through
      *      `metadata.website_id → website → project → owner_user_id`.
+     *   3. **Hosts-scoped events** (spec 029 — `source: hosts`,
+     *      `repository_id` is null) — channel resolves through
+     *      `metadata.host_id → host → project → owner_user_id`.
      *
      * If neither path resolves to an owner the broadcast no-ops; the
      * row still exists in the DB, and `RecentActivityForUserQuery`
@@ -89,6 +94,20 @@ class ActivityEventCreated implements ShouldBroadcastNow
             $website = Website::query()->find($websiteId);
 
             return $website?->project?->owner_user_id;
+        }
+
+        // Hosts-scoped path (spec 029).
+        if ($this->activityEvent->source === 'hosts') {
+            $metadata = $this->activityEvent->metadata ?? [];
+            $hostId = $metadata['host_id'] ?? null;
+
+            if ($hostId === null) {
+                return null;
+            }
+
+            $host = Host::query()->find($hostId);
+
+            return $host?->project?->owner_user_id;
         }
 
         return null;

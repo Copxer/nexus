@@ -57,4 +57,18 @@ class HostFactory extends Factory
             'archived_at' => now(),
         ]);
     }
+
+    public function offline(): static
+    {
+        return $this->state(fn () => [
+            'status' => HostStatus::Offline->value,
+            // Last reported just past the default 120s heartbeat
+            // window so spec-029 tests can assert the recovery
+            // transition out of the gate.
+            'last_seen_at' => now()->subMinutes(5),
+            'cpu_count' => 4,
+            'memory_total_mb' => 8192,
+            'disk_total_gb' => 100,
+        ]);
+    }
 }
