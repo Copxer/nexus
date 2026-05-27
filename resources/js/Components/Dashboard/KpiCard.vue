@@ -20,7 +20,7 @@ const props = withDefaults(
         /** Optional trend indicator next to the value. */
         trend?: { direction: 'up' | 'down' | 'flat'; value: string };
         /** Optional health pill rendered top-right of the card. */
-        status?: 'success' | 'warning' | 'danger' | 'info';
+        status?: 'success' | 'warning' | 'danger' | 'info' | 'muted';
         statusLabel?: string;
         /** Optional inline mini-sparkline data. */
         sparkline?: number[];

@@ -109,7 +109,7 @@ class RecordWebsiteCheckAction
      * Emits an activity event on:
      *   - Healthy → Failed     (incident — `website.down`, danger)
      *   - Pending → Failed     (incident on first probe — same shape)
-     *   - Failed  → Healthy    (recovery — `website.up`, success)
+     *   - Failed  → Healthy    (recovery — `website.recovered`, success)
      *
      * Steady-state (Healthy → Healthy, Failed → Failed) and the silent
      * Pending → Healthy first-probe-success path emit nothing — keeps
@@ -173,7 +173,7 @@ class RecordWebsiteCheckAction
 
         // Failed → Healthy (the only remaining transition).
         $this->createActivity->execute([
-            'event_type' => 'website.up',
+            'event_type' => 'website.recovered',
             'severity' => ActivitySeverity::Success,
             'title' => "{$website->name} recovered",
             'description' => $result->responseTimeMs !== null

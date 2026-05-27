@@ -4,6 +4,8 @@ namespace App\Domain\Activity\Queries;
 
 use App\Domain\Activity\ActivityEventPresenter;
 use App\Models\ActivityEvent;
+use App\Models\Alert;
+use App\Models\Host;
 use App\Models\User;
 use App\Models\Website;
 
@@ -11,10 +13,19 @@ use App\Models\Website;
  * Read-side query for the activity feed shown in the AppLayout right rail
  * and on the dedicated `/activity` page (spec 018).
  *
- * Returns events scoped to repositories owned by the user's projects —
- * cross-user isolation today is single-tenant (one user) but the query is
- * written so multi-tenant scoping (spec ???) only changes the inner
- * `whereHas` predicate.
+ * Returns events scoped to the user's owned domain — across four sources:
+ *   1. Repository-scoped events (spec 017 webhooks, spec 020 deployments)
+ *      via `repository → project → owner_user_id`.
+ *   2. Monitoring-scoped events (spec 024 — `source: monitoring`,
+ *      `metadata.website_id`) via the user's websites.
+ *   3. Hosts-scoped events (spec 029 — `source: hosts`,
+ *      `metadata.host_id`) via the user's hosts.
+ *   4. Alerts-scoped events (spec 030 — `source: alerts`,
+ *      `metadata.alert_id`) via the user's alerts.
+ *
+ * Each non-repo branch pre-resolves the relevant id list so the JSON
+ * predicate stays cheap (no JSON join per row); cross-DB JSON-extract
+ * syntax matches on MySQL and SQLite.
  *
  * Output shape matches the existing TS `ActivityEvent` type
  * (`resources/js/types/index.d.ts`) so the same `ActivityFeedItem.vue`
@@ -46,25 +57,24 @@ class RecentActivityForUserQuery
      */
     public function handle(User $user, int $limit = self::RAIL_LIMIT): array
     {
-        // Two scoping paths land in the same feed:
-        //   1. Repository-scoped events (spec 017's webhook handlers
-        //      and deployments — `repository_id` resolves through the
-        //      project's owner).
-        //   2. Monitoring-scoped events (spec 024 — `source: monitoring`,
-        //      `metadata.website_id` resolves through the website's
-        //      project's owner). These rows have `repository_id` null.
-        //
-        // The user's website ids are pre-resolved into a list once so
-        // the JSON predicate stays cheap (no JSON join per row); cross-
-        // DB JSON-extract syntax is the same shape on MySQL and SQLite.
         $userWebsiteIds = Website::query()
+            ->whereHas('project', fn ($q) => $q->where('owner_user_id', $user->id))
+            ->pluck('id')
+            ->all();
+
+        $userHostIds = Host::query()
+            ->whereHas('project', fn ($q) => $q->where('owner_user_id', $user->id))
+            ->pluck('id')
+            ->all();
+
+        $userAlertIds = Alert::query()
             ->whereHas('project', fn ($q) => $q->where('owner_user_id', $user->id))
             ->pluck('id')
             ->all();
 
         return ActivityEvent::query()
             ->with('repository:id,full_name')
-            ->where(function ($q) use ($user, $userWebsiteIds) {
+            ->where(function ($q) use ($user, $userWebsiteIds, $userHostIds, $userAlertIds) {
                 $q->whereHas('repository.project', function ($inner) use ($user) {
                     $inner->where('owner_user_id', $user->id);
                 });
@@ -73,6 +83,20 @@ class RecentActivityForUserQuery
                     $q->orWhere(function ($inner) use ($userWebsiteIds) {
                         $inner->where('source', 'monitoring')
                             ->whereIn('metadata->website_id', $userWebsiteIds);
+                    });
+                }
+
+                if (! empty($userHostIds)) {
+                    $q->orWhere(function ($inner) use ($userHostIds) {
+                        $inner->where('source', 'hosts')
+                            ->whereIn('metadata->host_id', $userHostIds);
+                    });
+                }
+
+                if (! empty($userAlertIds)) {
+                    $q->orWhere(function ($inner) use ($userAlertIds) {
+                        $inner->where('source', 'alerts')
+                            ->whereIn('metadata->alert_id', $userAlertIds);
                     });
                 }
             })

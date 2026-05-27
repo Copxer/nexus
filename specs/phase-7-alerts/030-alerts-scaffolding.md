@@ -13,7 +13,7 @@ updated: 2026-05-27
 Lay the data + promotion layer for Phase 7. Adds the `alerts` table, the
 `Alert` model + policy, three enums, and two actions (`TriggerAlertAction`,
 `ResolveAlertAction`). Then wires the existing transition emitters
-(`website.down` / `website.up`, `host.offline` / `host.recovered`,
+(`website.down` / `website.recovered`, `host.offline` / `host.recovered`,
 `workflow.failed`) to also promote into `alerts` rows. No UI yet — that
 lands in 031. After 030, every transition that would have produced an
 activity row also produces a durable, acknowledgeable alert that future
@@ -77,7 +77,7 @@ statuses + severities, §6.2 Action class pattern.
     website.project_id, type: 'website.down', severity: critical, title:
     "{name} went down", description: failure summary, metadata: {url,
     http_status_code, error_message})`. On the failed→healthy transition,
-    after the `website.up` activity event, call
+    after the `website.recovered` activity event, call
     `ResolveAlertAction(source: website, source_id: website.id)`.
   - **`DetectOfflineHostsAction`** (spec 029): after the `host.offline`
     activity event, call `TriggerAlertAction(source: docker, source_id:

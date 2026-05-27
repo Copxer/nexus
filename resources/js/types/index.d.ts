@@ -36,7 +36,12 @@ export type PageProps<
  * `StatusBadge` tone. Mirrors the four status colors locked in
  * tailwind.config.js + visual-reference.md.
  */
-export type DashboardStatus = 'success' | 'warning' | 'danger' | 'info';
+export type DashboardStatus =
+    | 'success'
+    | 'warning'
+    | 'danger'
+    | 'info'
+    | 'muted';
 
 /**
  * Mock dashboard payload returned by `OverviewController` for the Overview

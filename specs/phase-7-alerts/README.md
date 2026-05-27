@@ -21,7 +21,7 @@ matching alert. Overview's Alerts KPI swaps from the long-standing
 ## Acceptance criteria (phase-level)
 - [ ] `website.down`, `host.offline`, and `workflow.failed` (on a default
       branch) each create an Alert row with the right severity and source.
-- [ ] `website.up` / `host.recovered` auto-resolve the matching open alert;
+- [ ] `website.recovered` / `host.recovered` auto-resolve the matching open alert;
       workflow failures stay open until the user acts.
 - [ ] Same source + source_id firing twice within an open-alert window
       bumps `last_seen_at` instead of duplicating (idempotency).
