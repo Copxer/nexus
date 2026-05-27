@@ -16,7 +16,7 @@ use Illuminate\Queue\SerializesModels;
  * re-applies naturally, so we never replicate filter or aggregation
  * logic in JS.
  *
- * Spec 024's transition events (`website.down` / `website.up`) ride
+ * Spec 024's transition events (`website.down` / `website.recovered`) ride
  * the activity feed via `ActivityEventCreated` and surface on the
  * AppLayout right rail. This event is **on top of that** — it fires
  * for every check (steady-state runs included) so the per-website

@@ -75,15 +75,17 @@ const stubServices = [
 ];
 
 // Stubs only list widgets whose owning phase hasn't shipped yet.
-// `Deployment timeline` graduated when Phase 4 (specs 020–022) shipped
-// — its real surface is the `Deployments` sidebar entry / `/deployments`
-// page. `Website performance` stays here until spec 025 lands the
-// dedicated Overview widget on top of the spec-023 monitor data.
+// Visualization placeholders for widgets whose owning phase / spec
+// hasn't been written yet. `Deployment timeline` graduated with Phase 4
+// (Deployments sidebar entry); `Website performance` (spec 025) shipped
+// as a per-website sparkline on Show + the Uptime KPI on Overview —
+// retired from here. `Container Hosts` (Phase 6) ships its own card
+// above. What's left is genuine future work.
 const visualizationStubs = [
     { label: 'World map', icon: Globe, phase: 'Phase 8' },
-    { label: 'Resource utilization', icon: Activity, phase: 'Phase 6' },
-    { label: 'Website performance', icon: LineChart, phase: 'Phase 5 · spec 025' },
-    { label: 'System metrics', icon: Gauge, phase: 'Phase 8' },
+    { label: 'Resource utilization', icon: Activity, phase: 'Planned' },
+    { label: 'Analytics charts', icon: LineChart, phase: 'Phase 8' },
+    { label: 'System metrics', icon: Gauge, phase: 'Phase 9' },
 ] as const;
 </script>
 
@@ -195,7 +197,7 @@ const visualizationStubs = [
                     accent="magenta"
                     label="Uptime"
                     :value="`${dashboard.uptime.overall}%`"
-                    secondary="30-day"
+                    secondary="24h"
                     :status="dashboard.uptime.status"
                     status-label="SLA met"
                     :trend="{

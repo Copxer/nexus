@@ -93,7 +93,7 @@ const initials = computed(() => {
             class="relative flex h-9 w-9 cursor-not-allowed items-center justify-center rounded-lg border border-border-subtle bg-slate-950/40 text-text-muted transition focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
             aria-label="Notifications"
             aria-disabled="true"
-            title="Notifications arrive with the Alerts engine (spec 007)."
+            title="Notifications arrive with the Alerts engine (Phase 7 — specs 031 / 032)."
         >
             <Bell class="h-4 w-4" aria-hidden="true" />
             <span

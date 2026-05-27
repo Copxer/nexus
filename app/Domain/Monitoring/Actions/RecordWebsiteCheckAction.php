@@ -173,7 +173,7 @@ class RecordWebsiteCheckAction
 
         // Failed → Healthy (the only remaining transition).
         $this->createActivity->execute([
-            'event_type' => 'website.up',
+            'event_type' => 'website.recovered',
             'severity' => ActivitySeverity::Success,
             'title' => "{$website->name} recovered",
             'description' => $result->responseTimeMs !== null

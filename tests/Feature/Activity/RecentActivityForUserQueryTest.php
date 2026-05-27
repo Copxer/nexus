@@ -4,6 +4,8 @@ namespace Tests\Feature\Activity;
 
 use App\Domain\Activity\Queries\RecentActivityForUserQuery;
 use App\Models\ActivityEvent;
+use App\Models\Alert;
+use App\Models\Host;
 use App\Models\Project;
 use App\Models\Repository;
 use App\Models\User;
@@ -210,5 +212,79 @@ class RecentActivityForUserQueryTest extends TestCase
         // Newest first.
         $this->assertSame('Monitor event', $events[0]['title']);
         $this->assertSame('Repo event', $events[1]['title']);
+    }
+
+    public function test_includes_host_events_for_users_hosts(): void
+    {
+        $owner = User::factory()->create();
+        $project = Project::factory()->create(['owner_user_id' => $owner->id]);
+        $host = Host::factory()->create(['project_id' => $project->id]);
+
+        ActivityEvent::factory()->create([
+            'repository_id' => null,
+            'source' => 'hosts',
+            'event_type' => 'host.offline',
+            'title' => 'host-01 went offline',
+            'metadata' => ['host_id' => $host->id],
+        ]);
+
+        $events = (new RecentActivityForUserQuery)->handle($owner);
+
+        $this->assertCount(1, $events);
+        $this->assertSame('host-01 went offline', $events[0]['title']);
+    }
+
+    public function test_does_not_leak_host_events_for_other_users_hosts(): void
+    {
+        $owner = User::factory()->create();
+        $other = User::factory()->create();
+        $othersProject = Project::factory()->create(['owner_user_id' => $other->id]);
+        $othersHost = Host::factory()->create(['project_id' => $othersProject->id]);
+
+        ActivityEvent::factory()->create([
+            'repository_id' => null,
+            'source' => 'hosts',
+            'event_type' => 'host.offline',
+            'metadata' => ['host_id' => $othersHost->id],
+        ]);
+
+        $this->assertSame([], (new RecentActivityForUserQuery)->handle($owner));
+    }
+
+    public function test_includes_alert_events_for_users_alerts(): void
+    {
+        $owner = User::factory()->create();
+        $project = Project::factory()->create(['owner_user_id' => $owner->id]);
+        $alert = Alert::factory()->create(['project_id' => $project->id]);
+
+        ActivityEvent::factory()->create([
+            'repository_id' => null,
+            'source' => 'alerts',
+            'event_type' => 'alert.triggered',
+            'title' => 'Marketing site went down',
+            'metadata' => ['alert_id' => $alert->id],
+        ]);
+
+        $events = (new RecentActivityForUserQuery)->handle($owner);
+
+        $this->assertCount(1, $events);
+        $this->assertSame('Marketing site went down', $events[0]['title']);
+    }
+
+    public function test_does_not_leak_alert_events_for_other_users_alerts(): void
+    {
+        $owner = User::factory()->create();
+        $other = User::factory()->create();
+        $othersProject = Project::factory()->create(['owner_user_id' => $other->id]);
+        $othersAlert = Alert::factory()->create(['project_id' => $othersProject->id]);
+
+        ActivityEvent::factory()->create([
+            'repository_id' => null,
+            'source' => 'alerts',
+            'event_type' => 'alert.triggered',
+            'metadata' => ['alert_id' => $othersAlert->id],
+        ]);
+
+        $this->assertSame([], (new RecentActivityForUserQuery)->handle($owner));
     }
 }

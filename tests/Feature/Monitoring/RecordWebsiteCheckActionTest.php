@@ -226,7 +226,7 @@ class RecordWebsiteCheckActionTest extends TestCase
             new WebsiteProbeResult(WebsiteCheckStatus::Up, 200, 95, null),
         );
 
-        $event = ActivityEvent::query()->where('event_type', 'website.up')->firstOrFail();
+        $event = ActivityEvent::query()->where('event_type', 'website.recovered')->firstOrFail();
         $this->assertSame(ActivitySeverity::Success, $event->severity);
         $this->assertSame('monitoring', $event->source);
     }
