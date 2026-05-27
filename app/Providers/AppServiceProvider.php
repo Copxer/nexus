@@ -3,11 +3,13 @@
 namespace App\Providers;
 
 use App\Models\AgentToken;
+use App\Models\Alert;
 use App\Models\Host;
 use App\Models\Project;
 use App\Models\Repository;
 use App\Models\Website;
 use App\Policies\AgentTokenPolicy;
+use App\Policies\AlertPolicy;
 use App\Policies\HostPolicy;
 use App\Policies\ProjectPolicy;
 use App\Policies\RepositoryPolicy;
@@ -39,6 +41,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Website::class, WebsitePolicy::class);
         Gate::policy(Host::class, HostPolicy::class);
         Gate::policy(AgentToken::class, AgentTokenPolicy::class);
+        Gate::policy(Alert::class, AlertPolicy::class);
 
         // Per-token rate limiting on `/agent/telemetry` lives inside
         // `AuthenticateAgent` middleware (spec 027). Keeping it there

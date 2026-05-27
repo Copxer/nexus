@@ -6,6 +6,7 @@ use App\Domain\Activity\Actions\CreateActivityEventAction;
 use App\Enums\ActivitySeverity;
 use App\Events\ActivityEventCreated;
 use App\Models\ActivityEvent;
+use App\Models\Alert;
 use App\Models\Host;
 use App\Models\Project;
 use App\Models\Repository;
@@ -141,6 +142,50 @@ class ActivityEventCreatedBroadcastTest extends TestCase
             'source' => 'hosts',
             'event_type' => 'host.offline',
             'metadata' => ['host_id' => 99999],
+        ]);
+
+        $this->assertSame([], (new ActivityEventCreated($row))->broadcastOn());
+    }
+
+    public function test_alerts_source_resolves_to_alert_owners_channel(): void
+    {
+        $owner = User::factory()->create();
+        $project = Project::factory()->create(['owner_user_id' => $owner->id]);
+        $alert = Alert::factory()->create(['project_id' => $project->id]);
+
+        $row = ActivityEvent::factory()->create([
+            'repository_id' => null,
+            'source' => 'alerts',
+            'event_type' => 'alert.triggered',
+            'metadata' => ['alert_id' => $alert->id],
+        ]);
+
+        $channels = (new ActivityEventCreated($row))->broadcastOn();
+
+        $this->assertCount(1, $channels);
+        $this->assertInstanceOf(PrivateChannel::class, $channels[0]);
+        $this->assertSame("private-users.{$owner->id}.activity", $channels[0]->name);
+    }
+
+    public function test_alerts_source_is_silent_when_metadata_alert_id_missing(): void
+    {
+        $row = ActivityEvent::factory()->create([
+            'repository_id' => null,
+            'source' => 'alerts',
+            'event_type' => 'alert.triggered',
+            'metadata' => [],
+        ]);
+
+        $this->assertSame([], (new ActivityEventCreated($row))->broadcastOn());
+    }
+
+    public function test_alerts_source_is_silent_when_alert_id_is_unknown(): void
+    {
+        $row = ActivityEvent::factory()->create([
+            'repository_id' => null,
+            'source' => 'alerts',
+            'event_type' => 'alert.triggered',
+            'metadata' => ['alert_id' => 99999],
         ]);
 
         $this->assertSame([], (new ActivityEventCreated($row))->broadcastOn());

@@ -4,6 +4,7 @@ namespace App\Events;
 
 use App\Domain\Activity\ActivityEventPresenter;
 use App\Models\ActivityEvent;
+use App\Models\Alert;
 use App\Models\Host;
 use App\Models\Website;
 use Illuminate\Broadcasting\InteractsWithSockets;
@@ -37,7 +38,7 @@ class ActivityEventCreated implements ShouldBroadcastNow, ShouldDispatchAfterCom
      * Broadcast on the project owner's private activity channel.
      * `users.{userId}.activity` is authorized in `routes/channels.php`.
      *
-     * Three scoping paths:
+     * Four scoping paths:
      *   1. **Repo-scoped events** (spec 017's webhook handlers,
      *      spec 020's deployments) — channel resolves through
      *      `repository → project → owner_user_id`.
@@ -47,6 +48,9 @@ class ActivityEventCreated implements ShouldBroadcastNow, ShouldDispatchAfterCom
      *   3. **Hosts-scoped events** (spec 029 — `source: hosts`,
      *      `repository_id` is null) — channel resolves through
      *      `metadata.host_id → host → project → owner_user_id`.
+     *   4. **Alerts-scoped events** (spec 030 — `source: alerts`,
+     *      `repository_id` is null) — channel resolves through
+     *      `metadata.alert_id → alert → project → owner_user_id`.
      *
      * If neither path resolves to an owner the broadcast no-ops; the
      * row still exists in the DB, and `RecentActivityForUserQuery`
@@ -108,6 +112,20 @@ class ActivityEventCreated implements ShouldBroadcastNow, ShouldDispatchAfterCom
             $host = Host::query()->find($hostId);
 
             return $host?->project?->owner_user_id;
+        }
+
+        // Alerts-scoped path (spec 030).
+        if ($this->activityEvent->source === 'alerts') {
+            $metadata = $this->activityEvent->metadata ?? [];
+            $alertId = $metadata['alert_id'] ?? null;
+
+            if ($alertId === null) {
+                return null;
+            }
+
+            $alert = Alert::query()->find($alertId);
+
+            return $alert?->project?->owner_user_id;
         }
 
         return null;

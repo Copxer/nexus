@@ -3,7 +3,10 @@
 namespace App\Domain\Docker\Actions;
 
 use App\Domain\Activity\Actions\CreateActivityEventAction;
+use App\Domain\Alerts\Actions\TriggerAlertAction;
 use App\Enums\ActivitySeverity;
+use App\Enums\AlertSeverity;
+use App\Enums\AlertSource;
 use App\Enums\HostStatus;
 use App\Models\Host;
 use Illuminate\Support\Carbon;
@@ -28,6 +31,7 @@ class DetectOfflineHostsAction
 {
     public function __construct(
         private readonly CreateActivityEventAction $createActivity,
+        private readonly TriggerAlertAction $triggerAlert,
     ) {}
 
     /**
@@ -61,6 +65,23 @@ class DetectOfflineHostsAction
                     'source' => 'hosts',
                     'metadata' => [
                         'host_id' => $host->id,
+                        'last_seen_at' => $lastSeenAt?->toIso8601String(),
+                        'threshold_seconds' => $threshold,
+                    ],
+                ]);
+
+                // Spec 030 — promote into a durable Alert. Inside the
+                // same transaction as the status flip + activity event
+                // so the trio is atomic.
+                $this->triggerAlert->execute([
+                    'project_id' => $host->project_id,
+                    'source' => AlertSource::Docker,
+                    'source_id' => $host->id,
+                    'type' => 'host.offline',
+                    'severity' => AlertSeverity::Critical,
+                    'title' => "{$host->name} went offline",
+                    'description' => "No telemetry in {$threshold}s",
+                    'metadata' => [
                         'last_seen_at' => $lastSeenAt?->toIso8601String(),
                         'threshold_seconds' => $threshold,
                     ],

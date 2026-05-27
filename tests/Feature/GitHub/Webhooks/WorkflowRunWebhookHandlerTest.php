@@ -2,13 +2,15 @@
 
 namespace Tests\Feature\GitHub\Webhooks;
 
-use App\Domain\Activity\Actions\CreateActivityEventAction;
-use App\Domain\GitHub\Actions\NormalizeGitHubWorkflowRunAction;
 use App\Domain\GitHub\WebhookHandlers\WorkflowRunWebhookHandler;
+use App\Enums\AlertSeverity;
+use App\Enums\AlertSource;
+use App\Enums\AlertStatus;
 use App\Enums\WebhookDeliveryStatus;
 use App\Events\ActivityEventCreated;
 use App\Events\WorkflowRunUpserted;
 use App\Models\ActivityEvent;
+use App\Models\Alert;
 use App\Models\Project;
 use App\Models\Repository;
 use App\Models\User;
@@ -24,10 +26,7 @@ class WorkflowRunWebhookHandlerTest extends TestCase
 
     private function handler(): WorkflowRunWebhookHandler
     {
-        return new WorkflowRunWebhookHandler(
-            new CreateActivityEventAction,
-            new NormalizeGitHubWorkflowRunAction,
-        );
+        return app(WorkflowRunWebhookHandler::class);
     }
 
     private function deliveryFor(
@@ -135,6 +134,92 @@ class WorkflowRunWebhookHandlerTest extends TestCase
         $this->assertSame(0, ActivityEvent::query()->count());
         // No FK target for the upsert when the repo isn't imported yet.
         $this->assertSame(0, WorkflowRun::query()->count());
+    }
+
+    public function test_default_branch_failure_promotes_to_an_open_warning_alert(): void
+    {
+        Event::fake([ActivityEventCreated::class]);
+        $user = User::factory()->create();
+        $project = Project::factory()->create(['owner_user_id' => $user->id]);
+        // Pin default_branch so the test isn't a flake against the
+        // factory's random choice across {main, master, develop}.
+        Repository::factory()->create([
+            'project_id' => $project->id,
+            'full_name' => 'octocat/hello-world',
+            'default_branch' => 'main',
+        ]);
+
+        $this->handler()->handle($this->deliveryFor('completed', 'failure'));
+
+        $alert = Alert::query()->firstOrFail();
+        $this->assertSame(AlertSource::Deployment, $alert->source);
+        $this->assertSame('workflow.failed', $alert->type);
+        $this->assertSame(AlertSeverity::Warning, $alert->severity);
+        $this->assertSame(AlertStatus::Open, $alert->status);
+        $this->assertSame($project->id, $alert->project_id);
+        $this->assertSame(WorkflowRun::query()->value('id'), $alert->source_id);
+    }
+
+    public function test_non_default_branch_failure_emits_activity_but_no_alert(): void
+    {
+        Event::fake([ActivityEventCreated::class]);
+        $user = User::factory()->create();
+        $project = Project::factory()->create(['owner_user_id' => $user->id]);
+        Repository::factory()->create([
+            'project_id' => $project->id,
+            'full_name' => 'octocat/hello-world',
+            'default_branch' => 'main',
+        ]);
+
+        // Override the default payload (head_branch: main) with a
+        // feature-branch delivery.
+        $delivery = WebhookDelivery::factory()->create([
+            'event' => 'workflow_run',
+            'action' => 'completed',
+            'repository_full_name' => 'octocat/hello-world',
+            'payload_json' => [
+                'action' => 'completed',
+                'repository' => ['full_name' => 'octocat/hello-world'],
+                'workflow_run' => [
+                    'id' => 4321,
+                    'name' => 'CI',
+                    'head_branch' => 'feature/login-form',
+                    'head_sha' => 'b'.str_repeat('2', 39),
+                    'event' => 'pull_request',
+                    'run_number' => 99,
+                    'conclusion' => 'failure',
+                    'status' => 'completed',
+                    'updated_at' => '2026-04-29T12:00:00Z',
+                    'run_started_at' => '2026-04-29T11:55:00Z',
+                    'html_url' => 'https://github.com/octocat/hello-world/actions/runs/4321',
+                    'actor' => ['login' => 'alice'],
+                ],
+                'sender' => ['login' => 'alice'],
+            ],
+        ]);
+
+        $this->handler()->handle($delivery);
+
+        $this->assertDatabaseHas('activity_events', [
+            'event_type' => 'workflow.failed',
+        ]);
+        $this->assertSame(0, Alert::query()->count(), 'feature-branch failures stay rail-only');
+    }
+
+    public function test_default_branch_success_does_not_create_an_alert(): void
+    {
+        Event::fake([ActivityEventCreated::class]);
+        $user = User::factory()->create();
+        $project = Project::factory()->create(['owner_user_id' => $user->id]);
+        Repository::factory()->create([
+            'project_id' => $project->id,
+            'full_name' => 'octocat/hello-world',
+            'default_branch' => 'main',
+        ]);
+
+        $this->handler()->handle($this->deliveryFor('completed', 'success'));
+
+        $this->assertSame(0, Alert::query()->count());
     }
 
     public function test_completed_handled_run_upserts_into_workflow_runs(): void
