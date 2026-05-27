@@ -206,6 +206,51 @@ class WorkflowRunWebhookHandlerTest extends TestCase
         $this->assertSame(0, Alert::query()->count(), 'feature-branch failures stay rail-only');
     }
 
+    public function test_malformed_payload_missing_head_branch_does_not_create_an_alert(): void
+    {
+        // The handler's display-fallback ($run['head_branch'] ??
+        // $repository->default_branch ?? 'main') would silently match
+        // the default branch and trigger an alert otherwise; the
+        // raw-payload gate defends against this.
+        Event::fake([ActivityEventCreated::class]);
+        $user = User::factory()->create();
+        $project = Project::factory()->create(['owner_user_id' => $user->id]);
+        Repository::factory()->create([
+            'project_id' => $project->id,
+            'full_name' => 'octocat/hello-world',
+            'default_branch' => 'main',
+        ]);
+
+        $delivery = WebhookDelivery::factory()->create([
+            'event' => 'workflow_run',
+            'action' => 'completed',
+            'repository_full_name' => 'octocat/hello-world',
+            'payload_json' => [
+                'action' => 'completed',
+                'repository' => ['full_name' => 'octocat/hello-world'],
+                'workflow_run' => [
+                    'id' => 5555,
+                    'name' => 'CI',
+                    // head_branch intentionally absent
+                    'head_sha' => 'c'.str_repeat('3', 39),
+                    'event' => 'push',
+                    'run_number' => 7,
+                    'conclusion' => 'failure',
+                    'status' => 'completed',
+                    'updated_at' => '2026-04-29T12:00:00Z',
+                    'run_started_at' => '2026-04-29T11:55:00Z',
+                    'html_url' => 'https://github.com/octocat/hello-world/actions/runs/5555',
+                    'actor' => ['login' => 'alice'],
+                ],
+                'sender' => ['login' => 'alice'],
+            ],
+        ]);
+
+        $this->handler()->handle($delivery);
+
+        $this->assertSame(0, Alert::query()->count(), 'missing head_branch must not bypass the default-branch gate');
+    }
+
     public function test_default_branch_success_does_not_create_an_alert(): void
     {
         Event::fake([ActivityEventCreated::class]);

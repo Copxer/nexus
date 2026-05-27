@@ -42,7 +42,7 @@ Status legend: ⬜ not started · 🟡 in progress · 🟢 done · 🔴 blocked
 | 4 | Deployments & CI/CD | 🟢 | 3/3 specs done (020–022). Phase complete. |
 | 5 | Website Monitoring | 🟢 | 3/3 specs done (023–025). Phase complete. |
 | 6 | Docker Host Agent MVP | 🟢 | 4/4 specs done (026–029). Phase complete. |
-| 7 | Alerts Engine | 🟡 | 0/3 specs done (030–032). Scoped. |
+| 7 | Alerts Engine | 🟡 | 1/3 specs done (030–032). 030 shipped. |
 | 8 | Analytics & Health Scores | ⬜ | — |
 | 9 | Polish & Production Readiness | ⬜ | — |
 | 10 | Future Innovation | ⬜ | — |

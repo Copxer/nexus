@@ -102,6 +102,29 @@ class ResolveAlertActionTest extends TestCase
         );
     }
 
+    public function test_muted_alerts_are_left_alone_on_resolve(): void
+    {
+        // The user explicitly muted this alert; auto-resolve must
+        // not undo that decision. (Auto-resolve closes `open` and
+        // `acknowledged` — `muted` and `resolved` stay put.)
+        $project = Project::factory()->create();
+        $muted = Alert::factory()->muted()->create([
+            'project_id' => $project->id,
+            'source' => AlertSource::Website->value,
+            'source_id' => 50,
+            'type' => 'website.down',
+        ]);
+
+        $resolved = app(ResolveAlertAction::class)->execute([
+            'source' => AlertSource::Website,
+            'source_id' => 50,
+        ]);
+
+        $this->assertSame(0, $resolved);
+        $this->assertSame(AlertStatus::Muted, $muted->fresh()->status);
+        $this->assertSame(0, ActivityEvent::query()->count());
+    }
+
     public function test_type_filter_narrows_the_close_set(): void
     {
         $project = Project::factory()->create();

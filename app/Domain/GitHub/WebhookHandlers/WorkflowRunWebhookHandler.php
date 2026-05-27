@@ -128,13 +128,16 @@ class WorkflowRunWebhookHandler
         // Spec 030 — promote `workflow.failed` runs on the repo's
         // default branch into a durable Alert. Feature-branch failures
         // stay rail-only to keep alert noise in check; revisit with a
-        // per-repo monitored-branches allowlist later.
+        // per-repo monitored-branches allowlist later. Pass the RAW
+        // payload `head_branch` (not the fallback'd display value) so
+        // a malformed delivery missing the field doesn't accidentally
+        // pass the default-branch filter.
         $this->maybePromoteWorkflowAlert(
             rule: $rule,
             workflowRun: $workflowRun,
             repository: $repository,
             run: $run,
-            headBranch: $headBranch,
+            rawHeadBranch: $run['head_branch'] ?? null,
             title: $title,
             sender: $sender,
         );
@@ -151,7 +154,7 @@ class WorkflowRunWebhookHandler
         ?WorkflowRun $workflowRun,
         Repository $repository,
         array $run,
-        string $headBranch,
+        ?string $rawHeadBranch,
         string $title,
         ?string $sender,
     ): void {
@@ -161,8 +164,12 @@ class WorkflowRunWebhookHandler
         if ($workflowRun === null) {
             return; // normalizer rejected; no local row to point at
         }
+        if (! is_string($rawHeadBranch) || $rawHeadBranch === '') {
+            return; // unknown branch — don't alert (defends against
+            // malformed payloads that omit `head_branch`)
+        }
         $defaultBranch = $repository->default_branch;
-        if ($defaultBranch === null || $defaultBranch === '' || $headBranch !== $defaultBranch) {
+        if ($defaultBranch === null || $defaultBranch === '' || $rawHeadBranch !== $defaultBranch) {
             return; // feature-branch failures stay rail-only in 030
         }
         $projectId = $repository->project?->id;
@@ -181,7 +188,7 @@ class WorkflowRunWebhookHandler
             'metadata' => [
                 'workflow_run_id' => $workflowRun->id,
                 'github_run_id' => $workflowRun->github_id,
-                'head_branch' => $headBranch,
+                'head_branch' => $rawHeadBranch,
                 'conclusion' => (string) ($run['conclusion'] ?? ''),
                 'actor' => $sender,
                 'html_url' => $run['html_url'] ?? null,

@@ -24,6 +24,16 @@ use Illuminate\Support\Carbon;
  * the alert in realtime through the existing `ActivityEventCreated`
  * fan-out (the `source: alerts` branch resolves the recipient via
  * `metadata.alert_id`).
+ *
+ * Concurrency note: the idempotency check is `SELECT … WHERE status
+ * IN (open, acknowledged) … LIMIT 1` followed by an `INSERT`, not an
+ * atomic upsert. Two callers racing simultaneously could in theory
+ * both miss the existing row and both insert. The 030 call sites
+ * serialize (per-website scheduler / queued telemetry job / sequential
+ * webhook handler) so this is theoretical today; if a future caller
+ * arrives with real concurrency, add a partial unique index on
+ * `(source, source_id, type) WHERE status IN ('open', 'acknowledged')`
+ * (PostgreSQL) or a uniqueness guard at the action layer.
  */
 class TriggerAlertAction
 {

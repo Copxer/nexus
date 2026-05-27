@@ -14,7 +14,7 @@ matching alert. Overview's Alerts KPI swaps from the long-standing
 
 | # | Task | Status |
 |---|------|--------|
-| 030 | Alerts scaffolding + transition-based promotion (events → Alert rows) | ⬜ |
+| 030 | Alerts scaffolding + transition-based promotion (events → Alert rows) | 🟢 |
 | 031 | Alerts UI + acknowledge / resolve / mute actions | ⬜ |
 | 032 | Realtime updates + Overview Alerts KPI wiring (closes phase 7) | ⬜ |
 

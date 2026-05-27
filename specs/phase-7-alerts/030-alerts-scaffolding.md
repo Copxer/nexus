@@ -1,7 +1,7 @@
 ---
 spec: alerts-scaffolding
 phase: 7
-status: in-progress   # not-started | in-progress | blocked | done
+status: done   # not-started | in-progress | blocked | done
 owner: Yoany
 created: 2026-05-26
 updated: 2026-05-27
@@ -298,28 +298,28 @@ statuses + severities, §6.2 Action class pattern.
     test in `ActivityEventCreatedBroadcastTest`).
 
 ## Acceptance criteria
-- [ ] `alerts` migration applies cleanly on a fresh DB and rolls back.
-- [ ] `Alert` factory + policy work in tinker / tests.
-- [ ] A website's healthy → failed transition creates an open `Alert` with
+- [x] `alerts` migration applies cleanly on a fresh DB and rolls back.
+- [x] `Alert` factory + policy work in tinker / tests.
+- [x] A website's healthy → failed transition creates an open `Alert` with
       `severity: critical`, `source: website`, `source_id: website.id`,
       `type: website.down`.
-- [ ] The matching failed → healthy transition auto-resolves the open
+- [x] The matching failed → healthy transition auto-resolves the open
       Alert and emits an `alert.resolved` activity event.
-- [ ] A host going offline (`DetectOfflineHostsAction` flip) creates one
+- [x] A host going offline (`DetectOfflineHostsAction` flip) creates one
       open Alert with `severity: critical`, `source: docker`.
-- [ ] First telemetry after offline (`IngestHostTelemetryAction` recovery
+- [x] First telemetry after offline (`IngestHostTelemetryAction` recovery
       branch) auto-resolves the open host Alert.
-- [ ] A `workflow.failed` webhook for a run on the default branch creates
+- [x] A `workflow.failed` webhook for a run on the default branch creates
       an open Alert with `severity: warning`, `source: deployment`. The
       same handler does NOT create an Alert for a feature-branch failure.
-- [ ] A second identical `Trigger` call within the open window bumps
+- [x] A second identical `Trigger` call within the open window bumps
       `last_seen_at` and returns the same row — no duplicate Alert, no
       second activity event.
-- [ ] `ResolveAlertAction` is a no-op when no matching open Alert exists.
-- [ ] `ActivityEventCreated` routes `source: alerts` rows to the alert's
+- [x] `ResolveAlertAction` is a no-op when no matching open Alert exists.
+- [x] `ActivityEventCreated` routes `source: alerts` rows to the alert's
       project owner's `users.{id}.activity` channel; unknown alert_id
       short-circuits to no channels.
-- [ ] Pint clean, `php artisan test` green (new tests added), `npm run
+- [x] Pint clean, `php artisan test` green (new tests added), `npm run
       build` clean.
 
 ## Files touched
@@ -356,6 +356,10 @@ Fill in as work progresses.
 ### 2026-05-27
 - Shipping as drafted (all three open-question choices stay: workflow.failed at `warning`, default-branch-only filter, ack→resolve auto-promotion on recovery).
 - Issue [#89](https://github.com/Copxer/nexus/issues/89) opened, branch `spec/030-alerts-scaffolding` cut off `main`. Phase 7 folder created.
+- Backend: alerts migration + Alert model + 3 enums + factory + AlertPolicy + 2 actions; `ActivityEventCreated` extended with `source: alerts` branch.
+- Wired 4 promotion call sites (RecordWebsiteCheckAction, DetectOfflineHostsAction, IngestHostTelemetryAction, WorkflowRunWebhookHandler) to Trigger/Resolve alongside their existing activity events.
+- Tests: 20 new (action-level + integration + broadcast routing). Full suite 507→527 green, Pint clean, build clean.
+- Self-review via `superpowers:code-reviewer`. Addressed: (1) gated the workflow alert filter on the **raw** `head_branch` payload value instead of the display fallback — a malformed delivery missing the field no longer accidentally trips the default-branch match; added a regression test. (2) Documented the no-unique-index idempotency caveat in `TriggerAlertAction`'s docblock. (3) Added a `muted alerts are left alone on resolve` test to pin the load-bearing user-opt-out invariant.
 
 ## Open questions / blockers
 - **`workflow.failed` severity.** 030 ships `warning`. Some teams treat a
