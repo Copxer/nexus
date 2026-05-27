@@ -3,8 +3,12 @@
 namespace App\Domain\Monitoring\Actions;
 
 use App\Domain\Activity\Actions\CreateActivityEventAction;
+use App\Domain\Alerts\Actions\ResolveAlertAction;
+use App\Domain\Alerts\Actions\TriggerAlertAction;
 use App\Domain\Monitoring\Probes\WebsiteProbeResult;
 use App\Enums\ActivitySeverity;
+use App\Enums\AlertSeverity;
+use App\Enums\AlertSource;
 use App\Enums\WebsiteCheckStatus;
 use App\Enums\WebsiteStatus;
 use App\Events\WebsiteCheckRecorded;
@@ -47,6 +51,8 @@ class RecordWebsiteCheckAction
 {
     public function __construct(
         private readonly CreateActivityEventAction $createActivity,
+        private readonly TriggerAlertAction $triggerAlert,
+        private readonly ResolveAlertAction $resolveAlert,
     ) {}
 
     public function execute(Website $website, WebsiteProbeResult $result): WebsiteCheck
@@ -142,6 +148,26 @@ class RecordWebsiteCheckAction
                 ],
             ]);
 
+            // Spec 030 — promote the transition into a durable Alert.
+            // Idempotent on (source, source_id, type) so re-entering
+            // the failed bucket via a different status (Down vs Error)
+            // bumps `last_seen_at` on the existing alert instead of
+            // duplicating.
+            $this->triggerAlert->execute([
+                'project_id' => $website->project_id,
+                'source' => AlertSource::Website,
+                'source_id' => $website->id,
+                'type' => 'website.down',
+                'severity' => AlertSeverity::Critical,
+                'title' => "{$website->name} went down",
+                'description' => $this->failureDescription($result),
+                'metadata' => [
+                    'url' => $website->url,
+                    'http_status_code' => $result->httpStatusCode,
+                    'error_message' => $result->errorMessage,
+                ],
+            ]);
+
             return;
         }
 
@@ -161,6 +187,14 @@ class RecordWebsiteCheckAction
                 'http_status_code' => $result->httpStatusCode,
                 'response_time_ms' => $result->responseTimeMs,
             ],
+        ]);
+
+        // Spec 030 — close any open/acknowledged Alert for this
+        // website. No-op when nothing's open (eg. a recovery that
+        // beat the alert pipeline).
+        $this->resolveAlert->execute([
+            'source' => AlertSource::Website,
+            'source_id' => $website->id,
         ]);
     }
 

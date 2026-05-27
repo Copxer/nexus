@@ -4,8 +4,11 @@ namespace Tests\Unit\Domain\Docker;
 
 use App\Domain\Docker\Actions\IngestHostTelemetryAction;
 use App\Enums\ActivitySeverity;
+use App\Enums\AlertSource;
+use App\Enums\AlertStatus;
 use App\Enums\HostStatus;
 use App\Models\ActivityEvent;
+use App\Models\Alert;
 use App\Models\Host;
 use App\Models\HostMetricSnapshot;
 use Carbon\CarbonImmutable;
@@ -152,5 +155,20 @@ class IngestHostTelemetryActionTest extends TestCase
         app(IngestHostTelemetryAction::class)->execute($host, $this->basePayload());
 
         $this->assertSame(0, ActivityEvent::query()->where('event_type', 'host.recovered')->count());
+    }
+
+    public function test_recovery_auto_resolves_the_open_host_alert(): void
+    {
+        $host = Host::factory()->offline()->create();
+        $alert = Alert::factory()->forHost()->create([
+            'project_id' => $host->project_id,
+            'source' => AlertSource::Docker->value,
+            'source_id' => $host->id,
+            'type' => 'host.offline',
+        ]);
+
+        app(IngestHostTelemetryAction::class)->execute($host, $this->basePayload());
+
+        $this->assertSame(AlertStatus::Resolved, $alert->fresh()->status);
     }
 }

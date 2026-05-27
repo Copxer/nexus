@@ -3,7 +3,9 @@
 namespace App\Domain\Docker\Actions;
 
 use App\Domain\Activity\Actions\CreateActivityEventAction;
+use App\Domain\Alerts\Actions\ResolveAlertAction;
 use App\Enums\ActivitySeverity;
+use App\Enums\AlertSource;
 use App\Enums\HostStatus;
 use App\Events\HostTelemetryRecorded;
 use App\Models\Host;
@@ -35,6 +37,7 @@ class IngestHostTelemetryAction
     public function __construct(
         private readonly SyncContainerSnapshotsAction $syncContainers,
         private readonly CreateActivityEventAction $createActivity,
+        private readonly ResolveAlertAction $resolveAlert,
     ) {}
 
     /**
@@ -83,6 +86,13 @@ class IngestHostTelemetryAction
                     'host_id' => $host->id,
                     'recorded_at' => $recordedAt->toIso8601String(),
                 ],
+            ]);
+
+            // Spec 030 — auto-resolve any open or acknowledged
+            // host.offline Alert. No-op when nothing's open.
+            $this->resolveAlert->execute([
+                'source' => AlertSource::Docker,
+                'source_id' => $host->id,
             ]);
         }
     }

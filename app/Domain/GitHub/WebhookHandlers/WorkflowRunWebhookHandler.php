@@ -3,8 +3,11 @@
 namespace App\Domain\GitHub\WebhookHandlers;
 
 use App\Domain\Activity\Actions\CreateActivityEventAction;
+use App\Domain\Alerts\Actions\TriggerAlertAction;
 use App\Domain\GitHub\Actions\NormalizeGitHubWorkflowRunAction;
 use App\Enums\ActivitySeverity;
+use App\Enums\AlertSeverity;
+use App\Enums\AlertSource;
 use App\Enums\WebhookDeliveryStatus;
 use App\Events\WorkflowRunUpserted;
 use App\Models\Repository;
@@ -43,6 +46,7 @@ class WorkflowRunWebhookHandler
     public function __construct(
         private readonly CreateActivityEventAction $createActivity,
         private readonly NormalizeGitHubWorkflowRunAction $normalizer,
+        private readonly TriggerAlertAction $triggerAlert,
     ) {}
 
     public function handle(WebhookDelivery $delivery): WebhookDeliveryStatus
@@ -74,7 +78,7 @@ class WorkflowRunWebhookHandler
         // states (queued / in_progress / cancelled / etc.). Activity-event
         // creation below remains gated to terminal outcomes so the rail
         // doesn't thrash.
-        $this->upsertWorkflowRun($repository, $run);
+        $workflowRun = $this->upsertWorkflowRun($repository, $run);
 
         if ($action !== 'completed') {
             $delivery->forceFill([
@@ -121,7 +125,75 @@ class WorkflowRunWebhookHandler
             ],
         ]);
 
+        // Spec 030 — promote `workflow.failed` runs on the repo's
+        // default branch into a durable Alert. Feature-branch failures
+        // stay rail-only to keep alert noise in check; revisit with a
+        // per-repo monitored-branches allowlist later. Pass the RAW
+        // payload `head_branch` (not the fallback'd display value) so
+        // a malformed delivery missing the field doesn't accidentally
+        // pass the default-branch filter.
+        $this->maybePromoteWorkflowAlert(
+            rule: $rule,
+            workflowRun: $workflowRun,
+            repository: $repository,
+            run: $run,
+            rawHeadBranch: $run['head_branch'] ?? null,
+            title: $title,
+            sender: $sender,
+        );
+
         return WebhookDeliveryStatus::Processed;
+    }
+
+    /**
+     * @param  array{type: string, severity: ActivitySeverity}  $rule
+     * @param  array<string, mixed>  $run
+     */
+    private function maybePromoteWorkflowAlert(
+        array $rule,
+        ?WorkflowRun $workflowRun,
+        Repository $repository,
+        array $run,
+        ?string $rawHeadBranch,
+        string $title,
+        ?string $sender,
+    ): void {
+        if ($rule['type'] !== 'workflow.failed') {
+            return;
+        }
+        if ($workflowRun === null) {
+            return; // normalizer rejected; no local row to point at
+        }
+        if (! is_string($rawHeadBranch) || $rawHeadBranch === '') {
+            return; // unknown branch — don't alert (defends against
+            // malformed payloads that omit `head_branch`)
+        }
+        $defaultBranch = $repository->default_branch;
+        if ($defaultBranch === null || $defaultBranch === '' || $rawHeadBranch !== $defaultBranch) {
+            return; // feature-branch failures stay rail-only in 030
+        }
+        $projectId = $repository->project?->id;
+        if ($projectId === null) {
+            return; // orphan repo (shouldn't happen — defensive)
+        }
+
+        $this->triggerAlert->execute([
+            'project_id' => $projectId,
+            'source' => AlertSource::Deployment,
+            'source_id' => $workflowRun->id,
+            'type' => 'workflow.failed',
+            'severity' => AlertSeverity::Warning,
+            'title' => $title,
+            'description' => $repository->full_name,
+            'metadata' => [
+                'workflow_run_id' => $workflowRun->id,
+                'github_run_id' => $workflowRun->github_id,
+                'head_branch' => $rawHeadBranch,
+                'conclusion' => (string) ($run['conclusion'] ?? ''),
+                'actor' => $sender,
+                'html_url' => $run['html_url'] ?? null,
+            ],
+        ]);
     }
 
     private function resolveRepository(WebhookDelivery $delivery): ?Repository
@@ -151,12 +223,12 @@ class WorkflowRunWebhookHandler
      *
      * @param  array<string, mixed>  $run
      */
-    private function upsertWorkflowRun(Repository $repository, array $run): void
+    private function upsertWorkflowRun(Repository $repository, array $run): ?WorkflowRun
     {
         $normalized = $this->normalizer->execute($run);
 
         if ($normalized === null) {
-            return;
+            return null;
         }
 
         $workflowRun = WorkflowRun::query()->updateOrCreate(
@@ -179,6 +251,8 @@ class WorkflowRunWebhookHandler
             $workflowRun->repository_id,
             $ownerUserId,
         );
+
+        return $workflowRun;
     }
 
     private function occurredAt(array $run): Carbon

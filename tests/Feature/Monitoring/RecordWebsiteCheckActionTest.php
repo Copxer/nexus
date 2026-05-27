@@ -2,15 +2,17 @@
 
 namespace Tests\Feature\Monitoring;
 
-use App\Domain\Activity\Actions\CreateActivityEventAction;
 use App\Domain\Monitoring\Actions\RecordWebsiteCheckAction;
 use App\Domain\Monitoring\Probes\WebsiteProbeResult;
 use App\Enums\ActivitySeverity;
+use App\Enums\AlertSource;
+use App\Enums\AlertStatus;
 use App\Enums\WebsiteCheckStatus;
 use App\Enums\WebsiteStatus;
 use App\Events\ActivityEventCreated;
 use App\Events\WebsiteCheckRecorded;
 use App\Models\ActivityEvent;
+use App\Models\Alert;
 use App\Models\Project;
 use App\Models\User;
 use App\Models\Website;
@@ -25,7 +27,7 @@ class RecordWebsiteCheckActionTest extends TestCase
 
     private function action(): RecordWebsiteCheckAction
     {
-        return new RecordWebsiteCheckAction(new CreateActivityEventAction);
+        return app(RecordWebsiteCheckAction::class);
     }
 
     private function makeWebsite(WebsiteStatus $status = WebsiteStatus::Pending): Website
@@ -189,9 +191,10 @@ class RecordWebsiteCheckActionTest extends TestCase
             new WebsiteProbeResult(WebsiteCheckStatus::Down, 503, 220, 'HTTP 503: Service Unavailable'),
         );
 
-        $this->assertSame(1, ActivityEvent::query()->count());
-        $event = ActivityEvent::query()->first();
-        $this->assertSame('website.down', $event->event_type);
+        // Spec 030 promotes the transition into an alert.triggered
+        // activity event alongside the website.down rail event, so
+        // filter by event_type instead of counting all rows.
+        $event = ActivityEvent::query()->where('event_type', 'website.down')->firstOrFail();
         $this->assertSame(ActivitySeverity::Danger, $event->severity);
         $this->assertSame('monitoring', $event->source);
         $this->assertSame($website->id, $event->metadata['website_id']);
@@ -223,10 +226,46 @@ class RecordWebsiteCheckActionTest extends TestCase
             new WebsiteProbeResult(WebsiteCheckStatus::Up, 200, 95, null),
         );
 
-        $event = ActivityEvent::query()->firstOrFail();
-        $this->assertSame('website.up', $event->event_type);
+        $event = ActivityEvent::query()->where('event_type', 'website.up')->firstOrFail();
         $this->assertSame(ActivitySeverity::Success, $event->severity);
         $this->assertSame('monitoring', $event->source);
+    }
+
+    public function test_healthy_to_failed_promotes_into_an_open_critical_alert(): void
+    {
+        Event::fake([ActivityEventCreated::class]);
+        $website = $this->makeWebsite(WebsiteStatus::Up);
+
+        $this->action()->execute(
+            $website,
+            new WebsiteProbeResult(WebsiteCheckStatus::Down, 502, 200, 'HTTP 502'),
+        );
+
+        $alert = Alert::query()->firstOrFail();
+        $this->assertSame(AlertSource::Website, $alert->source);
+        $this->assertSame($website->id, $alert->source_id);
+        $this->assertSame('website.down', $alert->type);
+        $this->assertSame(AlertStatus::Open, $alert->status);
+        $this->assertSame($website->project_id, $alert->project_id);
+    }
+
+    public function test_failed_to_healthy_auto_resolves_the_open_alert(): void
+    {
+        Event::fake([ActivityEventCreated::class]);
+        $website = $this->makeWebsite(WebsiteStatus::Down);
+        $alert = Alert::factory()->create([
+            'project_id' => $website->project_id,
+            'source' => AlertSource::Website->value,
+            'source_id' => $website->id,
+            'type' => 'website.down',
+        ]);
+
+        $this->action()->execute(
+            $website,
+            new WebsiteProbeResult(WebsiteCheckStatus::Up, 200, 80, null),
+        );
+
+        $this->assertSame(AlertStatus::Resolved, $alert->fresh()->status);
     }
 
     public function test_steady_state_healthy_emits_nothing(): void

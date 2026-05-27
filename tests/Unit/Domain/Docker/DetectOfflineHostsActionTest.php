@@ -4,8 +4,11 @@ namespace Tests\Unit\Domain\Docker;
 
 use App\Domain\Docker\Actions\DetectOfflineHostsAction;
 use App\Enums\ActivitySeverity;
+use App\Enums\AlertSource;
+use App\Enums\AlertStatus;
 use App\Enums\HostStatus;
 use App\Models\ActivityEvent;
+use App\Models\Alert;
 use App\Models\Host;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -95,6 +98,22 @@ class DetectOfflineHostsActionTest extends TestCase
         $this->assertSame(0, $flipped);
         $this->assertSame(HostStatus::Offline, $host->fresh()->status);
         $this->assertSame(0, ActivityEvent::query()->where('event_type', 'host.offline')->count());
+    }
+
+    public function test_flipping_a_host_also_creates_a_critical_alert(): void
+    {
+        $host = Host::factory()->online()->create([
+            'last_seen_at' => now()->subSeconds(self::TIMEOUT + 60),
+        ]);
+
+        app(DetectOfflineHostsAction::class)->execute();
+
+        $alert = Alert::query()->firstOrFail();
+        $this->assertSame(AlertSource::Docker, $alert->source);
+        $this->assertSame($host->id, $alert->source_id);
+        $this->assertSame('host.offline', $alert->type);
+        $this->assertSame(AlertStatus::Open, $alert->status);
+        $this->assertSame($host->project_id, $alert->project_id);
     }
 
     public function test_multiple_stale_hosts_each_produce_one_event(): void
