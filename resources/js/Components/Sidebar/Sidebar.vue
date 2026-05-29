@@ -45,7 +45,7 @@ const nav: NavItem[] = [
     { label: 'Hosts', icon: Server, routeName: 'monitoring.hosts.index' },
     { label: 'Monitoring', icon: Globe, routeName: 'monitoring.websites.index' },
     { label: 'Analytics', icon: BarChart3, disabled: true, soonLabel: 'Phase 8' },
-    { label: 'Alerts', icon: Bell, disabled: true, soonLabel: 'Phase 7' },
+    { label: 'Alerts', icon: Bell, routeName: 'alerts.index' },
     { label: 'Activity', icon: History, routeName: 'activity.index' },
     { label: 'Settings', icon: SettingsIcon, routeName: 'settings.index' },
 ];
