@@ -2,6 +2,10 @@
 
 use App\Http\Controllers\ActivityController;
 use App\Http\Controllers\Agent\HostTelemetryController;
+use App\Http\Controllers\AlertAcknowledgeController;
+use App\Http\Controllers\AlertController;
+use App\Http\Controllers\AlertMuteController;
+use App\Http\Controllers\AlertResolveController;
 use App\Http\Controllers\DeploymentController;
 use App\Http\Controllers\GithubConnectionController;
 use App\Http\Controllers\GithubRepositoryImportController;
@@ -128,6 +132,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('monitoring.hosts.tokens.rotate');
     Route::delete('/monitoring/hosts/{host}/tokens/{token}', [AgentTokenController::class, 'destroy'])
         ->name('monitoring.hosts.tokens.destroy');
+
+    // Spec 031 — Alerts UI. Index + three single-action lifecycle
+    // verbs (ack / resolve / mute). Trigger / auto-resolve already
+    // happen inside the existing transition emitters (spec 030).
+    Route::get('/alerts', [AlertController::class, 'index'])
+        ->name('alerts.index');
+    Route::post('/alerts/{alert}/acknowledge', AlertAcknowledgeController::class)
+        ->name('alerts.acknowledge');
+    Route::post('/alerts/{alert}/resolve', AlertResolveController::class)
+        ->name('alerts.resolve');
+    Route::post('/alerts/{alert}/mute', AlertMuteController::class)
+        ->name('alerts.mute');
 });
 
 // Spec 017 — GitHub webhooks (no auth/CSRF; signature-verified inside).

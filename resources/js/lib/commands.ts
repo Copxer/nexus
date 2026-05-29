@@ -152,8 +152,8 @@ export function getCommands(): Command[] {
             label: 'Go to Alerts',
             group: 'navigation',
             icon: Bell,
-            disabled: true,
-            soonLabel: 'Phase 7',
+            keywords: ['incidents', 'open alerts', 'acks'],
+            run: () => router.visit(route('alerts.index')),
         },
         {
             id: 'go-settings',
