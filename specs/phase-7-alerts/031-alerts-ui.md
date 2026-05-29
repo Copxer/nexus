@@ -1,7 +1,7 @@
 ---
 spec: alerts-ui
 phase: 7
-status: in-progress   # not-started | in-progress | blocked | done
+status: done   # not-started | in-progress | blocked | done
 owner: Yoany
 created: 2026-05-27
 updated: 2026-05-29
@@ -252,26 +252,26 @@ timeline, ack / resolve / mute buttons, link to affected entity).
    "sibling user gets 403" path with no changes.
 
 ## Acceptance criteria
-- [ ] `/alerts` page renders the user's open alerts by default, sorted
+- [x] `/alerts` page renders the user's open alerts by default, sorted
       critical-first then newest.
-- [ ] Severity / source / status / project filters all narrow the list
+- [x] Severity / source / status / project filters all narrow the list
       correctly; URL-bound; reload preserves the filter set.
-- [ ] Acknowledge button flips an open alert to `acknowledged` and
+- [x] Acknowledge button flips an open alert to `acknowledged` and
       stamps `acknowledged_at`; idempotent on already-ack'd rows.
-- [ ] Resolve button flips an open / acknowledged alert to `resolved`,
+- [x] Resolve button flips an open / acknowledged alert to `resolved`,
       stamps `resolved_at`, emits one `alert.resolved` activity event.
-- [ ] Mute button flips a non-terminal alert to `muted`; idempotent on
+- [x] Mute button flips a non-terminal alert to `muted`; idempotent on
       already-muted rows.
-- [ ] None of ack / mute emit activity events (silent UI-state changes).
-- [ ] Sidebar `Alerts` entry routes to `/alerts`; Cmd+K `go-alerts`
+- [x] None of ack / mute emit activity events (silent UI-state changes).
+- [x] Sidebar `Alerts` entry routes to `/alerts`; Cmd+K `go-alerts`
       does the same.
-- [ ] Affected-entity icon links to the right page for website / docker
+- [x] Affected-entity icon links to the right page for website / docker
       alerts and to the GitHub run URL for deployment alerts.
-- [ ] Sibling user gets 403 on any of the three state-mutation routes.
-- [ ] Sibling user's alerts do not appear in another user's list.
-- [ ] Empty list (no alerts) shows an "All clear" state; empty result
+- [x] Sibling user gets 403 on any of the three state-mutation routes.
+- [x] Sibling user's alerts do not appear in another user's list.
+- [x] Empty list (no alerts) shows an "All clear" state; empty result
       under a filter shows a "Clear filter" CTA.
-- [ ] Pint clean, `php artisan test` green (new tests added),
+- [x] Pint clean, `php artisan test` green (new tests added),
       `npm run build` clean.
 
 ## Files touched
@@ -303,6 +303,11 @@ Fill in as work progresses.
 ### 2026-05-29
 - Shipping as drafted (silent ack / mute, GitHub Actions URL for deployment, no detail drawer, default landing filter `status: open`, no idempotency change for workflow.failed in this spec).
 - Issue [#92](https://github.com/Copxer/nexus/issues/92) opened, branch `spec/031-alerts-ui` cut off `main`.
+- Backend: `AcknowledgeAlertAction` + `MuteAlertAction` + `AlertController@index` + three single-action lifecycle controllers; routes registered.
+- Frontend: `Pages/Alerts/Index.vue` with the filter bar, per-row severity-toned card, three action buttons gated by `can_*` flags, two empty states; Sidebar Alerts entry enabled, Cmd+K `go-alerts` wired.
+- Tests: 34 new (8 action unit + 14 controller index + 5 resolve + 4 mute + 4 ack). Full suite 537→572 green, Pint clean, build clean.
+- Self-review via `superpowers:code-reviewer`. Addressed: (1) "Any status" dropdown was a silent duplicate of "Open" — added `'all'` URL sentinel + matching controller branch so the user can reach a "show every status" view; (2) `AlertResolveController` short-circuits on a muted alert with a clear error flash (the action's existing whereIn already skipped muted, but the controller was flashing "Alert resolved." misleadingly); (3) tightened the resolve activity-event assertions (`alert_source` / `alert_source_id` metadata + `acknowledged_at` preservation); (4) added a same-severity newest-first sort tie-break test; (5) dropped an unused `Link` import in the Vue page.
+- Deferred: spec 030's `ResolveAlertAction` race window (concurrent user-resolve + background recovery could double-emit). Pre-existing; reviewer accepted as a follow-up.
 
 ## Open questions / blockers
 - **Acknowledge / mute silent vs noisy.** Spec ships them silent (no

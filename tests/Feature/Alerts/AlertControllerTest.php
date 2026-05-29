@@ -151,6 +151,51 @@ class AlertControllerTest extends TestCase
             );
     }
 
+    public function test_status_all_sentinel_returns_every_status_in_one_list(): void
+    {
+        $user = $this->verifiedUser();
+        $project = Project::factory()->create(['owner_user_id' => $user->id]);
+        Alert::factory()->create(['project_id' => $project->id]); // open
+        Alert::factory()->acknowledged()->create(['project_id' => $project->id]);
+        Alert::factory()->resolved()->create(['project_id' => $project->id]);
+        Alert::factory()->muted()->create(['project_id' => $project->id]);
+
+        $this->actingAs($user)
+            ->get(route('alerts.index', ['status' => 'all']))
+            ->assertSuccessful()
+            ->assertInertia(
+                fn (AssertableInertia $page) => $page
+                    ->has('alerts', 4)
+                    ->where('filters.status', 'all'),
+            );
+    }
+
+    public function test_index_orders_newest_first_within_the_same_severity(): void
+    {
+        $user = $this->verifiedUser();
+        $project = Project::factory()->create(['owner_user_id' => $user->id]);
+        Alert::factory()->create([
+            'project_id' => $project->id,
+            'severity' => AlertSeverity::Critical->value,
+            'title' => 'older critical',
+            'triggered_at' => now()->subMinutes(10),
+        ]);
+        Alert::factory()->create([
+            'project_id' => $project->id,
+            'severity' => AlertSeverity::Critical->value,
+            'title' => 'newer critical',
+            'triggered_at' => now()->subMinute(),
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('alerts.index'))
+            ->assertInertia(function (AssertableInertia $page) {
+                $page->has('alerts', 2)
+                    ->where('alerts.0.title', 'newer critical')
+                    ->where('alerts.1.title', 'older critical');
+            });
+    }
+
     public function test_index_orders_critical_first_then_warning_then_info(): void
     {
         $user = $this->verifiedUser();

@@ -56,22 +56,24 @@ class AlertController extends Controller
         $sourceValues = array_map(fn (AlertSource $s) => $s->value, AlertSource::cases());
         $statusValues = array_map(fn (AlertStatus $s) => $s->value, AlertStatus::cases());
 
+        // `status: 'all'` is the explicit "show every status" sentinel.
+        // It survives a URL round-trip so the Vue dropdown can bind a
+        // non-null value to "Any status". Missing status → default to
+        // open (lands on the actionable set).
         $validated = $request->validate([
             'severity' => 'sometimes|nullable|in:'.implode(',', $severityValues),
             'source' => 'sometimes|nullable|in:'.implode(',', $sourceValues),
-            'status' => 'sometimes|nullable|in:'.implode(',', $statusValues),
+            'status' => 'sometimes|nullable|in:'.implode(',', [...$statusValues, 'all']),
             'project_id' => [
                 'sometimes', 'nullable', 'integer',
                 Rule::exists('projects', 'id')->where('owner_user_id', $user->id),
             ],
         ]);
 
-        // Default to the actionable set. An empty string from a cleared
-        // dropdown still counts as "show all"; null / missing falls back
-        // to the default.
-        $status = array_key_exists('status', $validated)
-            ? $validated['status']
-            : AlertStatus::Open->value;
+        $rawStatus = $validated['status'] ?? null;
+        $status = $rawStatus === 'all'
+            ? null
+            : ($rawStatus ?? AlertStatus::Open->value);
 
         $severity = $validated['severity'] ?? null;
         $source = $validated['source'] ?? null;
@@ -100,7 +102,9 @@ class AlertController extends Controller
             'filters' => [
                 'severity' => $severity,
                 'source' => $source,
-                'status' => $status,
+                // Round-trip the sentinel so the Vue dropdown can
+                // re-select "Any status" on reload.
+                'status' => $rawStatus === 'all' ? 'all' : $status,
                 'project_id' => $projectId,
             ],
             'filterOptions' => [

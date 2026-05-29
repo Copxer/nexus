@@ -46,7 +46,30 @@ class AlertResolveControllerTest extends TestCase
             ->firstOrFail();
         $this->assertSame('alerts', $event->source);
         $this->assertSame($alert->id, $event->metadata['alert_id']);
+        $this->assertSame('website', $event->metadata['alert_source']);
+        $this->assertSame(42, $event->metadata['alert_source_id']);
         $this->assertSame('Marketing site resolved', $event->title);
+    }
+
+    public function test_resolve_refuses_a_muted_alert_with_a_clear_error(): void
+    {
+        $user = $this->verifiedUser();
+        $project = Project::factory()->create(['owner_user_id' => $user->id]);
+        $alert = Alert::factory()->muted()->create(['project_id' => $project->id]);
+
+        $response = $this->actingAs($user)
+            ->post(route('alerts.resolve', $alert->id));
+
+        $response->assertRedirect();
+        $response->assertSessionHas('error');
+        $this->assertSame(AlertStatus::Muted, $alert->fresh()->status);
+        $this->assertSame(
+            0,
+            ActivityEvent::query()
+                ->where('event_type', 'alert.resolved')
+                ->count(),
+            'no spurious activity event on the refused resolve',
+        );
     }
 
     public function test_acknowledged_alert_can_be_resolved(): void
@@ -59,10 +82,24 @@ class AlertResolveControllerTest extends TestCase
             'source_id' => 5,
             'type' => 'host.offline',
         ]);
+        $originalAck = $alert->acknowledged_at;
 
         $this->actingAs($user)->post(route('alerts.resolve', $alert->id));
 
-        $this->assertSame(AlertStatus::Resolved, $alert->fresh()->status);
+        $alert->refresh();
+        $this->assertSame(AlertStatus::Resolved, $alert->status);
+        $this->assertNotNull($alert->resolved_at);
+        $this->assertSame(
+            $originalAck?->toIso8601String(),
+            $alert->acknowledged_at?->toIso8601String(),
+            'acknowledged_at is preserved through resolve',
+        );
+        $this->assertSame(
+            1,
+            ActivityEvent::query()
+                ->where('event_type', 'alert.resolved')
+                ->count(),
+        );
     }
 
     public function test_resolving_an_already_resolved_alert_is_a_noop(): void
@@ -78,7 +115,15 @@ class AlertResolveControllerTest extends TestCase
 
         $this->actingAs($user)->post(route('alerts.resolve', $alert->id));
 
-        $this->assertSame(0, ActivityEvent::query()->count(), 'no spurious activity event');
+        // Filter by event_type so the assertion stays sharp even if
+        // the action ever starts emitting other event types.
+        $this->assertSame(
+            0,
+            ActivityEvent::query()
+                ->where('event_type', 'alert.resolved')
+                ->count(),
+            'no spurious alert.resolved on re-resolve',
+        );
         $this->assertSame(AlertStatus::Resolved, $alert->fresh()->status);
     }
 

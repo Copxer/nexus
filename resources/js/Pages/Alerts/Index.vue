@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import StatusBadge from '@/Components/Dashboard/StatusBadge.vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
-import { Head, Link, router } from '@inertiajs/vue3';
+import { Head, router } from '@inertiajs/vue3';
 import {
     AlertTriangle,
     Bell,
@@ -257,7 +257,12 @@ const statusLabel = (alert: AlertRow): string => {
                             class="min-w-[140px] rounded-md border border-border-subtle bg-background-panel-hover px-2 py-1.5 text-sm text-text-primary focus:border-accent-cyan/60 focus:outline-none"
                             @change="applyFilters"
                         >
-                            <option :value="null">Any status</option>
+                            <!-- 'all' is the explicit "show every
+                                 status" sentinel — the controller
+                                 reads it as "skip the where clause"
+                                 and round-trips it so reload keeps
+                                 this option selected. -->
+                            <option value="all">Any status</option>
                             <option
                                 v-for="status in filterOptions.statuses"
                                 :key="status"
