@@ -45,7 +45,8 @@ class SmokeTest extends TestCase
                         ->has('services.running')
                         ->has('hosts.online')
                         ->has('alerts.active')
-                        ->where('alerts.status', 'danger')
+                        // No seeded alerts → alerts.status is 'success' (spec 032).
+                        ->where('alerts.status', 'success')
                         ->has('uptime.overall')
                         ->has('topRepositories')
                     )

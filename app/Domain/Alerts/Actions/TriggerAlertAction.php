@@ -6,6 +6,7 @@ use App\Domain\Activity\Actions\CreateActivityEventAction;
 use App\Enums\AlertSeverity;
 use App\Enums\AlertSource;
 use App\Enums\AlertStatus;
+use App\Events\AlertTriggered;
 use App\Models\Alert;
 use Illuminate\Support\Carbon;
 
@@ -112,6 +113,15 @@ class TriggerAlertAction
                 'alert_type' => $alert->type,
             ],
         ]);
+
+        // Spec 032 — dedicated alerts broadcast so the `/alerts` page
+        // can partial-reload its list + the TopBar bell can refresh
+        // its count without filtering every event off the activity
+        // channel. Only fires on the fresh-insert path; the
+        // steady-state `last_seen_at` bump above stays silent so a
+        // re-firing source doesn't double-toast.
+        $alert->loadMissing('project:id,owner_user_id');
+        AlertTriggered::dispatch($alert->id, $alert->project?->owner_user_id);
 
         return $alert;
     }

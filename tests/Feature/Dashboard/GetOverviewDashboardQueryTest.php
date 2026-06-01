@@ -3,7 +3,9 @@
 namespace Tests\Feature\Dashboard;
 
 use App\Domain\Dashboard\Queries\GetOverviewDashboardQuery;
+use App\Enums\AlertSeverity;
 use App\Models\ActivityEvent;
+use App\Models\Alert;
 use App\Models\Host;
 use App\Models\HostMetricSnapshot;
 use App\Models\Project;
@@ -275,17 +277,87 @@ class GetOverviewDashboardQueryTest extends TestCase
 
     public function test_mock_kpis_remain_consistent_with_phase_0_values(): void
     {
-        // Deployments graduated to a real query in spec 022 and uptime
-        // graduated in spec 025; remaining mocked slices (services /
-        // alerts) still pin to the phase-0 fixture values.
+        // Deployments graduated to a real query in spec 022, uptime in
+        // 025, hosts in 029, alerts in 032. The only mocked slice left
+        // is `services` — pin it to the phase-0 fixture value.
         $payload = (new GetOverviewDashboardQuery)->handle();
 
         $this->assertSame(47, $payload['dashboard']['services']['running']);
-        $this->assertSame(3, $payload['dashboard']['alerts']['active']);
-        $this->assertSame('danger', $payload['dashboard']['alerts']['status']);
 
         $this->assertCount(7, $payload['activityHeatmap']);
         $this->assertCount(6, $payload['activityHeatmap'][0]);
+    }
+
+    public function test_alerts_kpi_returns_zero_state_with_no_alerts(): void
+    {
+        $payload = (new GetOverviewDashboardQuery)->handle();
+
+        $this->assertSame(0, $payload['dashboard']['alerts']['active']);
+        $this->assertSame(0, $payload['dashboard']['alerts']['critical']);
+        $this->assertSame('success', $payload['dashboard']['alerts']['status']);
+        $this->assertCount(12, $payload['dashboard']['alerts']['sparkline']);
+    }
+
+    public function test_alerts_kpi_active_counts_open_plus_acknowledged(): void
+    {
+        $project = Project::factory()->create();
+        Alert::factory()->create(['project_id' => $project->id]); // open
+        Alert::factory()->acknowledged()->create(['project_id' => $project->id]);
+        Alert::factory()->resolved()->create(['project_id' => $project->id]);
+        Alert::factory()->muted()->create(['project_id' => $project->id]);
+
+        $payload = (new GetOverviewDashboardQuery)->handle();
+
+        $this->assertSame(2, $payload['dashboard']['alerts']['active']);
+    }
+
+    public function test_alerts_kpi_status_is_warning_when_active_but_no_critical(): void
+    {
+        $project = Project::factory()->create();
+        Alert::factory()->create([
+            'project_id' => $project->id,
+            'severity' => AlertSeverity::Warning->value,
+        ]);
+
+        $payload = (new GetOverviewDashboardQuery)->handle();
+
+        $this->assertSame(1, $payload['dashboard']['alerts']['active']);
+        $this->assertSame(0, $payload['dashboard']['alerts']['critical']);
+        $this->assertSame('warning', $payload['dashboard']['alerts']['status']);
+    }
+
+    public function test_alerts_kpi_status_is_danger_when_critical_is_open_or_acknowledged(): void
+    {
+        $project = Project::factory()->create();
+        Alert::factory()->acknowledged()->create([
+            'project_id' => $project->id,
+            'severity' => AlertSeverity::Critical->value,
+        ]);
+
+        $payload = (new GetOverviewDashboardQuery)->handle();
+
+        $this->assertSame(1, $payload['dashboard']['alerts']['critical']);
+        $this->assertSame('danger', $payload['dashboard']['alerts']['status']);
+    }
+
+    public function test_alerts_kpi_sparkline_keys_on_triggered_at_not_created_at(): void
+    {
+        $project = Project::factory()->create();
+        // created_at today, triggered_at 5 days ago — the sparkline must
+        // bucket on triggered_at.
+        Alert::factory()->create([
+            'project_id' => $project->id,
+            'triggered_at' => now()->subDays(5),
+            'created_at' => now(),
+        ]);
+
+        $payload = (new GetOverviewDashboardQuery)->handle();
+        $sparkline = $payload['dashboard']['alerts']['sparkline'];
+
+        $this->assertCount(12, $sparkline);
+        // 12-day window, today at index 11; 5 days ago is index 6.
+        $this->assertSame(1, $sparkline[6]);
+        $this->assertSame(0, $sparkline[11]);
     }
 
     public function test_uptime_kpi_is_wired_to_the_real_query(): void

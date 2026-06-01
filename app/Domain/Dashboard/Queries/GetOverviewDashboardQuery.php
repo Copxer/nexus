@@ -3,8 +3,11 @@
 namespace App\Domain\Dashboard\Queries;
 
 use App\Domain\Monitoring\Queries\GetMonitoringUptimeKpiQuery;
+use App\Enums\AlertSeverity;
+use App\Enums\AlertStatus;
 use App\Enums\HostStatus;
 use App\Models\ActivityEvent;
+use App\Models\Alert;
 use App\Models\Host;
 use App\Models\HostMetricSnapshot;
 use App\Models\Project;
@@ -45,7 +48,7 @@ use Illuminate\Support\Collection;
  *     (vs prior 24h) plus a 12-day daily sparkline.
  *
  * Still mock (extracted to MOCK_* constants — clearly marked):
- *   - dashboard.{services,alerts}                    → MOCK_KPIS
+ *   - dashboard.services                              → MOCK_KPIS
  *
  * The right-rail activity feed is no longer surfaced from this query —
  * the AppLayout consumes the shared `activity.recent` Inertia prop
@@ -73,6 +76,7 @@ class GetOverviewDashboardQuery
                 'projects' => $this->projects(),
                 'hosts' => $this->hosts(),
                 'deployments' => $this->deploymentsKpi(),
+                'alerts' => $this->alerts(),
                 'uptime' => app(GetMonitoringUptimeKpiQuery::class)->execute(),
                 'topRepositories' => $this->topRepositories(),
             ]),
@@ -453,7 +457,7 @@ class GetOverviewDashboardQuery
     // that ships the real source.
     // ──────────────────────────────────────────────────────────────────
 
-    /** Phase 5/6 (Services/Hosts), phase 7 (Alerts). */
+    /** Phase 5/6 (Services). Alerts shipped real in spec 032. */
     private const MOCK_KPIS = [
         'services' => [
             'running' => 47,
@@ -461,11 +465,78 @@ class GetOverviewDashboardQuery
             'sparkline' => [44, 45, 45, 46, 46, 47, 47, 47, 47, 47, 47, 47],
             'status' => 'success',
         ],
-        'alerts' => [
-            'active' => 3,
-            'critical' => 1,
-            'sparkline' => [1, 0, 1, 2, 1, 1, 2, 2, 3, 2, 3, 3],
-            'status' => 'danger',
-        ],
     ];
+
+    /**
+     * Real Alerts KPI slice (spec 032 — replaces the long-standing
+     * `MOCK_KPIS.alerts` placeholder). Counts come from the `alerts`
+     * table directly; the sparkline shows daily `triggered_at` volume
+     * (the real fire moment, not the row insert) over the last 12 days.
+     *
+     * Status thresholds:
+     *   critical > 0           → danger
+     *   active > 0 (no crit)   → warning
+     *   else                   → success
+     *
+     * No `muted` — the Alerts KPI is never "no signal" the way Hosts
+     * can be (an empty fleet is a meaningful zero state for hosts).
+     *
+     * @return array{
+     *     active: int,
+     *     critical: int,
+     *     sparkline: array<int, int>,
+     *     status: 'success'|'warning'|'danger',
+     * }
+     */
+    private function alerts(): array
+    {
+        $actionable = [AlertStatus::Open->value, AlertStatus::Acknowledged->value];
+
+        $active = Alert::query()->whereIn('status', $actionable)->count();
+        $critical = Alert::query()
+            ->whereIn('status', $actionable)
+            ->where('severity', AlertSeverity::Critical->value)
+            ->count();
+        $sparkline = $this->triggeredCountSparkline(self::SPARKLINE_DAYS);
+
+        return [
+            'active' => $active,
+            'critical' => $critical,
+            'sparkline' => $sparkline,
+            'status' => match (true) {
+                $critical > 0 => 'danger',
+                $active > 0 => 'warning',
+                default => 'success',
+            },
+        ];
+    }
+
+    /**
+     * Daily Alert-trigger counts over the past `$days`, keyed on
+     * `triggered_at` (the real fire moment) rather than `created_at`
+     * (the insert moment). Almost always identical, but explicit is
+     * better and mirrors how spec 022 added a dedicated
+     * `workflowRunSparkline()` keyed on `run_completed_at`.
+     *
+     * @return array<int, int>
+     */
+    private function triggeredCountSparkline(int $days): array
+    {
+        $start = now()->startOfDay()->subDays($days - 1);
+
+        $rows = Alert::query()
+            ->where('triggered_at', '>=', $start)
+            ->selectRaw('DATE(triggered_at) as date, COUNT(*) as total')
+            ->groupBy('date')
+            ->get()
+            ->keyBy(fn ($row) => (string) $row->date);
+
+        $series = [];
+        for ($i = 0; $i < $days; $i++) {
+            $day = $start->copy()->addDays($i)->toDateString();
+            $series[] = (int) ($rows->get($day)->total ?? 0);
+        }
+
+        return $series;
+    }
 }

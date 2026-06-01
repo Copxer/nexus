@@ -5,10 +5,13 @@ namespace Tests\Unit\Domain\Alerts;
 use App\Domain\Alerts\Actions\ResolveAlertAction;
 use App\Enums\AlertSource;
 use App\Enums\AlertStatus;
+use App\Events\AlertResolved;
 use App\Models\ActivityEvent;
 use App\Models\Alert;
 use App\Models\Project;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
 use Tests\TestCase;
 
 class ResolveAlertActionTest extends TestCase
@@ -156,5 +159,47 @@ class ResolveAlertActionTest extends TestCase
                 ->count(),
             'website.slow stayed open',
         );
+    }
+
+    public function test_closing_a_row_dispatches_alert_resolved_with_resolved_owner(): void
+    {
+        Event::fake([AlertResolved::class]);
+        $owner = User::factory()->create();
+        $project = Project::factory()->create(['owner_user_id' => $owner->id]);
+        $alert = Alert::factory()->create([
+            'project_id' => $project->id,
+            'source' => AlertSource::Website->value,
+            'source_id' => 9,
+            'type' => 'website.down',
+        ]);
+
+        app(ResolveAlertAction::class)->execute([
+            'source' => AlertSource::Website,
+            'source_id' => 9,
+        ]);
+
+        Event::assertDispatched(
+            AlertResolved::class,
+            fn (AlertResolved $event): bool => $event->alertId === $alert->id
+                && $event->ownerUserId === $owner->id,
+        );
+        Event::assertDispatchedTimes(AlertResolved::class, 1);
+    }
+
+    public function test_noop_does_not_dispatch_alert_resolved(): void
+    {
+        Event::fake([AlertResolved::class]);
+        Alert::factory()->resolved()->create([
+            'source' => AlertSource::Website->value,
+            'source_id' => 1,
+            'type' => 'website.down',
+        ]);
+
+        app(ResolveAlertAction::class)->execute([
+            'source' => AlertSource::Website,
+            'source_id' => 1,
+        ]);
+
+        Event::assertNotDispatched(AlertResolved::class);
     }
 }

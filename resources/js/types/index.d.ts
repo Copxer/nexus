@@ -29,6 +29,14 @@ export type PageProps<
     activity?: {
         recent: ActivityEvent[];
     };
+    /**
+     * Open + acknowledged alert count, shared by
+     * `HandleInertiaRequests::share()` (spec 032). Drives the TopBar
+     * notifications-bell badge across every page. `null` for guests.
+     */
+    alerts?: {
+        activeCount: number;
+    } | null;
 };
 
 /**

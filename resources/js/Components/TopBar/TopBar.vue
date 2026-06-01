@@ -2,7 +2,8 @@
 import Dropdown from '@/Components/Dropdown.vue';
 import DropdownLink from '@/Components/DropdownLink.vue';
 import TopBarSearch from '@/Components/TopBar/TopBarSearch.vue';
-import { usePage } from '@inertiajs/vue3';
+import type { PageProps } from '@/types';
+import { Link, router, usePage } from '@inertiajs/vue3';
 import {
     Bell,
     ChevronDown,
@@ -12,12 +13,10 @@ import {
     PanelRight,
     UserCog,
 } from 'lucide-vue-next';
-import { computed } from 'vue';
+import { computed, onBeforeUnmount, onMounted } from 'vue';
 
 withDefaults(
     defineProps<{
-        /** Number of unread notifications to render in the bell badge. Visual only this spec. */
-        notificationsCount?: number;
         /** Hide the activity rail toggle when the page itself is the activity feed. */
         showActivityRailToggle?: boolean;
     }>(),
@@ -33,7 +32,7 @@ const emit = defineEmits<{
     (e: 'open-palette'): void;
 }>();
 
-const page = usePage();
+const page = usePage<PageProps>();
 const user = computed(() => page.props.auth.user!);
 const initials = computed(() => {
     const name = user.value.name ?? '';
@@ -45,6 +44,49 @@ const initials = computed(() => {
             .map((part) => part[0]!.toUpperCase())
             .join('') || '?'
     );
+});
+
+// Spec 032 — `alerts.activeCount` is a shared Inertia prop populated
+// by `HandleInertiaRequests::share()`. The Echo subscription below
+// triggers a partial-reload of just this prop on every `AlertTriggered`
+// / `AlertResolved` pulse so the badge updates across every page.
+const activeAlertsCount = computed<number>(
+    () => page.props.alerts?.activeCount ?? 0,
+);
+
+// ─── Reverb subscription (spec 032) ──────────────────────────────────
+// Listens on `users.{id}.alerts` for both fresh triggers and resolves.
+// Echo connection state is intentionally not tracked here — the bell
+// is a low-stakes surface; "Live offline" presentation lives on the
+// `/alerts` page itself.
+let teardown: (() => void) | null = null;
+
+onMounted(() => {
+    if (typeof window === 'undefined' || !window.Echo) {
+        return;
+    }
+    const userId = page.props.auth?.user?.id;
+    if (userId == null) return;
+
+    const channelName = `users.${userId}.alerts`;
+    const channel = window.Echo.private(channelName);
+
+    const reloadBadge = () => {
+        router.reload({ only: ['alerts'] });
+    };
+
+    channel.listen('.AlertTriggered', reloadBadge);
+    channel.listen('.AlertResolved', reloadBadge);
+
+    teardown = () => {
+        channel.stopListening('.AlertTriggered');
+        channel.stopListening('.AlertResolved');
+        window.Echo?.leave(channelName);
+    };
+});
+
+onBeforeUnmount(() => {
+    teardown?.();
 });
 </script>
 
@@ -87,22 +129,25 @@ const initials = computed(() => {
             <ChevronDown class="h-3 w-3" aria-hidden="true" />
         </button>
 
-        <!-- Notifications -->
-        <button
-            type="button"
-            class="relative flex h-9 w-9 cursor-not-allowed items-center justify-center rounded-lg border border-border-subtle bg-slate-950/40 text-text-muted transition focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
-            aria-label="Notifications"
-            aria-disabled="true"
-            title="Notifications arrive with the Alerts engine (Phase 7 — specs 031 / 032)."
+        <!-- Notifications — links to /alerts, badge reflects the user's
+             open + acknowledged count, auto-updates on Reverb pulses. -->
+        <Link
+            :href="route('alerts.index')"
+            class="relative flex h-9 w-9 items-center justify-center rounded-lg border border-border-subtle bg-slate-950/40 text-text-muted transition hover:border-accent-cyan/40 hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
+            :aria-label="
+                activeAlertsCount > 0
+                    ? `${activeAlertsCount} active alert${activeAlertsCount === 1 ? '' : 's'}. Open the alerts page.`
+                    : 'Open the alerts page.'
+            "
         >
             <Bell class="h-4 w-4" aria-hidden="true" />
             <span
-                v-if="notificationsCount && notificationsCount > 0"
+                v-if="activeAlertsCount > 0"
                 class="absolute -end-1 -top-1 inline-flex min-w-[18px] items-center justify-center rounded-full border border-background-base bg-status-danger px-1 font-mono text-[10px] font-semibold text-text-primary"
             >
-                {{ notificationsCount > 9 ? '9+' : notificationsCount }}
+                {{ activeAlertsCount > 9 ? '9+' : activeAlertsCount }}
             </span>
-        </button>
+        </Link>
 
         <!-- Activity rail toggle — visible whenever the rail isn't a
              persistent column (i.e. below 2xl). Includes mobile so users

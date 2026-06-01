@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import StatusBadge from '@/Components/Dashboard/StatusBadge.vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
-import { Head, router } from '@inertiajs/vue3';
+import type { PageProps } from '@/types';
+import { Head, router, usePage } from '@inertiajs/vue3';
 import {
     AlertTriangle,
     Bell,
@@ -9,8 +10,9 @@ import {
     CheckCircle2,
     ExternalLink,
     Eye,
+    WifiOff,
 } from 'lucide-vue-next';
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 
 interface ProjectChip {
     id: number;
@@ -62,6 +64,8 @@ const props = defineProps<{
     filters: FilterState;
     filterOptions: FilterOptions;
 }>();
+
+const page = usePage<PageProps>();
 
 const filterDraft = ref<FilterState>({ ...props.filters });
 
@@ -166,6 +170,78 @@ const statusLabel = (alert: AlertRow): string => {
     }
     return capitalize(alert.status);
 };
+
+// ─── Reverb subscription (spec 032) ──────────────────────────────────
+// Listen on `users.{id}.alerts` for both fresh triggers and resolves.
+// Each pulse partial-reloads the list / filters / filterOptions props
+// so server-side sort + status filter re-apply naturally — no JS-side
+// merge logic. Mirrors spec 028's Hosts Show pattern verbatim.
+const realtimeConnected = ref<boolean | null>(null);
+let teardown: (() => void) | null = null;
+
+onMounted(() => {
+    if (typeof window === 'undefined' || !window.Echo) {
+        return;
+    }
+    const userId = page.props.auth?.user?.id;
+    if (userId == null) return;
+
+    const channelName = `users.${userId}.alerts`;
+    const channel = window.Echo.private(channelName);
+
+    const reloadList = () => {
+        router.reload({ only: ['alerts', 'filters', 'filterOptions'] });
+    };
+
+    channel.listen('.AlertTriggered', reloadList);
+    channel.listen('.AlertResolved', reloadList);
+
+    const connector = window.Echo.connector;
+    const pusher = (
+        connector as {
+            pusher?: {
+                connection?: {
+                    state?: string;
+                    bind: (e: string, cb: () => void) => void;
+                    unbind: (e: string, cb: () => void) => void;
+                };
+            };
+        }
+    )?.pusher;
+
+    const onConnect = () => {
+        realtimeConnected.value = true;
+    };
+    const onDisconnect = () => {
+        realtimeConnected.value = false;
+    };
+
+    if (pusher?.connection) {
+        if (pusher.connection.state === 'connected') {
+            realtimeConnected.value = true;
+        }
+        pusher.connection.bind('connected', onConnect);
+        pusher.connection.bind('disconnected', onDisconnect);
+        pusher.connection.bind('unavailable', onDisconnect);
+        pusher.connection.bind('failed', onDisconnect);
+    }
+
+    teardown = () => {
+        channel.stopListening('.AlertTriggered');
+        channel.stopListening('.AlertResolved');
+        window.Echo?.leave(channelName);
+        if (pusher?.connection) {
+            pusher.connection.unbind('connected', onConnect);
+            pusher.connection.unbind('disconnected', onDisconnect);
+            pusher.connection.unbind('unavailable', onDisconnect);
+            pusher.connection.unbind('failed', onDisconnect);
+        }
+    };
+});
+
+onBeforeUnmount(() => {
+    teardown?.();
+});
 </script>
 
 <template>
@@ -186,9 +262,19 @@ const statusLabel = (alert: AlertRow): string => {
         <div class="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
             <header class="mb-6 flex flex-wrap items-end justify-between gap-4">
                 <div class="flex flex-col gap-2">
-                    <h2 class="text-xl font-semibold text-text-primary">
-                        Open alerts
-                    </h2>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <h2 class="text-xl font-semibold text-text-primary">
+                            Open alerts
+                        </h2>
+                        <span
+                            v-if="realtimeConnected === false"
+                            class="inline-flex items-center gap-1.5 rounded-full border border-status-warning/40 bg-status-warning/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-status-warning"
+                            title="Live updates offline. Alerts still land on the schedule; refresh to see the latest."
+                        >
+                            <WifiOff class="h-3 w-3" aria-hidden="true" />
+                            Live offline
+                        </span>
+                    </div>
                     <p class="text-sm text-text-secondary">
                         {{ headerCounts.total }}
                         {{
