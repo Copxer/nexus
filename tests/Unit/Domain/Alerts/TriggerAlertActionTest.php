@@ -6,10 +6,13 @@ use App\Domain\Alerts\Actions\TriggerAlertAction;
 use App\Enums\AlertSeverity;
 use App\Enums\AlertSource;
 use App\Enums\AlertStatus;
+use App\Events\AlertTriggered;
 use App\Models\ActivityEvent;
 use App\Models\Alert;
 use App\Models\Project;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
 use Tests\TestCase;
 
 class TriggerAlertActionTest extends TestCase
@@ -139,5 +142,44 @@ class TriggerAlertActionTest extends TestCase
         $this->assertSame($existing->id, $alert->id);
         $this->assertSame(AlertStatus::Acknowledged, $alert->fresh()->status);
         $this->assertSame(1, Alert::query()->count());
+    }
+
+    public function test_fresh_trigger_dispatches_alert_triggered_with_resolved_owner(): void
+    {
+        Event::fake([AlertTriggered::class]);
+        $owner = User::factory()->create();
+        $project = Project::factory()->create(['owner_user_id' => $owner->id]);
+
+        $alert = app(TriggerAlertAction::class)->execute([
+            'project_id' => $project->id,
+            'source' => AlertSource::Website,
+            'source_id' => 1,
+            'type' => 'website.down',
+            'severity' => AlertSeverity::Critical,
+            'title' => 'fresh',
+        ]);
+
+        Event::assertDispatched(
+            AlertTriggered::class,
+            fn (AlertTriggered $event): bool => $event->alertId === $alert->id
+                && $event->ownerUserId === $owner->id,
+        );
+        Event::assertDispatchedTimes(AlertTriggered::class, 1);
+    }
+
+    public function test_idempotent_re_trigger_does_not_re_broadcast(): void
+    {
+        $project = Project::factory()->create();
+        $action = app(TriggerAlertAction::class);
+        // First trigger lays the row down + emits (we don't care about
+        // the first emit; tests above cover that).
+        $action->execute($this->attrs(['project_id' => $project->id]));
+
+        // Fake AFTER the first dispatch so we only observe the second.
+        Event::fake([AlertTriggered::class]);
+
+        $action->execute($this->attrs(['project_id' => $project->id]));
+
+        Event::assertNotDispatched(AlertTriggered::class);
     }
 }

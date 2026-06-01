@@ -6,6 +6,7 @@ use App\Domain\Activity\Actions\CreateActivityEventAction;
 use App\Enums\ActivitySeverity;
 use App\Enums\AlertSource;
 use App\Enums\AlertStatus;
+use App\Events\AlertResolved;
 use App\Models\Alert;
 use Illuminate\Support\Carbon;
 
@@ -83,6 +84,13 @@ class ResolveAlertAction
                     'alert_source_id' => $alert->source_id,
                 ],
             ]);
+
+            // Spec 032 — dedicated alerts broadcast per closed row.
+            // Trigger's idempotency means the typical resolve closes
+            // a single row, but the per-row dispatch stays correct if
+            // a future caller ever resolves N at once.
+            $alert->loadMissing('project:id,owner_user_id');
+            AlertResolved::dispatch($alert->id, $alert->project?->owner_user_id);
         }
 
         return $resolving->count();

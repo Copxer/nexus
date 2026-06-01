@@ -38,3 +38,13 @@ Broadcast::channel('users.{userId}.monitoring', function ($user, $userId) {
 Broadcast::channel('users.{userId}.hosts', function ($user, $userId) {
     return (int) $user->id === (int) $userId;
 });
+
+// Spec 032 — per-user alerts channel. `AlertTriggered` /
+// `AlertResolved` broadcast here on every fresh trigger / resolve so
+// the `/alerts` page + the TopBar bell react in realtime. Separate
+// from `users.{id}.activity` (which already carries the broader
+// `alert.triggered` activity event) so the targeted surfaces don't
+// need to filter every other event type out of the rail stream.
+Broadcast::channel('users.{userId}.alerts', function ($user, $userId) {
+    return (int) $user->id === (int) $userId;
+});

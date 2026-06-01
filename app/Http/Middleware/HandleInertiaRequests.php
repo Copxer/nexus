@@ -3,6 +3,9 @@
 namespace App\Http\Middleware;
 
 use App\Domain\Activity\Queries\RecentActivityForUserQuery;
+use App\Enums\AlertStatus;
+use App\Models\Alert;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -60,6 +63,27 @@ class HandleInertiaRequests extends Middleware
                         ->handle($request->user(), RecentActivityForUserQuery::RAIL_LIMIT)
                     : [],
             ],
+            // Spec 032 — shared count for the TopBar bell badge.
+            // Reflects the auth user's open + acknowledged alerts
+            // (the "still needs attention" set); resolved + muted are
+            // excluded. `null` for guests. Refreshed on every render;
+            // realtime pulses from `AlertTriggered` / `AlertResolved`
+            // trigger a `router.reload({ only: ['alerts'] })` from
+            // the TopBar's Echo subscription.
+            'alerts' => fn () => $request->user() !== null
+                ? ['activeCount' => $this->activeAlertsCount($request->user())]
+                : null,
         ];
+    }
+
+    private function activeAlertsCount(User $user): int
+    {
+        return Alert::query()
+            ->whereHas('project', fn ($q) => $q->where('owner_user_id', $user->id))
+            ->whereIn('status', [
+                AlertStatus::Open->value,
+                AlertStatus::Acknowledged->value,
+            ])
+            ->count();
     }
 }
