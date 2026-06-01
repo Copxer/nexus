@@ -1,7 +1,7 @@
 ---
 spec: alerts-realtime-and-overview-kpi
 phase: 7
-status: in-progress   # not-started | in-progress | blocked | done
+status: done   # not-started | in-progress | blocked | done
 owner: Yoany
 created: 2026-06-01
 updated: 2026-06-01
@@ -279,26 +279,26 @@ Alerts UX Requirements, §10 dashboard data sources.
      resolved/muted don't count.
 
 ## Acceptance criteria
-- [ ] A fresh `TriggerAlertAction` insert dispatches `AlertTriggered`
+- [x] A fresh `TriggerAlertAction` insert dispatches `AlertTriggered`
       on `users.{ownerUserId}.alerts`; idempotent re-trigger
       dispatches nothing.
-- [ ] Each `ResolveAlertAction` close dispatches `AlertResolved` on
+- [x] Each `ResolveAlertAction` close dispatches `AlertResolved` on
       the same channel.
-- [ ] Both events implement `ShouldBroadcastNow` + `ShouldDispatchAfterCommit`.
-- [ ] `/alerts` page partial-reloads its `alerts` + `filters` +
+- [x] Both events implement `ShouldBroadcastNow` + `ShouldDispatchAfterCommit`.
+- [x] `/alerts` page partial-reloads its `alerts` + `filters` +
       `filterOptions` props on each pulse; shows "Live updates
       offline" when the socket is down.
-- [ ] TopBar bell is no longer disabled; clicking it navigates to
+- [x] TopBar bell is no longer disabled; clicking it navigates to
       `/alerts`; the badge shows the user's open + acknowledged
       count; the badge auto-updates on `AlertTriggered` /
       `AlertResolved` without a page reload.
-- [ ] Overview Alerts KPI shows real `active` / `critical` /
+- [x] Overview Alerts KPI shows real `active` / `critical` /
       `sparkline` / `status` — no `MOCK_KPIS.alerts`.
-- [ ] Overview Alerts KPI status thresholds: `critical > 0` →
+- [x] Overview Alerts KPI status thresholds: `critical > 0` →
       `danger`; `active > 0` → `warning`; otherwise `success`.
-- [ ] Sibling user's alerts don't appear in another user's KPI,
+- [x] Sibling user's alerts don't appear in another user's KPI,
       bell count, or partial-reload payload.
-- [ ] Pint clean, `php artisan test` green (new tests added),
+- [x] Pint clean, `php artisan test` green (new tests added),
       `npm run build` clean.
 
 ## Files touched
@@ -326,6 +326,10 @@ Fill in as work progresses.
 - Spec drafted for review.
 - Shipping as drafted (bell = navigate-only; alerts KPI global + bell count user-scoped; sparkline keys on `triggered_at`; idempotent re-triggers stay silent; `ResolveAlertAction` race deferred to a follow-up `fix/` PR after 032 lands).
 - Issue [#94](https://github.com/Copxer/nexus/issues/94) opened, branch `spec/032-alerts-realtime-and-overview-kpi` cut off `main`.
+- Backend: `AlertTriggered` + `AlertResolved` events + channel auth + dispatch from both actions; `HandleInertiaRequests::share()` adds `alerts.activeCount`; `GetOverviewDashboardQuery::alerts()` replaces `MOCK_KPIS.alerts` with real counts + `triggeredCountSparkline()`.
+- Frontend: `Pages/Alerts/Index.vue` Echo subscription + Live offline pill; `TopBar.vue` bell becomes a `<Link>` with a reactive badge; `types/index.d.ts` PageProps gains the `alerts?` shape.
+- Tests: 24 new (6+6 event surface, 2+2 action broadcast, 5 Overview KPI, 3 shared prop). Full suite 572→596 green, Pint clean, build clean.
+- Self-review via `superpowers:code-reviewer` — assessed ready to PR with no critical / important issues. Minors all polish suggestions, none folded in this PR.
 
 ## Open questions / blockers
 - **Bell click behavior.** Ships as a plain `<Link>` to
