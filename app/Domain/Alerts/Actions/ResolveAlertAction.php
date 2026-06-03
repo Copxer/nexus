@@ -9,6 +9,7 @@ use App\Enums\AlertStatus;
 use App\Events\AlertResolved;
 use App\Models\Alert;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Close every open or acknowledged Alert matching a recovery
@@ -22,8 +23,28 @@ use Illuminate\Support\Carbon;
  * through recovery they can mute (031).
  *
  * For each closed row the action emits an `alert.resolved` activity
- * event so the rail picks up the recovery in realtime. A no-op call
+ * event and (spec 032) an `AlertResolved` broadcast so the rail + the
+ * `/alerts` page + the TopBar bell react in realtime. A no-op call
  * (nothing matches) emits nothing.
+ *
+ * **Race-guard (post-032 follow-up).** Two callers can hit the same
+ * `(source, source_id, type)` near-simultaneously — e.g. a user
+ * clicking Resolve in the browser while a website-monitor cron's
+ * recovery path is mid-flight. Without a guard, both `query->get()`
+ * SELECTs return the row, both flip + emit, both broadcast — the
+ * rail double-renders the recovery and the TopBar badge churns.
+ *
+ * The guard: re-fetch each candidate inside a per-row transaction
+ * with `lockForUpdate()` and a fresh `whereIn('status', [open,
+ * acknowledged])` filter. The first caller wins the row-level lock,
+ * flips + emits, releases. The second caller's re-fetch returns
+ * `null` (status is now resolved → filter excludes it) and the close
+ * path is silently skipped. The action's return value reports the
+ * rows actually closed, not the rows the initial SELECT returned.
+ *
+ * On SQLite (the dev/test DB) `lockForUpdate` is a no-op — file-level
+ * locks already serialize writes, so the guard is harmless and the
+ * status re-check on its own still catches stale candidates.
  */
 class ResolveAlertAction
 {
@@ -37,7 +58,9 @@ class ResolveAlertAction
      *     source_id: int|null,
      *     type?: string,
      * }  $criteria
-     * @return int Number of Alerts resolved.
+     * @return int Number of Alerts actually closed (may be less than the
+     *             initial SELECT returned if concurrent callers won the
+     *             race for some rows — see the race-guard note above).
      */
     public function execute(array $criteria): int
     {
@@ -57,15 +80,47 @@ class ResolveAlertAction
             $query->where('type', $criteria['type']);
         }
 
-        $resolving = $query->get();
+        $candidates = $query->get();
 
-        if ($resolving->isEmpty()) {
+        if ($candidates->isEmpty()) {
             return 0;
         }
 
         $now = Carbon::now();
+        $closed = 0;
 
-        foreach ($resolving as $alert) {
+        foreach ($candidates as $candidate) {
+            if ($this->closeIfStillActionable($candidate->id, $source, $now)) {
+                $closed++;
+            }
+        }
+
+        return $closed;
+    }
+
+    /**
+     * Close one candidate alert under a row-level lock; returns true
+     * iff this caller actually flipped the row + emitted. A racing
+     * caller that already won the lock returns false here (the
+     * re-fetch finds the row's status outside the `[open,
+     * acknowledged]` set, so nothing to do).
+     */
+    private function closeIfStillActionable(int $candidateId, string $source, Carbon $now): bool
+    {
+        return DB::transaction(function () use ($candidateId, $source, $now): bool {
+            $alert = Alert::query()
+                ->whereKey($candidateId)
+                ->whereIn('status', [
+                    AlertStatus::Open->value,
+                    AlertStatus::Acknowledged->value,
+                ])
+                ->lockForUpdate()
+                ->first();
+
+            if ($alert === null) {
+                return false; // racing caller already closed it
+            }
+
             $alert->forceFill([
                 'status' => AlertStatus::Resolved->value,
                 'resolved_at' => $now,
@@ -86,13 +141,14 @@ class ResolveAlertAction
             ]);
 
             // Spec 032 — dedicated alerts broadcast per closed row.
-            // Trigger's idempotency means the typical resolve closes
-            // a single row, but the per-row dispatch stays correct if
-            // a future caller ever resolves N at once.
+            // Inside the same transaction as the close + activity
+            // event so the broadcast can't race the write (the
+            // `ShouldDispatchAfterCommit` interface defers it until
+            // commit).
             $alert->loadMissing('project:id,owner_user_id');
             AlertResolved::dispatch($alert->id, $alert->project?->owner_user_id);
-        }
 
-        return $resolving->count();
+            return true;
+        });
     }
 }

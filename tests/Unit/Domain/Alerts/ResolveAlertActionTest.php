@@ -11,6 +11,7 @@ use App\Models\Alert;
 use App\Models\Project;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Tests\TestCase;
 
@@ -201,5 +202,63 @@ class ResolveAlertActionTest extends TestCase
         ]);
 
         Event::assertNotDispatched(AlertResolved::class);
+    }
+
+    public function test_race_guard_skips_an_alert_concurrently_resolved_during_iteration(): void
+    {
+        // Simulates a racing caller (eg. a website-monitor cron's
+        // recovery path) flipping the alert to resolved between the
+        // action's initial SELECT and the per-row `lockForUpdate`
+        // re-fetch. The race guard's whereIn('status', [open, ack'd])
+        // filter on the lock-acquiring SELECT must catch this — the
+        // close + emit + broadcast should all be skipped, not
+        // double-fired.
+        $alert = Alert::factory()->create([
+            'source' => AlertSource::Website->value,
+            'source_id' => 100,
+            'type' => 'website.down',
+            'status' => AlertStatus::Open->value,
+        ]);
+
+        // Listener fires on every Alert retrieval. The first time we
+        // see the still-open candidate row (the action's initial
+        // SELECT), we flip its DB-side status to resolved directly
+        // (bypassing the model so this listener doesn't re-trigger).
+        // The action's per-row `lockForUpdate` re-fetch then sees the
+        // new status and the whereIn filter skips it.
+        $flipped = false;
+        $listener = function (Alert $model) use ($alert, &$flipped): void {
+            if ($flipped) {
+                return;
+            }
+            if ($model->id !== $alert->id) {
+                return;
+            }
+            if ($model->status !== AlertStatus::Open) {
+                return;
+            }
+            DB::table('alerts')
+                ->where('id', $alert->id)
+                ->update(['status' => AlertStatus::Resolved->value]);
+            $flipped = true;
+        };
+        Alert::retrieved($listener);
+
+        $closed = app(ResolveAlertAction::class)->execute([
+            'source' => AlertSource::Website,
+            'source_id' => 100,
+        ]);
+
+        $this->assertSame(0, $closed, 'race guard reported zero closes');
+        $this->assertSame(
+            0,
+            ActivityEvent::query()
+                ->where('event_type', 'alert.resolved')
+                ->count(),
+            'no spurious alert.resolved activity event',
+        );
+        // The row landed resolved via the racing caller's direct
+        // update (simulating the other resolve path winning the lock).
+        $this->assertSame(AlertStatus::Resolved, $alert->fresh()->status);
     }
 }
