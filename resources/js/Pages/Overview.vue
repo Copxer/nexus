@@ -5,8 +5,8 @@ import Sparkline from '@/Components/Dashboard/Sparkline.vue';
 import StatusBadge from '@/Components/Dashboard/StatusBadge.vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { hostStatusTone } from '@/lib/hostStyles';
-import type { ActivityHeatmapPayload, DashboardPayload } from '@/types';
-import { Head, Link } from '@inertiajs/vue3';
+import type { ActivityHeatmapPayload, DashboardPayload, PageProps } from '@/types';
+import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import {
     Activity,
     BarChart3,
@@ -22,6 +22,7 @@ import {
     Server,
     ShieldCheck,
 } from 'lucide-vue-next';
+import { onBeforeUnmount, onMounted } from 'vue';
 
 interface TopWorkItem {
     id: string;
@@ -40,6 +41,47 @@ defineProps<{
     activityHeatmap: ActivityHeatmapPayload;
     topWorkItems: TopWorkItem[];
 }>();
+
+// ─── Reverb subscription (spec 033) ──────────────────────────────────
+// Listen on `users.{id}.dashboard` for `HealthScoreUpdated` pulses
+// emitted by `RefreshProjectHealthScoreAction`. On each pulse, ask
+// Inertia for a fresh `dashboard` payload.
+//
+// Note (pre-035): `dashboard` doesn't currently carry per-project
+// score data, so the partial reload is effectively a no-op render-
+// wise today — the cost is one tiny Inertia round-trip per score
+// move. The wiring lands here in 033 so the channel + handler exist
+// and get exercised in dev as soon as the listener-driven recompute
+// fires; the visible payoff arrives in 035 when Overview renders the
+// "Risky projects" panel + per-project chips that this reload feeds.
+const page = usePage<PageProps>();
+let teardown: (() => void) | null = null;
+
+onMounted(() => {
+    if (typeof window === 'undefined' || !window.Echo) {
+        return;
+    }
+    const userId = page.props.auth?.user?.id;
+    if (userId == null) return;
+
+    const channelName = `users.${userId}.dashboard`;
+    const channel = window.Echo.private(channelName);
+
+    const refreshDashboard = () => {
+        router.reload({ only: ['dashboard'] });
+    };
+
+    channel.listen('.HealthScoreUpdated', refreshDashboard);
+
+    teardown = () => {
+        channel.stopListening('.HealthScoreUpdated');
+        window.Echo?.leave(channelName);
+    };
+});
+
+onBeforeUnmount(() => {
+    teardown?.();
+});
 
 // ----- Hardcoded mock data for the populated stub widgets -----
 // These widgets each have their own dedicated spec in later phases. The

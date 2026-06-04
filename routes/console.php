@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Analytics\Jobs\RecomputeAllProjectHealthScoresJob;
 use App\Domain\Docker\Jobs\DetectOfflineHostsJob;
 use App\Domain\Monitoring\Jobs\DispatchDueWebsiteChecksJob;
 use Illuminate\Foundation\Inspiring;
@@ -41,3 +42,14 @@ Schedule::job(new DetectOfflineHostsJob)
     ->everyMinute()
     ->name('hosts:detect-offline')
     ->withoutOverlapping();
+
+// Spec 033 — every-5-minute sweep that fans out per-project health-
+// score recomputes for any project with activity in the last 7 days
+// or no stored score yet. The transition listener
+// (`RecomputeProjectHealthOnActivity`) catches realtime moves; this
+// sweep covers slow-drift signals (eg. a workflow failure aging past
+// the 24h window) and the first-run backfill.
+Schedule::job(new RecomputeAllProjectHealthScoresJob)
+    ->everyFiveMinutes()
+    ->name('analytics:recompute-health-scores')
+    ->withoutOverlapping(10);

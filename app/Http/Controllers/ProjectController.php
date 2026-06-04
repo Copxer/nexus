@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Domain\Activity\Queries\RecentActivityForProjectQuery;
 use App\Domain\GitHub\Queries\DeploymentTimelineQuery;
+use App\Enums\HealthScoreBand;
 use App\Enums\ProjectPriority;
 use App\Enums\ProjectStatus;
 use App\Http\Requests\Projects\StoreProjectRequest;
@@ -208,6 +209,9 @@ class ProjectController extends Controller
             'color' => $project->color,
             'icon' => $project->icon,
             'health_score' => $project->health_score,
+            'health_band' => $project->health_score === null
+                ? null
+                : HealthScoreBand::fromScore($project->health_score)->value,
             'last_activity_at' => $project->last_activity_at?->diffForHumans(),
             'owner' => $project->owner ? [
                 'id' => $project->owner->id,
