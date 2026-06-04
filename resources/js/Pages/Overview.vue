@@ -5,8 +5,8 @@ import Sparkline from '@/Components/Dashboard/Sparkline.vue';
 import StatusBadge from '@/Components/Dashboard/StatusBadge.vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { hostStatusTone } from '@/lib/hostStyles';
-import type { ActivityHeatmapPayload, DashboardPayload } from '@/types';
-import { Head, Link } from '@inertiajs/vue3';
+import type { ActivityHeatmapPayload, DashboardPayload, PageProps } from '@/types';
+import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import {
     Activity,
     BarChart3,
@@ -22,6 +22,7 @@ import {
     Server,
     ShieldCheck,
 } from 'lucide-vue-next';
+import { onBeforeUnmount, onMounted } from 'vue';
 
 interface TopWorkItem {
     id: string;
@@ -40,6 +41,42 @@ defineProps<{
     activityHeatmap: ActivityHeatmapPayload;
     topWorkItems: TopWorkItem[];
 }>();
+
+// ─── Reverb subscription (spec 033) ──────────────────────────────────
+// Listen on `users.{id}.dashboard` for `HealthScoreUpdated` pulses
+// emitted by `RefreshProjectHealthScoreAction`. On each pulse, ask
+// Inertia for a fresh `dashboard` payload — server-side query
+// re-aggregates per-project scores so the cards on this page reflect
+// the change without a manual reload. 035 will reuse the same channel
+// for the activity-heatmap real-data pulse.
+const page = usePage<PageProps>();
+let teardown: (() => void) | null = null;
+
+onMounted(() => {
+    if (typeof window === 'undefined' || !window.Echo) {
+        return;
+    }
+    const userId = page.props.auth?.user?.id;
+    if (userId == null) return;
+
+    const channelName = `users.${userId}.dashboard`;
+    const channel = window.Echo.private(channelName);
+
+    const refreshDashboard = () => {
+        router.reload({ only: ['dashboard'] });
+    };
+
+    channel.listen('.HealthScoreUpdated', refreshDashboard);
+
+    teardown = () => {
+        channel.stopListening('.HealthScoreUpdated');
+        window.Echo?.leave(channelName);
+    };
+});
+
+onBeforeUnmount(() => {
+    teardown?.();
+});
 
 // ----- Hardcoded mock data for the populated stub widgets -----
 // These widgets each have their own dedicated spec in later phases. The

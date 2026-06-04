@@ -102,6 +102,46 @@ class ProjectControllerTest extends TestCase
             );
     }
 
+    public function test_show_payload_carries_health_score_and_band(): void
+    {
+        $user = $this->verifiedUser();
+        $project = Project::factory()->create([
+            'owner_user_id' => $user->id,
+            'health_score' => 82,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('projects.show', $project))
+            ->assertSuccessful()
+            ->assertInertia(
+                fn (AssertableInertia $page) => $page
+                    ->where('project.health_score', 82)
+                    ->where('project.health_band', 'good'),
+            );
+    }
+
+    public function test_show_payload_health_band_is_null_when_score_is_null(): void
+    {
+        // Pre-first-sweep state: a freshly-created project has no
+        // stored score. The transform must surface both fields as
+        // null so the frontend renders the "Unscored" placeholder
+        // rather than mapping a missing band to a misleading tone.
+        $user = $this->verifiedUser();
+        $project = Project::factory()->create([
+            'owner_user_id' => $user->id,
+            'health_score' => null,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('projects.show', $project))
+            ->assertSuccessful()
+            ->assertInertia(
+                fn (AssertableInertia $page) => $page
+                    ->where('project.health_score', null)
+                    ->where('project.health_band', null),
+            );
+    }
+
     public function test_show_scopes_monitors_to_this_project(): void
     {
         $user = $this->verifiedUser();

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import ActivityFeed from '@/Components/Activity/ActivityFeed.vue';
+import HealthScoreBadge from '@/Components/Project/HealthScoreBadge.vue';
 import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
@@ -51,6 +52,7 @@ interface ProjectShape {
     color: string | null;
     icon: string | null;
     health_score: number | null;
+    health_band: string | null;
     last_activity_at: string | null;
     owner: { id: number; name: string; initials: string } | null;
 }
@@ -282,9 +284,15 @@ const confirmDelete = () => {
                             />
                         </span>
                         <div class="flex min-w-0 flex-col gap-2">
-                            <h2 class="text-xl font-semibold text-text-primary">
-                                {{ project.name }}
-                            </h2>
+                            <div class="flex flex-wrap items-center gap-3">
+                                <h2 class="text-xl font-semibold text-text-primary">
+                                    {{ project.name }}
+                                </h2>
+                                <HealthScoreBadge
+                                    :score="project.health_score"
+                                    :band="project.health_band"
+                                />
+                            </div>
                             <p
                                 v-if="project.description"
                                 class="text-sm text-text-secondary"

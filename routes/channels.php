@@ -48,3 +48,13 @@ Broadcast::channel('users.{userId}.hosts', function ($user, $userId) {
 Broadcast::channel('users.{userId}.alerts', function ($user, $userId) {
     return (int) $user->id === (int) $userId;
 });
+
+// Spec 033 — per-user dashboard channel. `HealthScoreUpdated`
+// broadcasts here whenever a project's score changes (transition-
+// driven or scheduled-sweep) so Overview refreshes its score chips
+// without a manual reload. 035 will reuse the channel for the
+// activity-heatmap real-data pulse and the Overview risky-projects
+// re-rank.
+Broadcast::channel('users.{userId}.dashboard', function ($user, $userId) {
+    return (int) $user->id === (int) $userId;
+});
