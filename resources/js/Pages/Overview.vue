@@ -45,10 +45,15 @@ defineProps<{
 // ─── Reverb subscription (spec 033) ──────────────────────────────────
 // Listen on `users.{id}.dashboard` for `HealthScoreUpdated` pulses
 // emitted by `RefreshProjectHealthScoreAction`. On each pulse, ask
-// Inertia for a fresh `dashboard` payload — server-side query
-// re-aggregates per-project scores so the cards on this page reflect
-// the change without a manual reload. 035 will reuse the same channel
-// for the activity-heatmap real-data pulse.
+// Inertia for a fresh `dashboard` payload.
+//
+// Note (pre-035): `dashboard` doesn't currently carry per-project
+// score data, so the partial reload is effectively a no-op render-
+// wise today — the cost is one tiny Inertia round-trip per score
+// move. The wiring lands here in 033 so the channel + handler exist
+// and get exercised in dev as soon as the listener-driven recompute
+// fires; the visible payoff arrives in 035 when Overview renders the
+// "Risky projects" panel + per-project chips that this reload feeds.
 const page = usePage<PageProps>();
 let teardown: (() => void) | null = null;
 

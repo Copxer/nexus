@@ -328,6 +328,17 @@ Dated notes as work progresses.
 - Branch `spec/033-health-score-scaffolding` cut off main.
 - Tracking issue #97.
 - Scope shipped as drafted (no late edits requested).
+- Plan-vs-impl notes:
+  - Overview Echo subscription reloads `only: ['dashboard']` (the
+    actual page prop shape), not `['kpis', 'projects']` as the
+    Plan §9 placeholder named.
+  - Per-project job is `RecomputeProjectHealthScoreJob` (singular
+    Score). Plan §6 named it `RecomputeProjectHealthScoresJob`
+    (plural) — singular is right since it's per-row.
+  - Self-review noted: the Overview subscription is correct but
+    cosmetic until 035 surfaces per-project health on the page.
+    Wiring + comment ship in 033 so the channel is exercised in dev
+    immediately; visible payoff arrives in 035.
 
 ## Open questions / blockers
 
