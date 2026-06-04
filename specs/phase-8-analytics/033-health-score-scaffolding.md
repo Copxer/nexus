@@ -1,7 +1,7 @@
 ---
 spec: health-score-scaffolding
 phase: 8
-status: in-progress   # not-started | in-progress | blocked | done
+status: done   # not-started | in-progress | blocked | done
 owner: Yoany
 created: 2026-06-03
 updated: 2026-06-04
