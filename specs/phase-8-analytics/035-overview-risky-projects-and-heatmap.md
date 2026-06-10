@@ -1,7 +1,7 @@
 ---
 spec: overview-risky-projects-and-heatmap
 phase: 8
-status: in-progress   # not-started | in-progress | blocked | done
+status: done   # not-started | in-progress | blocked | done
 owner: Yoany
 created: 2026-06-10
 updated: 2026-06-10
