@@ -1,10 +1,10 @@
 ---
 spec: analytics-dashboard
 phase: 8
-status: in-progress   # not-started | in-progress | blocked | done
+status: done   # not-started | in-progress | blocked | done
 owner: Yoany
 created: 2026-06-04
-updated: 2026-06-04
+updated: 2026-06-10
 ---
 
 # 034 — Analytics dashboard page
