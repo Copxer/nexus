@@ -41,9 +41,9 @@ use Illuminate\Support\Collection;
  *     limit 4. `commits` proxies via stars_count until phase 2 syncs
  *     real commit counts from GitHub.
  *   - activityHeatmap — 7 days × 6 four-hour buckets aggregated from
- *     `activity_events.occurred_at` over the last 90 days. Bucketing
- *     happens in PHP so the query stays cross-DB without `DAYOFWEEK()` /
- *     `HOUR()` polyfills.
+ *     `activity_events.occurred_at` over the last 12 weeks (84 days).
+ *     Bucketing happens in PHP so the query stays cross-DB without
+ *     `DAYOFWEEK()` / `HOUR()` polyfills.
  *   - dashboard.uptime.{overall,change,sparkline,status} — Spec 025;
  *     `GetMonitoringUptimeKpiQuery` aggregates `website_checks`
  *     volume-weighted across all of the user's monitors over 24h
@@ -226,22 +226,23 @@ class GetOverviewDashboardQuery
     /**
      * Engineering-rhythm heatmap (7 days × 6 four-hour buckets).
      *
-     * Aggregates `activity_events.occurred_at` over the last 90 days
-     * into a `[day_of_week][bucket]` grid where:
+     * Aggregates `activity_events.occurred_at` over the last 12 weeks
+     * (84 days) into a `[day_of_week][bucket]` grid where:
      *   - day_of_week: 0=Sun, 1=Mon, …, 6=Sat (Carbon's convention,
      *     matches the JS `Date#getDay()` axis on the heatmap component)
      *   - bucket: 0=00:00–04:00, 1=04:00–08:00, …, 5=20:00–24:00
      *
-     * 90-day window is long enough to surface a recurring rhythm but
+     * 12-week window is long enough to surface a recurring rhythm but
      * recent enough to reflect *current* habits — narrower than "all
      * time" (which dilutes signal forever) and wider than "last week"
-     * (which is noisy on quiet accounts).
+     * (which is noisy on quiet accounts). The window was 90 days
+     * pre-spec 035; the shift aligns to the Phase 8 acceptance text.
      *
      * **Why bucket in PHP, not SQL:** `DAYOFWEEK()` (MySQL) and
      * `strftime('%w', …)` (SQLite) disagree on indexing AND on
      * timezone handling, and the test suite runs on SQLite while prod
      * uses MySQL. A single `SELECT occurred_at FROM activity_events
-     * WHERE occurred_at >= ?` is cheap at phase-1 scale (≤90d × low
+     * WHERE occurred_at >= ?` is cheap at phase-1 scale (≤12 weeks × low
      * webhook traffic), and bucketing in PHP keeps the math obvious.
      *
      * **Timezone caveat:** the hour bucket is computed in the app's
@@ -295,6 +296,7 @@ class GetOverviewDashboardQuery
             ->orderByRaw('health_score IS NULL')
             ->orderBy('health_score', 'asc')
             ->orderByDesc('last_activity_at')
+            ->orderBy('id') // deterministic tiebreaker when score + last_activity_at collide
             ->limit(self::RISKY_PROJECTS_LIMIT)
             ->get([
                 'id',

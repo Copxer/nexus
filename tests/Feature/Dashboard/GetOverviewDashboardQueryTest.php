@@ -699,20 +699,6 @@ class GetOverviewDashboardQueryTest extends TestCase
         $this->assertSame(3, $heatmap[1][2]);
     }
 
-    public function test_activity_heatmap_excludes_events_older_than_90_days(): void
-    {
-        $repository = $this->setUpRepository();
-
-        ActivityEvent::factory()->create([
-            'repository_id' => $repository->id,
-            'occurred_at' => now()->subDays(91)->startOfDay()->addHours(10),
-        ]);
-
-        $heatmap = (new GetOverviewDashboardQuery)->handle($this->defaultUser())['activityHeatmap'];
-
-        $this->assertSame(array_fill(0, 7, array_fill(0, 6, 0)), $heatmap);
-    }
-
     public function test_activity_heatmap_includes_events_inside_12_week_window(): void
     {
         // Spec 035 — window is exactly 12 weeks (84 days). An 83-day-
@@ -901,6 +887,35 @@ class GetOverviewDashboardQueryTest extends TestCase
             ->handle($a)['dashboard']['riskyProjects'];
 
         $this->assertSame([], $rows, "A's payload must not include B's projects");
+    }
+
+    public function test_risky_projects_surfaces_good_band_rows_server_side(): void
+    {
+        // The server returns every owned project ordered by score —
+        // including the "good" band (70–89). Spec 035's empty-state
+        // semantics ("All projects healthy" when every score ≥ 70)
+        // are enforced on the *frontend*, not in this query. Locking
+        // the server-side contract here keeps the two layers
+        // intentionally distinct.
+        $owner = User::factory()->create();
+        $good = Project::factory()->create([
+            'owner_user_id' => $owner->id,
+            'name' => 'Goodish',
+            'health_score' => 75,
+        ]);
+        $healthy = Project::factory()->create([
+            'owner_user_id' => $owner->id,
+            'name' => 'Healthier',
+            'health_score' => 95,
+        ]);
+
+        $rows = (new GetOverviewDashboardQuery)
+            ->handle($owner)['dashboard']['riskyProjects'];
+
+        $this->assertCount(2, $rows);
+        $this->assertSame('Goodish', $rows[0]['name']);
+        $this->assertSame('good', $rows[0]['health_band']);
+        $this->assertSame('Healthier', $rows[1]['name']);
     }
 
     public function test_risky_projects_row_carries_expected_shape(): void

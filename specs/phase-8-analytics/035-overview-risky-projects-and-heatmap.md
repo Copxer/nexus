@@ -205,6 +205,21 @@ Dated notes as work progresses.
 - Branch `spec/035-overview-risky-projects-and-heatmap` cut off main.
 - Tracking issue #103.
 - Scope shipped as drafted (no late edits requested).
+- Plan-vs-impl notes:
+  - Controller-level coverage landed in `tests/Feature/SmokeTest.php`
+    (one new payload assertion + extended dashboard shape check)
+    instead of a dedicated `OverviewControllerTest.php` — SmokeTest
+    already owns the Overview render path, and a separate
+    controller test would be 90% overlap.
+  - Two-layer empty-state semantics: server returns every owned
+    project ordered ascending by score (including the "good" band),
+    `RiskyProjects.vue` hides the panel when every row sits at
+    score ≥ 70. Test
+    `test_risky_projects_surfaces_good_band_rows_server_side`
+    pins the server contract; frontend test would need JS infra
+    that doesn't exist yet.
+  - Added `->orderBy('id')` tiebreaker per code-reviewer feedback
+    so collisions on `(score, last_activity_at)` are deterministic.
 
 ## Open questions / blockers
 

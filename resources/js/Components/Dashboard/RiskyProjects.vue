@@ -8,27 +8,36 @@ import { computed } from 'vue';
 
 /**
  * Spec 035 — Overview "Risky projects" panel. The query layer
- * (`GetOverviewDashboardQuery::riskyProjects`) already sorts ascending
- * by `health_score` with nulls last and caps at 6, so this component
- * is pure render: project chip + name + `HealthScoreBadge` + last-
+ * (`GetOverviewDashboardQuery::riskyProjects`) sorts ascending by
+ * `health_score` with nulls last and caps at 6, so this component is
+ * pure render: project chip + name + `HealthScoreBadge` + last-
  * activity line. Each row links to the project's Show page.
  *
- * Empty state triggers when the array is empty (user has no projects)
- * or when every row sits in the "healthy" band (score ≥ 90). The
- * panel hides quietly rather than surfacing a "no risky projects"
- * card — Overview's grid stays tight.
+ * Empty-state placeholder ("All projects healthy") triggers when:
+ *   - the user has no projects, OR
+ *   - every project sits at score ≥ 70 (the §14.2 "good" band floor,
+ *     `healthy` + `good`) or has no score yet (`null`).
+ *
+ * A "good"-banded project at score 75 is intentionally *not* shown:
+ * §14.2 calls it "good", not "needs attention". The panel surfaces
+ * only `degraded` / `warning` / `critical` rows that genuinely warrant
+ * the user's eyes today.
  */
 const props = defineProps<{
     projects: RiskyProjectRow[];
 }>();
 
-const everythingHealthy = computed<boolean>(
-    () =>
-        props.projects.length > 0
-        && props.projects.every(
-            (row) => row.health_band === 'healthy' || row.health_band === null,
-        ),
-);
+const HIDING_BANDS = new Set(['healthy', 'good']);
+
+const shouldShowList = computed<boolean>(() => {
+    if (props.projects.length === 0) {
+        return false;
+    }
+
+    return props.projects.some(
+        (row) => row.health_band !== null && !HIDING_BANDS.has(row.health_band),
+    );
+});
 
 const iconAccentClass = (color: string | null): string => {
     switch (color) {
@@ -64,18 +73,18 @@ const iconAccentClass = (color: string | null): string => {
                 </h3>
             </div>
             <ShieldCheck
-                v-if="everythingHealthy"
+                v-if="!shouldShowList && props.projects.length > 0"
                 class="h-4 w-4 text-status-success"
                 aria-hidden="true"
             />
         </header>
 
         <ul
-            v-if="props.projects.length > 0 && !everythingHealthy"
+            v-if="shouldShowList"
             class="space-y-2"
         >
             <li
-                v-for="project in props.projects"
+                v-for="project in props.projects.filter((p) => p.health_band !== null && !HIDING_BANDS.has(p.health_band))"
                 :key="project.id"
             >
                 <Link
