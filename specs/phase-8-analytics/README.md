@@ -21,7 +21,7 @@ matters.
 |---|------|--------|
 | 033 | Health-score scaffolding (calculation + scheduled & transition-driven recompute + broadcast + Overview & project UI) | 🟢 |
 | 034 | Analytics dashboard page (`/analytics` route, §8.13 chart set, date-range filter) | 🟢 |
-| 035 | Real-data activity heatmap + Overview risky-project prioritization (closes phase 8) | ⬜ |
+| 035 | Real-data activity heatmap + Overview risky-project prioritization (closes phase 8) | 🟢 |
 
 ## Acceptance criteria (phase-level)
 - [ ] `projects.health_score` is non-null for every project after the

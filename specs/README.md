@@ -43,7 +43,7 @@ Status legend: ⬜ not started · 🟡 in progress · 🟢 done · 🔴 blocked
 | 5 | Website Monitoring | 🟢 | 3/3 specs done (023–025). Phase complete. |
 | 6 | Docker Host Agent MVP | 🟢 | 4/4 specs done (026–029). Phase complete. |
 | 7 | Alerts Engine | 🟢 | 3/3 specs done (030–032). Phase complete. |
-| 8 | Analytics & Health Scores | 🟡 | 2/3 specs done (033, 034). 035 (heatmap + risky-projects close) pending. |
+| 8 | Analytics & Health Scores | 🟢 | 3/3 specs done (033–035). Phase complete. |
 | 9 | Polish & Production Readiness | ⬜ | — |
 | 10 | Future Innovation | ⬜ | — |
 
