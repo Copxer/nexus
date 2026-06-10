@@ -5,6 +5,7 @@ use App\Http\Controllers\Agent\HostTelemetryController;
 use App\Http\Controllers\AlertAcknowledgeController;
 use App\Http\Controllers\AlertController;
 use App\Http\Controllers\AlertMuteController;
+use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\AlertResolveController;
 use App\Http\Controllers\DeploymentController;
 use App\Http\Controllers\GithubConnectionController;
@@ -144,6 +145,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('alerts.resolve');
     Route::post('/alerts/{alert}/mute', AlertMuteController::class)
         ->name('alerts.mute');
+
+    // Spec 034 — Analytics dashboard. Single-action invokable
+    // controller. The `?range=7d|30d|90d` filter is read inside the
+    // controller; queries scope strictly by the authenticated user's
+    // owned projects so the page never leaks cross-tenant data.
+    Route::get('/analytics', AnalyticsController::class)
+        ->name('analytics.index');
 });
 
 // Spec 017 — GitHub webhooks (no auth/CSRF; signature-verified inside).

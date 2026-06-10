@@ -144,8 +144,8 @@ export function getCommands(): Command[] {
             label: 'Go to Analytics',
             group: 'navigation',
             icon: BarChart3,
-            disabled: true,
-            soonLabel: 'Phase 8',
+            keywords: ['metrics', 'dashboard', 'charts', 'trends', 'mttr', 'uptime'],
+            run: () => router.visit(route('analytics.index')),
         },
         {
             id: 'go-alerts',
