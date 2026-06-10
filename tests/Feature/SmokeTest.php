@@ -49,8 +49,33 @@ class SmokeTest extends TestCase
                         ->where('alerts.status', 'success')
                         ->has('uptime.overall')
                         ->has('topRepositories')
+                        // Spec 035 — `riskyProjects` always present
+                        // in the payload; empty when the user has no
+                        // projects.
+                        ->where('riskyProjects', [])
                     )
                     ->has('topWorkItems')
+            );
+    }
+
+    public function test_overview_payload_carries_risky_projects_for_owner(): void
+    {
+        $user = User::factory()->create(['email_verified_at' => now()]);
+        $project = Project::factory()->create([
+            'owner_user_id' => $user->id,
+            'name' => 'Risky Service',
+            'health_score' => 25,
+        ]);
+
+        $this->actingAs($user)
+            ->get('/overview')
+            ->assertInertia(
+                fn (AssertableInertia $page) => $page
+                    ->has('dashboard.riskyProjects', 1)
+                    ->where('dashboard.riskyProjects.0.id', $project->id)
+                    ->where('dashboard.riskyProjects.0.name', 'Risky Service')
+                    ->where('dashboard.riskyProjects.0.health_score', 25)
+                    ->where('dashboard.riskyProjects.0.health_band', 'critical'),
             );
     }
 

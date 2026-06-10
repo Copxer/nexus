@@ -5,6 +5,7 @@ namespace App\Domain\Dashboard\Queries;
 use App\Domain\Monitoring\Queries\GetMonitoringUptimeKpiQuery;
 use App\Enums\AlertSeverity;
 use App\Enums\AlertStatus;
+use App\Enums\HealthScoreBand;
 use App\Enums\HostStatus;
 use App\Models\ActivityEvent;
 use App\Models\Alert;
@@ -12,6 +13,7 @@ use App\Models\Host;
 use App\Models\HostMetricSnapshot;
 use App\Models\Project;
 use App\Models\Repository;
+use App\Models\User;
 use App\Models\WorkflowRun;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
@@ -39,9 +41,9 @@ use Illuminate\Support\Collection;
  *     limit 4. `commits` proxies via stars_count until phase 2 syncs
  *     real commit counts from GitHub.
  *   - activityHeatmap — 7 days × 6 four-hour buckets aggregated from
- *     `activity_events.occurred_at` over the last 90 days. Bucketing
- *     happens in PHP so the query stays cross-DB without `DAYOFWEEK()` /
- *     `HOUR()` polyfills.
+ *     `activity_events.occurred_at` over the last 12 weeks (84 days).
+ *     Bucketing happens in PHP so the query stays cross-DB without
+ *     `DAYOFWEEK()` / `HOUR()` polyfills.
  *   - dashboard.uptime.{overall,change,sparkline,status} — Spec 025;
  *     `GetMonitoringUptimeKpiQuery` aggregates `website_checks`
  *     volume-weighted across all of the user's monitors over 24h
@@ -69,7 +71,10 @@ class GetOverviewDashboardQuery
     /** Default number of repositories returned by the Top Repositories slice. */
     private const TOP_REPOS_LIMIT = 4;
 
-    public function handle(): array
+    /** Cap for the riskyProjects panel — mirrors the dashboard row rhythm (spec 035). */
+    private const RISKY_PROJECTS_LIMIT = 6;
+
+    public function handle(User $user): array
     {
         return [
             'dashboard' => array_merge(self::MOCK_KPIS, [
@@ -79,6 +84,7 @@ class GetOverviewDashboardQuery
                 'alerts' => $this->alerts(),
                 'uptime' => app(GetMonitoringUptimeKpiQuery::class)->execute(),
                 'topRepositories' => $this->topRepositories(),
+                'riskyProjects' => $this->riskyProjects($user),
             ]),
             'activityHeatmap' => $this->activityHeatmap(),
         ];
@@ -220,22 +226,23 @@ class GetOverviewDashboardQuery
     /**
      * Engineering-rhythm heatmap (7 days × 6 four-hour buckets).
      *
-     * Aggregates `activity_events.occurred_at` over the last 90 days
-     * into a `[day_of_week][bucket]` grid where:
+     * Aggregates `activity_events.occurred_at` over the last 12 weeks
+     * (84 days) into a `[day_of_week][bucket]` grid where:
      *   - day_of_week: 0=Sun, 1=Mon, …, 6=Sat (Carbon's convention,
      *     matches the JS `Date#getDay()` axis on the heatmap component)
      *   - bucket: 0=00:00–04:00, 1=04:00–08:00, …, 5=20:00–24:00
      *
-     * 90-day window is long enough to surface a recurring rhythm but
+     * 12-week window is long enough to surface a recurring rhythm but
      * recent enough to reflect *current* habits — narrower than "all
      * time" (which dilutes signal forever) and wider than "last week"
-     * (which is noisy on quiet accounts).
+     * (which is noisy on quiet accounts). The window was 90 days
+     * pre-spec 035; the shift aligns to the Phase 8 acceptance text.
      *
      * **Why bucket in PHP, not SQL:** `DAYOFWEEK()` (MySQL) and
      * `strftime('%w', …)` (SQLite) disagree on indexing AND on
      * timezone handling, and the test suite runs on SQLite while prod
      * uses MySQL. A single `SELECT occurred_at FROM activity_events
-     * WHERE occurred_at >= ?` is cheap at phase-1 scale (≤90d × low
+     * WHERE occurred_at >= ?` is cheap at phase-1 scale (≤12 weeks × low
      * webhook traffic), and bucketing in PHP keeps the math obvious.
      *
      * **Timezone caveat:** the hour bucket is computed in the app's
@@ -250,8 +257,10 @@ class GetOverviewDashboardQuery
     {
         $grid = array_fill(0, 7, array_fill(0, 6, 0));
 
+        // Spec 035 — 12 weeks (84 days), aligning with the Phase 8
+        // README's literal acceptance text. Was 90 days previously.
         ActivityEvent::query()
-            ->where('occurred_at', '>=', now()->subDays(90))
+            ->where('occurred_at', '>=', now()->subWeeks(12))
             ->select('occurred_at')
             ->get()
             ->each(function (ActivityEvent $event) use (&$grid) {
@@ -265,6 +274,52 @@ class GetOverviewDashboardQuery
             });
 
         return $grid;
+    }
+
+    /**
+     * Spec 035 — owned projects ranked ascending by `health_score`
+     * with nulls placed last so unscored projects don't displace
+     * genuinely-risky ones. Returns up to 6 rows; the Overview
+     * "Risky projects" panel renders the badge + last-activity line.
+     *
+     * Single-tenant ordering note: `ORDER BY health_score IS NULL`
+     * is portable across SQLite + MySQL (both treat it as 0/1 for
+     * the secondary key). Postgres would need explicit `NULLS LAST`
+     * — flag during a future port.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function riskyProjects(User $user): array
+    {
+        return Project::query()
+            ->where('owner_user_id', $user->id)
+            ->orderByRaw('health_score IS NULL')
+            ->orderBy('health_score', 'asc')
+            ->orderByDesc('last_activity_at')
+            ->orderBy('id') // deterministic tiebreaker when score + last_activity_at collide
+            ->limit(self::RISKY_PROJECTS_LIMIT)
+            ->get([
+                'id',
+                'slug',
+                'name',
+                'color',
+                'icon',
+                'health_score',
+                'last_activity_at',
+            ])
+            ->map(fn (Project $p): array => [
+                'id' => $p->id,
+                'slug' => $p->slug,
+                'name' => $p->name,
+                'color' => $p->color,
+                'icon' => $p->icon,
+                'health_score' => $p->health_score,
+                'health_band' => $p->health_score === null
+                    ? null
+                    : HealthScoreBand::fromScore($p->health_score)->value,
+                'last_activity_at' => $p->last_activity_at?->diffForHumans(),
+            ])
+            ->all();
     }
 
     /**

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import ActivityHeatmap from '@/Components/Activity/ActivityHeatmap.vue';
 import KpiCard from '@/Components/Dashboard/KpiCard.vue';
+import RiskyProjects from '@/Components/Dashboard/RiskyProjects.vue';
 import Sparkline from '@/Components/Dashboard/Sparkline.vue';
 import StatusBadge from '@/Components/Dashboard/StatusBadge.vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
@@ -560,6 +561,15 @@ const visualizationStubs = [
                     </footer>
                 </section>
 
+                <!-- Risky projects (spec 035) — sorts owned projects
+                     ascending by health_score so degraded / critical
+                     surface first. Echo-refreshed via the
+                     `users.{id}.dashboard` subscription wired in
+                     spec 033. -->
+                <div class="lg:col-span-12">
+                    <RiskyProjects :projects="dashboard.riskyProjects" />
+                </div>
+
                 <!-- Activity Heatmap — 7 days × 6 four-hour buckets per §8.11 -->
                 <section
                     aria-label="Activity Heatmap"
@@ -576,7 +586,7 @@ const visualizationStubs = [
                             </h2>
                         </div>
                         <span class="hidden font-mono text-[11px] text-text-muted sm:inline">
-                            7 days · 4-hour buckets · last 90 days
+                            7 days · 4-hour buckets · last 12 weeks
                         </span>
                     </header>
                     <ActivityHeatmap :data="activityHeatmap" />

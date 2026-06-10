@@ -10,14 +10,15 @@ use Inertia\Response;
 
 /**
  * Overview dashboard. Mostly delegates the read to
- * `GetOverviewDashboardQuery` (roadmap §10.2) — that query handles the
- * single-tenant phase-1 slices that don't need a user (projects,
- * hosts, deployments, top repositories, activity heatmap).
+ * `GetOverviewDashboardQuery` (roadmap §10.2) — that query now accepts
+ * the authenticated user so the riskyProjects slice (spec 035) can
+ * scope to owned projects. The remaining KPI slices (projects /
+ * hosts / deployments / topRepositories / activity heatmap) stay
+ * single-tenant until a dedicated tenancy spec.
  *
- * The Issues & PRs widget is the one user-scoped slice on this page
- * — `WorkItemsForUserQuery` requires a `User` so we run it here and
- * merge the result rather than threading the user into
- * `GetOverviewDashboardQuery`'s no-arg signature.
+ * The Issues & PRs widget is the second user-scoped slice on this
+ * page — `WorkItemsForUserQuery` lives in a different domain so we
+ * run it here and merge the result.
  */
 class OverviewController extends Controller
 {
@@ -32,7 +33,7 @@ class OverviewController extends Controller
         GetOverviewDashboardQuery $query,
         WorkItemsForUserQuery $workItemsQuery,
     ): Response {
-        $payload = $query->handle();
+        $payload = $query->handle($request->user());
 
         // Spec 016 shipped the work-items query; this surfaces the top
         // N open items on the Overview's Issues & PRs widget so the
