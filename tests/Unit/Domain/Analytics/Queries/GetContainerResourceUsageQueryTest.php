@@ -40,9 +40,12 @@ class GetContainerResourceUsageQueryTest extends TestCase
         $user = User::factory()->create();
         $project = Project::factory()->create(['owner_user_id' => $user->id]);
         $host = Host::factory()->create(['project_id' => $project->id]);
+        // No `project_id` set — the query scopes through
+        // `host_id → hosts.project_id`, not the denormalized
+        // `containers.project_id` column. Keep the test honest about
+        // which path is being exercised.
         $container = Container::factory()->create([
             'host_id' => $host->id,
-            'project_id' => $project->id,
         ]);
 
         // CPU avg = (10 + 30) / 2 = 20 → success band (<60).
@@ -73,9 +76,12 @@ class GetContainerResourceUsageQueryTest extends TestCase
         $user = User::factory()->create();
         $project = Project::factory()->create(['owner_user_id' => $user->id]);
         $host = Host::factory()->create(['project_id' => $project->id]);
+        // No `project_id` set — the query scopes through
+        // `host_id → hosts.project_id`, not the denormalized
+        // `containers.project_id` column. Keep the test honest about
+        // which path is being exercised.
         $container = Container::factory()->create([
             'host_id' => $host->id,
-            'project_id' => $project->id,
         ]);
 
         ContainerMetricSnapshot::factory()->create([
@@ -98,7 +104,6 @@ class GetContainerResourceUsageQueryTest extends TestCase
         $hostB = Host::factory()->create(['project_id' => $projectB->id]);
         $containerB = Container::factory()->create([
             'host_id' => $hostB->id,
-            'project_id' => $projectB->id,
         ]);
         ContainerMetricSnapshot::factory()->count(5)->create([
             'container_id' => $containerB->id,

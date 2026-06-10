@@ -289,6 +289,20 @@ Dated notes as work progresses.
 - Branch `spec/034-analytics-dashboard` cut off main.
 - Tracking issue #100.
 - Scope shipped as drafted (no late edits requested).
+- Plan-vs-impl notes:
+  - **Deferred:** the spec's "In scope" wording for deployment success
+    rate + uptime mentioned `change` deltas vs. a previous window.
+    Not implemented — would double the per-card query cost (current +
+    prior window) for a small "+0.3%" chip the page doesn't render
+    anyway. Snapshot semantics for the analytics page are
+    sufficient; a delta indicator can land as polish if it ever
+    proves load-bearing.
+  - **MTTR** computed in PHP via `Carbon::getTimestamp()` deltas
+    instead of a SQLite-vs-MySQL dialect split. Hydrating ~5k
+    resolved-alert timestamp rows is well under the controller
+    budget; at 500k+ the page itself becomes slow and a perf pass
+    is the right response. Test DB is SQLite, prod is MySQL —
+    portability wins phase-1.
 
 ## Open questions / blockers
 

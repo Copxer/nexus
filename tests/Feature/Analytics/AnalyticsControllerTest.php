@@ -55,7 +55,8 @@ class AnalyticsControllerTest extends TestCase
 
         $this->actingAs($user)
             ->get(route('analytics.index', ['range' => '1y']))
-            ->assertStatus(302); // validation redirect
+            ->assertStatus(302) // validation redirect
+            ->assertSessionHasErrors(['range']);
     }
 
     public function test_payload_carries_expected_metric_shape(): void
