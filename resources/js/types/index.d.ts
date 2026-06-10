@@ -122,6 +122,32 @@ export interface DashboardPayload {
         commits: number;
         share: number;
     }>;
+
+    /**
+     * Spec 035 — owned projects ranked ascending by `health_score`
+     * with nulls last. Empty array triggers the "All projects healthy"
+     * placeholder. Capped at 6 server-side.
+     */
+    riskyProjects: RiskyProjectRow[];
+}
+
+export interface RiskyProjectRow {
+    id: number;
+    slug: string;
+    name: string;
+    color: string | null;
+    icon: string | null;
+    health_score: number | null;
+    /** §14.2 band — null when score is null. */
+    health_band:
+        | 'healthy'
+        | 'good'
+        | 'degraded'
+        | 'warning'
+        | 'critical'
+        | null;
+    /** Humanized via `diffForHumans()`. */
+    last_activity_at: string | null;
 }
 
 /**

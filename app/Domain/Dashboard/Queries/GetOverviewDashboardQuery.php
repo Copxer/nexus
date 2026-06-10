@@ -5,6 +5,7 @@ namespace App\Domain\Dashboard\Queries;
 use App\Domain\Monitoring\Queries\GetMonitoringUptimeKpiQuery;
 use App\Enums\AlertSeverity;
 use App\Enums\AlertStatus;
+use App\Enums\HealthScoreBand;
 use App\Enums\HostStatus;
 use App\Models\ActivityEvent;
 use App\Models\Alert;
@@ -12,6 +13,7 @@ use App\Models\Host;
 use App\Models\HostMetricSnapshot;
 use App\Models\Project;
 use App\Models\Repository;
+use App\Models\User;
 use App\Models\WorkflowRun;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
@@ -69,7 +71,10 @@ class GetOverviewDashboardQuery
     /** Default number of repositories returned by the Top Repositories slice. */
     private const TOP_REPOS_LIMIT = 4;
 
-    public function handle(): array
+    /** Cap for the riskyProjects panel — mirrors the dashboard row rhythm (spec 035). */
+    private const RISKY_PROJECTS_LIMIT = 6;
+
+    public function handle(User $user): array
     {
         return [
             'dashboard' => array_merge(self::MOCK_KPIS, [
@@ -79,6 +84,7 @@ class GetOverviewDashboardQuery
                 'alerts' => $this->alerts(),
                 'uptime' => app(GetMonitoringUptimeKpiQuery::class)->execute(),
                 'topRepositories' => $this->topRepositories(),
+                'riskyProjects' => $this->riskyProjects($user),
             ]),
             'activityHeatmap' => $this->activityHeatmap(),
         ];
@@ -250,8 +256,10 @@ class GetOverviewDashboardQuery
     {
         $grid = array_fill(0, 7, array_fill(0, 6, 0));
 
+        // Spec 035 — 12 weeks (84 days), aligning with the Phase 8
+        // README's literal acceptance text. Was 90 days previously.
         ActivityEvent::query()
-            ->where('occurred_at', '>=', now()->subDays(90))
+            ->where('occurred_at', '>=', now()->subWeeks(12))
             ->select('occurred_at')
             ->get()
             ->each(function (ActivityEvent $event) use (&$grid) {
@@ -265,6 +273,51 @@ class GetOverviewDashboardQuery
             });
 
         return $grid;
+    }
+
+    /**
+     * Spec 035 — owned projects ranked ascending by `health_score`
+     * with nulls placed last so unscored projects don't displace
+     * genuinely-risky ones. Returns up to 6 rows; the Overview
+     * "Risky projects" panel renders the badge + last-activity line.
+     *
+     * Single-tenant ordering note: `ORDER BY health_score IS NULL`
+     * is portable across SQLite + MySQL (both treat it as 0/1 for
+     * the secondary key). Postgres would need explicit `NULLS LAST`
+     * — flag during a future port.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function riskyProjects(User $user): array
+    {
+        return Project::query()
+            ->where('owner_user_id', $user->id)
+            ->orderByRaw('health_score IS NULL')
+            ->orderBy('health_score', 'asc')
+            ->orderByDesc('last_activity_at')
+            ->limit(self::RISKY_PROJECTS_LIMIT)
+            ->get([
+                'id',
+                'slug',
+                'name',
+                'color',
+                'icon',
+                'health_score',
+                'last_activity_at',
+            ])
+            ->map(fn (Project $p): array => [
+                'id' => $p->id,
+                'slug' => $p->slug,
+                'name' => $p->name,
+                'color' => $p->color,
+                'icon' => $p->icon,
+                'health_score' => $p->health_score,
+                'health_band' => $p->health_score === null
+                    ? null
+                    : HealthScoreBand::fromScore($p->health_score)->value,
+                'last_activity_at' => $p->last_activity_at?->diffForHumans(),
+            ])
+            ->all();
     }
 
     /**

@@ -32,7 +32,7 @@ class OverviewController extends Controller
         GetOverviewDashboardQuery $query,
         WorkItemsForUserQuery $workItemsQuery,
     ): Response {
-        $payload = $query->handle();
+        $payload = $query->handle($request->user());
 
         // Spec 016 shipped the work-items query; this surfaces the top
         // N open items on the Overview's Issues & PRs widget so the
