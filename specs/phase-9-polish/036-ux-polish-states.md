@@ -246,6 +246,28 @@ Dated notes as work progresses.
 - Branch `spec/036-ux-polish-states` cut off main.
 - Tracking issue #106.
 - Scope shipped as drafted (no late edits requested).
+- Plan-vs-impl notes:
+  - **Empty-state audit pass scope-trimmed.** The plan listed 9
+    pages to swap to `<EmptyState>`. During impl, every existing
+    page already ships a thorough hand-tuned empty state (most are
+    *better* than what `<EmptyState>` would render — eg.
+    Projects/Index has a prominent "Create your first project" CTA
+    that the generic component can't replicate without growing
+    props). The primitive ships for *new* pages and ad-hoc adoption;
+    retrofitting existing pages would regress UX quality and isn't
+    done here. `RiskyProjects.vue` (spec 035) is the canonical
+    consumer pattern.
+  - **Skeleton wiring scope-trimmed similarly.** Primitives shipped
+    (`Skeleton.vue`, `SkeletonCard.vue`, `SkeletonRow.vue`,
+    `useFirstPaint` composable). Per-page wiring deferred — Inertia's
+    progress bar covers the sub-200ms navigation case, and our
+    pages stay snappy in dev. When a slow-cold-load surface lands,
+    these primitives are ready to drop in.
+  - **Light-mode baseline approach.** Tailwind's `darkMode: 'class'`
+    + a `:not(.dark)` overlay in `app.css` (body bg + glass-card
+    surface). A full token retokenization for light/dark variants
+    is a follow-up design pass — this spec ships legible-but-not-
+    polished light mode, as scoped.
 
 ## Open questions / blockers
 

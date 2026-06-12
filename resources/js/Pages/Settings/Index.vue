@@ -1,18 +1,22 @@
 <script setup lang="ts">
 import StatusBadge from '@/Components/Dashboard/StatusBadge.vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
-import { Head, router } from '@inertiajs/vue3';
+import { Head, router, usePage } from '@inertiajs/vue3';
 import {
     AlertTriangle,
     CheckCircle2,
     ExternalLink,
     Github,
+    Moon,
     Plug,
     PlugZap,
     ShieldCheck,
+    Sun,
+    SunMoon,
     Unplug,
 } from 'lucide-vue-next';
-import { computed } from 'vue';
+import type { PageProps } from '@/types';
+import { computed, ref } from 'vue';
 
 interface GithubConnectionShape {
     username: string;
@@ -34,6 +38,31 @@ const isConnected = computed(() => props.github !== null);
 const isExpired = computed(
     () => props.github !== null && !props.github.is_token_valid,
 );
+
+// Spec 036 — per-user theme preference. Local ref tracks the
+// optimistic selection; POST persists via ThemeController. AppLayout
+// re-applies the `<html>` class on the next page navigation by reading
+// the updated `auth.user.theme` shared prop.
+const page = usePage<PageProps>();
+const themeChoice = ref<'dark' | 'light' | 'system'>(
+    page.props.auth?.user?.theme ?? 'dark',
+);
+
+const updateTheme = (next: 'dark' | 'light' | 'system') => {
+    if (next === themeChoice.value) return;
+    themeChoice.value = next;
+    router.post(
+        route('settings.theme.update'),
+        { theme: next },
+        { preserveScroll: true },
+    );
+};
+
+const themeOptions = [
+    { value: 'dark', label: 'Dark', icon: Moon, description: 'Original interface.' },
+    { value: 'light', label: 'Light', icon: Sun, description: 'Baseline light surfaces.' },
+    { value: 'system', label: 'System', icon: SunMoon, description: 'Match your OS preference.' },
+] as const;
 
 const disconnect = () => {
     if (
@@ -273,6 +302,63 @@ const disconnect = () => {
                     (spec 014), then sync issues + pull requests into the
                     Work Items page (specs 015–016).
                 </p>
+            </section>
+
+            <!-- Section header — Appearance -->
+            <header class="flex items-center justify-between gap-3 pt-2">
+                <div>
+                    <h2 class="text-base font-semibold text-text-primary">
+                        Appearance
+                    </h2>
+                    <p class="mt-1 text-sm text-text-secondary">
+                        Pick the surface palette Nexus renders in.
+                    </p>
+                </div>
+            </header>
+
+            <section class="glass-card p-6 sm:p-8">
+                <fieldset class="flex flex-col gap-3">
+                    <legend class="sr-only">Theme</legend>
+                    <div
+                        class="grid grid-cols-1 gap-3 sm:grid-cols-3"
+                        role="radiogroup"
+                        aria-label="Theme preference"
+                    >
+                        <button
+                            v-for="opt in themeOptions"
+                            :key="opt.value"
+                            type="button"
+                            role="radio"
+                            :aria-checked="themeChoice === opt.value"
+                            class="flex items-center gap-3 rounded-lg border bg-background-panel-hover px-4 py-3 text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
+                            :class="
+                                themeChoice === opt.value
+                                    ? 'border-accent-cyan/50'
+                                    : 'border-border-subtle hover:border-accent-cyan/30'
+                            "
+                            @click="updateTheme(opt.value)"
+                        >
+                            <component
+                                :is="opt.icon"
+                                class="h-4 w-4 shrink-0"
+                                :class="
+                                    themeChoice === opt.value
+                                        ? 'text-accent-cyan'
+                                        : 'text-text-muted'
+                                "
+                                aria-hidden="true"
+                            />
+                            <span class="flex min-w-0 flex-col">
+                                <span class="text-sm font-semibold text-text-primary">
+                                    {{ opt.label }}
+                                </span>
+                                <span class="truncate text-[11px] text-text-muted">
+                                    {{ opt.description }}
+                                </span>
+                            </span>
+                        </button>
+                    </div>
+                </fieldset>
             </section>
         </div>
     </AppLayout>

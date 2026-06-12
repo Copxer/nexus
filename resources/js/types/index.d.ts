@@ -3,6 +3,8 @@ export interface User {
     name: string;
     email: string;
     email_verified_at?: string;
+    /** Spec 036 — per-user UI theme preference. */
+    theme?: 'dark' | 'light' | 'system';
 }
 
 export type PageProps<
