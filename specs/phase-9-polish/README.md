@@ -24,7 +24,7 @@ docs alone.
 
 | # | Task | Status |
 |---|------|--------|
-| 036 | UX polish — skeleton loading, empty / error states, reduced-motion, light-mode toggle, responsive edge cases | ⬜ |
+| 036 | UX polish — skeleton loading, empty / error states, reduced-motion, light-mode toggle, responsive edge cases | 🟢 |
 | 037 | Reliability hardening — job retry/backoff, rate-limit response handling, webhook retry UI | ⬜ |
 | 038 | Nexus self-monitoring — internal alerts (queue / GitHub-rate / webhook / agent failures) + observability slice | ⬜ |
 | 039 | Security audit — token encryption pass, Horizon production allow-list, agent fingerprinting opt-in, rate-limit coverage | ⬜ |

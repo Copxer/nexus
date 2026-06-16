@@ -1,10 +1,10 @@
 ---
 spec: ux-polish-states
 phase: 9
-status: in-progress   # not-started | in-progress | blocked | done
+status: done   # not-started | in-progress | blocked | done
 owner: Yoany
 created: 2026-06-10
-updated: 2026-06-11
+updated: 2026-06-16
 ---
 
 # 036 — UX polish: loading, empty, error states + reduced-motion + light mode
