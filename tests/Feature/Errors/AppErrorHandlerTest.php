@@ -58,11 +58,21 @@ class AppErrorHandlerTest extends TestCase
             ->get('/__test/__crash');
 
         $response->assertStatus(500);
+        $body = $response->getContent();
+
         // Inertia's HTML wrapper serializes the component into the
-        // `data-page` attribute on the root <div>. Grepping that
-        // proves the page rendered through Inertia, not the default
-        // template.
-        $this->assertStringContainsString('Errors/AppError', $response->getContent());
+        // `data-page` attribute on the root <div>. JSON-encoded
+        // slashes appear escaped (`Errors\/AppError`) under
+        // `JSON_HEX_TAG`/default flags; non-escaped under
+        // `JSON_UNESCAPED_SLASHES`. CI uses the escaped form, local
+        // dev may use the raw form — accept either.
+        $hasComponent = str_contains($body, 'Errors/AppError')
+            || str_contains($body, 'Errors\\/AppError');
+
+        $this->assertTrue(
+            $hasComponent,
+            'Expected Inertia data-page to reference the Errors/AppError component (escaped or raw).',
+        );
     }
 
     public function test_webhook_path_does_not_render_inertia_app_error_page(): void
@@ -83,7 +93,12 @@ class AppErrorHandlerTest extends TestCase
             ->post('/webhooks/__test/__crash');
 
         $response->assertStatus(500);
-        $this->assertStringNotContainsString('Errors/AppError', $response->getContent());
+        $body = $response->getContent();
+        $this->assertFalse(
+            str_contains($body, 'Errors/AppError')
+            || str_contains($body, 'Errors\\/AppError'),
+            'Webhook path must not render the Inertia AppError component.',
+        );
     }
 
     public function test_json_consumer_does_not_render_inertia_app_error_page(): void
@@ -95,6 +110,11 @@ class AppErrorHandlerTest extends TestCase
             ->get('/__test/__crash');
 
         $response->assertStatus(500);
-        $this->assertStringNotContainsString('Errors/AppError', $response->getContent());
+        $body = $response->getContent();
+        $this->assertFalse(
+            str_contains($body, 'Errors/AppError')
+            || str_contains($body, 'Errors\\/AppError'),
+            'JSON consumer must not render the Inertia AppError component.',
+        );
     }
 }
