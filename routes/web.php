@@ -23,6 +23,7 @@ use App\Http\Controllers\RepositoryPullRequestsSyncController;
 use App\Http\Controllers\RepositorySyncAllController;
 use App\Http\Controllers\RepositorySyncController;
 use App\Http\Controllers\RepositoryWorkflowRunsSyncController;
+use App\Http\Controllers\Settings\ThemeController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\Webhooks\GitHubWebhookController;
 use App\Http\Controllers\WorkItemController;
@@ -57,6 +58,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->where(['repository' => '[\w.-]+/[\w.-]+']);
 
     Route::get('/settings', SettingsController::class)->name('settings.index');
+
+    // Spec 036 — per-user theme preference. The persisted value
+    // surfaces via `auth.user.theme` (HandleInertiaRequests); the
+    // `<html>` class toggle happens client-side in AppLayout.
+    Route::post('/settings/theme', ThemeController::class)
+        ->name('settings.theme.update');
 
     Route::get('/integrations/github/connect', [GithubConnectionController::class, 'redirect'])
         ->name('integrations.github.connect');

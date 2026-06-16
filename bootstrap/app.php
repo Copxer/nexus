@@ -2,10 +2,16 @@
 
 use App\Http\Middleware\AuthenticateAgent;
 use App\Http\Middleware\HandleInertiaRequests;
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
+use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
+use Inertia\Inertia;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -49,5 +55,53 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        // Spec 036 — surface uncaught 500-class errors as a friendly
+        // Inertia page (`Errors/AppError`) so the user sees a
+        // consistent UI with a `Try again` link instead of Laravel's
+        // default error template.
         //
+        // The handler runs ONLY for browser-style requests rendered
+        // through Inertia. Webhooks, agent telemetry, JSON API
+        // consumers, and anything that explicitly asks for JSON must
+        // fall through to Laravel's default JSON-error response.
+        //
+        // Positive-predicate guard avoids the `acceptsHtml()` trap:
+        // `Accept: */*` (GitHub webhooks) and missing Accept headers
+        // (Go HTTP client defaults) both return `true` from
+        // `acceptsHtml()`, which would otherwise pull webhook
+        // payloads into the Inertia render path.
+        //
+        // Other escape hatches:
+        //   - `APP_DEBUG=true` → Ignition stays (devs need the stack).
+        //   - `ValidationException`/`AuthenticationException`/known
+        //     `HttpException` (403/404/419/etc.) → default flow,
+        //     which Inertia already maps to the right UX.
+        $exceptions->render(function (Throwable $e, Request $request): ?Response {
+            if (config('app.debug')) {
+                return null;
+            }
+
+            if (
+                $e instanceof ValidationException
+                || $e instanceof AuthenticationException
+                || $e instanceof HttpExceptionInterface
+            ) {
+                return null;
+            }
+
+            $wantsInertia = $request->header('X-Inertia') !== null;
+            $wantsHtml = $request->acceptsHtml()
+                && ! $request->wantsJson()
+                && ! $request->expectsJson()
+                && ! $request->is('webhooks/*', 'agent/*');
+
+            if (! $wantsInertia && ! $wantsHtml) {
+                return null;
+            }
+
+            return Inertia::render('Errors/AppError', [
+                'status' => 500,
+                'message' => 'Something went wrong on our end.',
+            ])->toResponse($request)->setStatusCode(500);
+        });
     })->create();

@@ -66,4 +66,98 @@
         font-feature-settings: 'tnum' on, 'lnum' on, 'cv11' on;
         letter-spacing: -0.01em;
     }
+
+    /* Spec 036 — base shimmer for skeleton placeholders. The
+       `<Skeleton>` component layers a fixed-width translucent stripe
+       on top of a muted base color and slides it across in a loop. */
+    .skeleton-shimmer {
+        background: linear-gradient(
+            90deg,
+            rgba(148, 163, 184, 0.08) 0%,
+            rgba(148, 163, 184, 0.18) 50%,
+            rgba(148, 163, 184, 0.08) 100%
+        );
+        background-size: 200% 100%;
+        animation: skeleton-slide 1.6s ease-in-out infinite;
+    }
+
+    @keyframes skeleton-slide {
+        0% {
+            background-position: 200% 0;
+        }
+        100% {
+            background-position: -200% 0;
+        }
+    }
+}
+
+/* Spec 036 — baseline light-mode overlay. The design ships dark-first
+   (every Tailwind token in `tailwind.config.js` resolves to a dark
+   value). `darkMode: 'class'` is already enabled, so `<html class="dark">`
+   is the dark theme; absence is light. This block paints a legible
+   baseline for the light variant — body background, primary surface
+   tone, and text colors. A full design pass that retokenizes every
+   component for light-vs-dark variants is a follow-up polish spec. */
+html:not(.dark) {
+    background: #F8FAFC;
+    color: #0F172A;
+}
+
+html:not(.dark) body {
+    background: #F8FAFC;
+    background-image: none;
+}
+
+html:not(.dark) .glass-card {
+    background-color: rgba(255, 255, 255, 0.85);
+    border-color: rgba(15, 23, 42, 0.08);
+}
+
+html:not(.dark) .glass-card:hover {
+    background-color: rgba(255, 255, 255, 0.98);
+    border-color: rgba(56, 189, 248, 0.4);
+}
+
+/* The Tailwind text tokens (`text-text-primary` = #F8FAFC etc.)
+   would otherwise paint near-white on near-white in light mode.
+   Re-resolve them inside `:not(.dark)` so the existing utility
+   classes stay legible without rewriting components. Borders +
+   panel-hover ditto. */
+html:not(.dark) .text-text-primary {
+    color: #0F172A;
+}
+html:not(.dark) .text-text-secondary {
+    color: #334155;
+}
+html:not(.dark) .text-text-muted {
+    color: #64748B;
+}
+html:not(.dark) .border-border-subtle {
+    border-color: rgba(15, 23, 42, 0.12);
+}
+html:not(.dark) .bg-background-panel-hover,
+html:not(.dark) .bg-background-panel-hover\/40 {
+    background-color: rgba(241, 245, 249, 0.7);
+}
+
+/* Spec 036 — honor `prefers-reduced-motion: reduce`. Browsers expose
+   the user's OS-level motion preference; we collapse every animation
+   + transition we own to a near-zero duration so the UI stays
+   functional but stops moving.
+   `!important` is intentional — utility-first Tailwind classes set
+   durations inline; only `!` wins them.
+   Scoped to `.nexus-app` so third-party dashboards mounted under our
+   web middleware stack (Horizon, Reverb's future panel) keep their
+   own animations. AppLayout adds the class to its root, so every
+   page that renders through it inherits the rule. */
+@media (prefers-reduced-motion: reduce) {
+    .nexus-app,
+    .nexus-app *,
+    .nexus-app *::before,
+    .nexus-app *::after {
+        animation-duration: 0.001s !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001s !important;
+        scroll-behavior: auto !important;
+    }
 }

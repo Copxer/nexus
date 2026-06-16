@@ -120,7 +120,34 @@ const onKeydown = (event: KeyboardEvent) => {
     }
 };
 
-onMounted(() => document.addEventListener('keydown', onKeydown));
+// Spec 036 — apply the user's theme preference to <html>. Tailwind's
+// `darkMode: 'class'` toggles on the presence of `.dark`. We read
+// `auth.user.theme` (shared by HandleInertiaRequests) and translate:
+//   - `dark`   → add `.dark`
+//   - `light`  → remove `.dark`
+//   - `system` → defer to `prefers-color-scheme: dark`
+// Re-runs on every page navigation so a settings-page update takes
+// effect immediately without a full reload.
+const applyTheme = () => {
+    const theme = page.props.auth?.user?.theme ?? 'dark';
+    const root = document.documentElement;
+
+    const wantDark =
+        theme === 'dark'
+        || (theme === 'system'
+            && window.matchMedia('(prefers-color-scheme: dark)').matches);
+
+    root.classList.toggle('dark', wantDark);
+};
+
+onMounted(() => {
+    document.addEventListener('keydown', onKeydown);
+    applyTheme();
+});
+watch(
+    () => page.props.auth?.user?.theme,
+    () => applyTheme(),
+);
 onBeforeUnmount(() => {
     document.removeEventListener('keydown', onKeydown);
     setBodyScroll(false);
@@ -129,7 +156,7 @@ onBeforeUnmount(() => {
 
 <template>
     <div
-        class="relative isolate flex min-h-screen bg-app-gradient text-text-primary"
+        class="nexus-app relative isolate flex min-h-screen bg-app-gradient text-text-primary"
     >
         <!-- Persistent sidebar (≥ lg) -->
         <div class="relative z-30 hidden lg:flex">
