@@ -156,7 +156,7 @@ onBeforeUnmount(() => {
 
 <template>
     <div
-        class="relative isolate flex min-h-screen bg-app-gradient text-text-primary"
+        class="nexus-app relative isolate flex min-h-screen bg-app-gradient text-text-primary"
     >
         <!-- Persistent sidebar (≥ lg) -->
         <div class="relative z-30 hidden lg:flex">

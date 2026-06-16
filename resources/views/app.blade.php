@@ -1,10 +1,27 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="dark">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
 
         <title inertia>{{ config('app.name', 'Laravel') }}</title>
+
+        {{-- Spec 036 — pre-paint theme application. Runs before any
+             CSS resolves so a light-mode user doesn't briefly flash
+             the dark palette while Vue boots. Reads the persisted
+             `users.theme` value if authenticated (defaults to `dark`).
+             `AppLayout.vue` re-applies the same logic on mount + on
+             every page navigation, so a runtime toggle (Settings)
+             still works without a refresh. --}}
+        <script>
+            (function () {
+                var theme = '{{ Auth::user()?->theme ?? 'dark' }}';
+                var wantDark = theme === 'dark'
+                    || (theme === 'system'
+                        && window.matchMedia('(prefers-color-scheme: dark)').matches);
+                if (wantDark) document.documentElement.classList.add('dark');
+            })();
+        </script>
 
         <!-- Favicons (PNG raster, SVG vector, .ico fallback, Apple touch, web manifest) -->
         <link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96" />

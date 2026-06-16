@@ -60,9 +60,19 @@ return Application::configure(basePath: dirname(__DIR__))
         // consistent UI with a `Try again` link instead of Laravel's
         // default error template.
         //
-        // Strict guards keep Laravel's existing flows intact:
+        // The handler runs ONLY for browser-style requests rendered
+        // through Inertia. Webhooks, agent telemetry, JSON API
+        // consumers, and anything that explicitly asks for JSON must
+        // fall through to Laravel's default JSON-error response.
+        //
+        // Positive-predicate guard avoids the `acceptsHtml()` trap:
+        // `Accept: */*` (GitHub webhooks) and missing Accept headers
+        // (Go HTTP client defaults) both return `true` from
+        // `acceptsHtml()`, which would otherwise pull webhook
+        // payloads into the Inertia render path.
+        //
+        // Other escape hatches:
         //   - `APP_DEBUG=true` → Ignition stays (devs need the stack).
-        //   - Non-Inertia / non-HTML requests → default handler.
         //   - `ValidationException`/`AuthenticationException`/known
         //     `HttpException` (403/404/419/etc.) → default flow,
         //     which Inertia already maps to the right UX.
@@ -71,15 +81,21 @@ return Application::configure(basePath: dirname(__DIR__))
                 return null;
             }
 
-            if (! $request->header('X-Inertia') && ! $request->acceptsHtml()) {
-                return null;
-            }
-
             if (
                 $e instanceof ValidationException
                 || $e instanceof AuthenticationException
                 || $e instanceof HttpExceptionInterface
             ) {
+                return null;
+            }
+
+            $wantsInertia = $request->header('X-Inertia') !== null;
+            $wantsHtml = $request->acceptsHtml()
+                && ! $request->wantsJson()
+                && ! $request->expectsJson()
+                && ! $request->is('webhooks/*', 'agent/*');
+
+            if (! $wantsInertia && ! $wantsHtml) {
                 return null;
             }
 

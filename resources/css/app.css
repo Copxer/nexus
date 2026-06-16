@@ -97,7 +97,7 @@
    is the dark theme; absence is light. This block paints a legible
    baseline for the light variant — body background, primary surface
    tone, and text colors. A full design pass that retokenizes every
-   component for light-vs-dark is a follow-up polish spec. */
+   component for light-vs-dark variants is a follow-up polish spec. */
 html:not(.dark) {
     background: #F8FAFC;
     color: #0F172A;
@@ -111,7 +111,6 @@ html:not(.dark) body {
 html:not(.dark) .glass-card {
     background-color: rgba(255, 255, 255, 0.85);
     border-color: rgba(15, 23, 42, 0.08);
-    color: #0F172A;
 }
 
 html:not(.dark) .glass-card:hover {
@@ -119,16 +118,43 @@ html:not(.dark) .glass-card:hover {
     border-color: rgba(56, 189, 248, 0.4);
 }
 
+/* The Tailwind text tokens (`text-text-primary` = #F8FAFC etc.)
+   would otherwise paint near-white on near-white in light mode.
+   Re-resolve them inside `:not(.dark)` so the existing utility
+   classes stay legible without rewriting components. Borders +
+   panel-hover ditto. */
+html:not(.dark) .text-text-primary {
+    color: #0F172A;
+}
+html:not(.dark) .text-text-secondary {
+    color: #334155;
+}
+html:not(.dark) .text-text-muted {
+    color: #64748B;
+}
+html:not(.dark) .border-border-subtle {
+    border-color: rgba(15, 23, 42, 0.12);
+}
+html:not(.dark) .bg-background-panel-hover,
+html:not(.dark) .bg-background-panel-hover\/40 {
+    background-color: rgba(241, 245, 249, 0.7);
+}
+
 /* Spec 036 — honor `prefers-reduced-motion: reduce`. Browsers expose
    the user's OS-level motion preference; we collapse every animation
    + transition we own to a near-zero duration so the UI stays
-   functional but stops moving. The `!important` is intentional —
-   utility-first Tailwind classes set durations inline; only `!` wins
-   them. */
+   functional but stops moving.
+   `!important` is intentional — utility-first Tailwind classes set
+   durations inline; only `!` wins them.
+   Scoped to `.nexus-app` so third-party dashboards mounted under our
+   web middleware stack (Horizon, Reverb's future panel) keep their
+   own animations. AppLayout adds the class to its root, so every
+   page that renders through it inherits the rule. */
 @media (prefers-reduced-motion: reduce) {
-    *,
-    *::before,
-    *::after {
+    .nexus-app,
+    .nexus-app *,
+    .nexus-app *::before,
+    .nexus-app *::after {
         animation-duration: 0.001s !important;
         animation-iteration-count: 1 !important;
         transition-duration: 0.001s !important;

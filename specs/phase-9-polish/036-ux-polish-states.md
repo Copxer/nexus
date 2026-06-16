@@ -193,8 +193,11 @@ light-mode deferral.
 - [ ] Every major page (Overview, Projects, Hosts, Websites,
       Alerts, Analytics) renders skeleton placeholders during the
       initial paint.
-- [ ] Every list/grid that can be empty renders an `<EmptyState>`
-      with icon + headline + tip.
+- [ ] An `<EmptyState>` primitive ships and is the canonical
+      pattern for *new* lists/grids; existing hand-tuned empty
+      states (Projects/Index's "Create your first project" CTA,
+      etc.) stay as-is — retrofitting is deferred to keep this
+      spec scoped (see work-log §2026-06-11 plan-vs-impl notes).
 - [ ] An uncaught 500-class exception renders `Errors/AppError`
       with a `Try again` button — not Laravel's default page.
       Validation 422s + 403 + 404 behave as before.
@@ -265,9 +268,28 @@ Dated notes as work progresses.
     these primitives are ready to drop in.
   - **Light-mode baseline approach.** Tailwind's `darkMode: 'class'`
     + a `:not(.dark)` overlay in `app.css` (body bg + glass-card
-    surface). A full token retokenization for light/dark variants
-    is a follow-up design pass — this spec ships legible-but-not-
-    polished light mode, as scoped.
+    surface + text + border + panel-hover overrides). A full token
+    retokenization for light/dark variants is a follow-up design
+    pass — this spec ships legible-but-not-polished light mode,
+    as scoped.
+  - **Self-review fixes applied pre-merge:**
+    1. Render handler guard inverted to positive predicates with
+       `webhooks/*` + `agent/*` path exclusion + `wantsJson` /
+       `expectsJson` checks, so webhook + agent paths bypass the
+       Inertia render even with `Accept: */*`. Two new regression
+       tests pin this.
+    2. Reduced-motion block scoped to `.nexus-app *` so third-party
+       UIs mounted under the web stack (Horizon, future Reverb
+       panel) keep their own motion.
+    3. Pre-paint blocking `<script>` added to `resources/views/
+       app.blade.php` so a light-mode user doesn't flash dark
+       briefly while Vue boots. Default `<html>` class stripped;
+       both the inline script and the Vue runtime drive the class.
+    4. `useFirstPaint.ts` deleted — no consumer in this spec;
+       reintroduce when the first wiring lands rather than ship
+       vaporware API surface.
+    5. Light-mode text + border + panel overrides added so the
+       baseline isn't white-on-white.
 
 ## Open questions / blockers
 

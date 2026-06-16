@@ -3,6 +3,7 @@
 namespace Tests\Feature\Errors;
 
 use Exception;
+use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
 use Tests\TestCase;
@@ -62,5 +63,38 @@ class AppErrorHandlerTest extends TestCase
         // proves the page rendered through Inertia, not the default
         // template.
         $this->assertStringContainsString('Errors/AppError', $response->getContent());
+    }
+
+    public function test_webhook_path_does_not_render_inertia_app_error_page(): void
+    {
+        // GitHub webhooks send `Accept: */*` (and similar machine-
+        // origin requests omit the Accept header entirely). Both
+        // satisfy `acceptsHtml() === true`, which is why the handler
+        // also gates on the path prefix. Verify a crash on a
+        // webhook-style path falls through to Laravel's default
+        // response and never pulls the Inertia render pipeline in.
+        Route::post('/webhooks/__test/__crash', function (): void {
+            throw new Exception('webhook test crash');
+        })->withoutMiddleware([
+            ValidateCsrfToken::class,
+        ]);
+
+        $response = $this->withHeaders(['Accept' => '*/*'])
+            ->post('/webhooks/__test/__crash');
+
+        $response->assertStatus(500);
+        $this->assertStringNotContainsString('Errors/AppError', $response->getContent());
+    }
+
+    public function test_json_consumer_does_not_render_inertia_app_error_page(): void
+    {
+        // A JSON consumer (eg. an explicit `Accept: application/json`
+        // API client) must continue to receive a JSON-shaped error
+        // response, not the Inertia HTML wrapper.
+        $response = $this->withHeaders(['Accept' => 'application/json'])
+            ->get('/__test/__crash');
+
+        $response->assertStatus(500);
+        $this->assertStringNotContainsString('Errors/AppError', $response->getContent());
     }
 }
