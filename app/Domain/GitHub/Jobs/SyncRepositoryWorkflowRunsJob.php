@@ -44,9 +44,16 @@ class SyncRepositoryWorkflowRunsJob implements ShouldQueue
     use Queueable;
     use SerializesModels;
 
-    public int $tries = 1;
+    /** Spec 037 — 3 attempts on transient failures. */
+    public int $tries = 3;
 
     public function __construct(public readonly int $repositoryId) {}
+
+    /** Spec 037 — 1 min / 5 min / 15 min exponential backoff. */
+    public function backoff(): array
+    {
+        return [60, 300, 900];
+    }
 
     public function handle(SyncRepositoryWorkflowRunsAction $action): void
     {
@@ -84,28 +91,79 @@ class SyncRepositoryWorkflowRunsJob implements ShouldQueue
                 'workflow_runs_sync_failed_at' => null,
             ])->save();
         } catch (GitHubApiException $e) {
+            // Spec 037 — see SyncRepositoryIssuesJob for the rationale.
             if ($e->isUnauthorized()) {
                 $this->expireConnection($connection);
+
+                Log::warning('GitHub workflow runs sync — unauthorized', [
+                    'repository_id' => $repository->id,
+                    'full_name' => $repository->full_name,
+                ]);
+
+                $this->markUnauthorized($repository, $e->getMessage());
+
+                return;
             }
 
-            Log::warning('GitHub workflow runs sync failed', [
+            // Rate-limited: see SyncRepositoryIssuesJob for the
+            // `release()` semantics. Persistent rate-limiting exhausts
+            // `$tries` and falls through to `failed()`.
+            if ($e->wasRateLimited()) {
+                $delay = max($e->secondsUntilReset(), 60);
+                $delay = min($delay, 3600);
+
+                Log::info('GitHub workflow runs sync — rate-limited; releasing', [
+                    'repository_id' => $repository->id,
+                    'full_name' => $repository->full_name,
+                    'release_seconds' => $delay,
+                ]);
+
+                $this->markRateLimited($repository, $e->getMessage());
+                $this->release($delay);
+
+                return;
+            }
+
+            Log::warning('GitHub workflow runs sync — transient API failure', [
                 'repository_id' => $repository->id,
                 'full_name' => $repository->full_name,
                 'status' => $e->statusCode,
+                'attempt' => $this->attempts(),
                 'message' => $e->getMessage(),
             ]);
 
-            $this->markFailed($repository, $e->getMessage());
+            throw $e;
         } catch (Throwable $e) {
-            Log::error('GitHub workflow runs sync errored', [
+            Log::error('GitHub workflow runs sync — unexpected error', [
                 'repository_id' => $repository->id,
                 'full_name' => $repository->full_name,
                 'exception' => $e::class,
+                'attempt' => $this->attempts(),
                 'message' => $e->getMessage(),
             ]);
 
-            $this->markFailed($repository, $e->getMessage() !== '' ? $e->getMessage() : $e::class);
+            throw $e;
         }
+    }
+
+    /** Spec 037 — terminal-failure handler after `$tries` exhausted. */
+    public function failed(Throwable $e): void
+    {
+        $repository = Repository::query()->find($this->repositoryId);
+
+        if ($repository === null) {
+            return;
+        }
+
+        if ($e instanceof GitHubApiException && $e->isUnauthorized()) {
+            $this->markUnauthorized($repository, $e->getMessage());
+
+            return;
+        }
+
+        $reason = $e->getMessage() !== '' ? $e->getMessage() : $e::class;
+
+        $this->markFailed($repository, $reason);
     }
 
     private function resolveConnection(Repository $repository): ?GithubConnection
@@ -129,6 +187,23 @@ class SyncRepositoryWorkflowRunsJob implements ShouldQueue
     {
         $repository->forceFill([
             'workflow_runs_sync_status' => RepositorySyncStatus::Failed->value,
+            'workflow_runs_sync_error' => $reason !== null ? Str::limit($reason, 500, '…') : null,
+            'workflow_runs_sync_failed_at' => now(),
+        ])->save();
+    }
+
+    private function markRateLimited(Repository $repository, ?string $reason = null): void
+    {
+        $repository->forceFill([
+            'workflow_runs_sync_status' => RepositorySyncStatus::RateLimited->value,
+            'workflow_runs_sync_error' => $reason !== null ? Str::limit($reason, 500, '…') : null,
+        ])->save();
+    }
+
+    private function markUnauthorized(Repository $repository, ?string $reason = null): void
+    {
+        $repository->forceFill([
+            'workflow_runs_sync_status' => RepositorySyncStatus::Unauthorized->value,
             'workflow_runs_sync_error' => $reason !== null ? Str::limit($reason, 500, '…') : null,
             'workflow_runs_sync_failed_at' => now(),
         ])->save();

@@ -128,11 +128,12 @@ class ProcessGitHubWebhookJobTest extends TestCase
         Log::shouldHaveReceived('info')->atLeast()->once();
     }
 
-    public function test_handler_exception_flips_to_failed_with_error_message(): void
+    public function test_handle_rethrows_handler_exceptions_so_the_retry_pipeline_runs(): void
     {
-        // Re-bind the issues handler to throw — exercises the job's
-        // catch path that flips status to `failed` and captures the
-        // exception message into `error_message`.
+        // Spec 037 — handler exceptions are no longer caught + persisted
+        // in-job. The job re-throws so Laravel's retry pipeline can run
+        // the configured backoff. The terminal `Failed` state is set
+        // by `failed()` after `$tries` exhausted.
         $delivery = WebhookDelivery::factory()->create([
             'event' => 'issues',
             'action' => 'opened',
@@ -140,7 +141,6 @@ class ProcessGitHubWebhookJobTest extends TestCase
             'status' => WebhookDeliveryStatus::Received->value,
         ]);
 
-        // Re-bind the handler to throw on `handle`.
         $this->app->bind(
             IssuesWebhookHandler::class,
             fn () => new class
@@ -154,7 +154,30 @@ class ProcessGitHubWebhookJobTest extends TestCase
             },
         );
 
-        (new ProcessGitHubWebhookJob($delivery->id))->handle();
+        $this->expectException(\RuntimeException::class);
+
+        try {
+            (new ProcessGitHubWebhookJob($delivery->id))->handle();
+        } finally {
+            // Status stays `Received` between retries.
+            $this->assertSame(WebhookDeliveryStatus::Received, $delivery->fresh()->status);
+        }
+    }
+
+    public function test_failed_handler_marks_failed_with_error_message(): void
+    {
+        // Spec 037 — Laravel calls `failed()` once `$tries` exhausted.
+        // The handler stamps the terminal status + the message.
+        $delivery = WebhookDelivery::factory()->create([
+            'event' => 'issues',
+            'action' => 'opened',
+            'repository_full_name' => 'whoever/whatever',
+            'status' => WebhookDeliveryStatus::Received->value,
+        ]);
+
+        $exception = new \RuntimeException('Synthetic boom on delivery');
+
+        (new ProcessGitHubWebhookJob($delivery->id))->failed($exception);
 
         $fresh = $delivery->fresh();
         $this->assertSame(WebhookDeliveryStatus::Failed, $fresh->status);

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\GitHub;
 
+use App\Domain\GitHub\Exceptions\GitHubApiException;
 use App\Domain\GitHub\Jobs\SyncGitHubRepositoryJob;
 use App\Domain\GitHub\Jobs\SyncRepositoryIssuesJob;
 use App\Domain\GitHub\Jobs\SyncRepositoryPullRequestsJob;
@@ -12,6 +13,7 @@ use App\Models\Project;
 use App\Models\Repository;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
@@ -71,7 +73,7 @@ class SyncGitHubRepositoryJobTest extends TestCase
         $this->assertNotNull($repo->last_pushed_at);
     }
 
-    public function test_handle_marks_failed_and_expires_connection_on_401(): void
+    public function test_handle_marks_unauthorized_and_expires_connection_on_401(): void
     {
         $context = $this->setUpProjectWithConnection();
 
@@ -85,14 +87,14 @@ class SyncGitHubRepositoryJobTest extends TestCase
         (new SyncGitHubRepositoryJob($context['repository']->id))->handle();
 
         $repo = $context['repository']->fresh();
-        $this->assertSame(RepositorySyncStatus::Failed, $repo->sync_status);
+        $this->assertSame(RepositorySyncStatus::Unauthorized, $repo->sync_status);
 
         $connection = $context['user']->fresh()->githubConnection;
         $this->assertSame('', $connection->access_token);
         $this->assertFalse($connection->isAccessTokenValid());
     }
 
-    public function test_handle_marks_failed_on_generic_error(): void
+    public function test_handle_throws_transient_errors_so_the_retry_pipeline_runs(): void
     {
         $context = $this->setUpProjectWithConnection();
 
@@ -103,23 +105,60 @@ class SyncGitHubRepositoryJobTest extends TestCase
             ),
         ]);
 
-        (new SyncGitHubRepositoryJob($context['repository']->id))->handle();
+        $this->expectException(GitHubApiException::class);
+
+        try {
+            (new SyncGitHubRepositoryJob($context['repository']->id))->handle();
+        } finally {
+            $repo = $context['repository']->fresh();
+            $this->assertSame(RepositorySyncStatus::Syncing, $repo->sync_status);
+        }
+    }
+
+    public function test_failed_handler_persists_terminal_failed_status_after_retries_exhausted(): void
+    {
+        $context = $this->setUpProjectWithConnection();
+
+        $job = new SyncGitHubRepositoryJob($context['repository']->id);
+        $exception = new GitHubApiException('Boom', 500);
+
+        $job->failed($exception);
 
         $repo = $context['repository']->fresh();
         $this->assertSame(RepositorySyncStatus::Failed, $repo->sync_status);
-
-        // 500 is not unauthorized — connection should NOT be expired.
-        $connection = $context['user']->fresh()->githubConnection;
-        $this->assertNotSame('', $connection->access_token);
-        $this->assertTrue($connection->isAccessTokenValid());
+        $this->assertNotNull($repo->sync_error);
+        $this->assertStringContainsString('Boom', $repo->sync_error);
+        $this->assertNotNull($repo->sync_failed_at);
     }
 
-    public function test_handle_preserves_last_synced_at_on_failure(): void
+    public function test_handle_releases_for_rate_limit(): void
+    {
+        Carbon::setTestNow(Carbon::createFromTimestamp(1000));
+
+        $context = $this->setUpProjectWithConnection();
+
+        Http::fake([
+            'api.github.com/repos/octocat/hello-world' => Http::response(
+                ['message' => 'API rate limit exceeded'],
+                429,
+                ['X-RateLimit-Reset' => '1300'],
+            ),
+        ]);
+
+        (new SyncGitHubRepositoryJob($context['repository']->id))->handle();
+
+        $repo = $context['repository']->fresh();
+        $this->assertSame(RepositorySyncStatus::RateLimited, $repo->sync_status);
+
+        Carbon::setTestNow();
+    }
+
+    public function test_handle_preserves_last_synced_at_when_thrown_for_retry(): void
     {
         // `last_synced_at` is the contract Settings surfaces as
-        // "Last sync N min ago" — a failed run must NOT bump it,
-        // otherwise a repo that's never synced successfully would
-        // misleadingly read as recently synced.
+        // "Last sync N min ago" — a thrown-for-retry attempt must NOT
+        // bump it, otherwise a repo that's never synced successfully
+        // would misleadingly read as recently synced.
         $context = $this->setUpProjectWithConnection();
         $priorSync = now()->subHours(3);
         $context['repository']->forceFill(['last_synced_at' => $priorSync])->save();
@@ -131,10 +170,13 @@ class SyncGitHubRepositoryJobTest extends TestCase
             ),
         ]);
 
-        (new SyncGitHubRepositoryJob($context['repository']->id))->handle();
+        try {
+            (new SyncGitHubRepositoryJob($context['repository']->id))->handle();
+        } catch (GitHubApiException) {
+            // expected
+        }
 
         $repo = $context['repository']->fresh();
-        $this->assertSame(RepositorySyncStatus::Failed, $repo->sync_status);
         $this->assertEquals(
             $priorSync->toIso8601String(),
             $repo->last_synced_at->toIso8601String(),
@@ -206,14 +248,18 @@ class SyncGitHubRepositoryJobTest extends TestCase
             ),
         ]);
 
-        (new SyncGitHubRepositoryJob($context['repository']->id))->handle();
+        try {
+            (new SyncGitHubRepositoryJob($context['repository']->id))->handle();
+        } catch (GitHubApiException) {
+            // expected — spec 037
+        }
 
         Queue::assertNotPushed(SyncRepositoryIssuesJob::class);
         Queue::assertNotPushed(SyncRepositoryPullRequestsJob::class);
         Queue::assertNotPushed(SyncRepositoryWorkflowRunsJob::class);
     }
 
-    public function test_handle_persists_sync_error_and_failed_at_on_api_failure(): void
+    public function test_handle_throws_404_so_the_retry_pipeline_runs(): void
     {
         $context = $this->setUpProjectWithConnection();
 
@@ -224,13 +270,9 @@ class SyncGitHubRepositoryJobTest extends TestCase
             ),
         ]);
 
-        (new SyncGitHubRepositoryJob($context['repository']->id))->handle();
+        $this->expectException(GitHubApiException::class);
 
-        $repo = $context['repository']->fresh();
-        $this->assertSame(RepositorySyncStatus::Failed, $repo->sync_status);
-        $this->assertNotNull($repo->sync_error);
-        $this->assertStringContainsString('404', $repo->sync_error);
-        $this->assertNotNull($repo->sync_failed_at);
+        (new SyncGitHubRepositoryJob($context['repository']->id))->handle();
     }
 
     public function test_handle_persists_sync_error_when_no_connection(): void
@@ -280,20 +322,16 @@ class SyncGitHubRepositoryJobTest extends TestCase
         $this->assertNull($repo->sync_failed_at);
     }
 
-    public function test_handle_truncates_long_sync_error_messages(): void
+    public function test_failed_handler_truncates_long_sync_error_messages(): void
     {
         $context = $this->setUpProjectWithConnection();
 
         $longMessage = str_repeat('x', 800);
 
-        Http::fake([
-            'api.github.com/repos/octocat/hello-world' => Http::response(
-                ['message' => $longMessage],
-                500,
-            ),
-        ]);
+        $job = new SyncGitHubRepositoryJob($context['repository']->id);
+        $exception = new GitHubApiException($longMessage, 500);
 
-        (new SyncGitHubRepositoryJob($context['repository']->id))->handle();
+        $job->failed($exception);
 
         $repo = $context['repository']->fresh();
         $this->assertNotNull($repo->sync_error);
