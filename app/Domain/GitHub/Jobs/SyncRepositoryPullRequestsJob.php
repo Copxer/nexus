@@ -40,9 +40,16 @@ class SyncRepositoryPullRequestsJob implements ShouldQueue
     use Queueable;
     use SerializesModels;
 
-    public int $tries = 1;
+    /** Spec 037 — 3 attempts on transient failures. */
+    public int $tries = 3;
 
     public function __construct(public readonly int $repositoryId) {}
+
+    /** Spec 037 — 1 min / 5 min / 15 min exponential backoff. */
+    public function backoff(): array
+    {
+        return [60, 300, 900];
+    }
 
     public function handle(SyncRepositoryPullRequestsAction $action): void
     {
@@ -80,28 +87,76 @@ class SyncRepositoryPullRequestsJob implements ShouldQueue
                 'prs_sync_failed_at' => null,
             ])->save();
         } catch (GitHubApiException $e) {
+            // Spec 037 — see SyncRepositoryIssuesJob for the rationale.
             if ($e->isUnauthorized()) {
                 $this->expireConnection($connection);
+
+                Log::warning('GitHub PRs sync — unauthorized', [
+                    'repository_id' => $repository->id,
+                    'full_name' => $repository->full_name,
+                ]);
+
+                $this->markUnauthorized($repository, $e->getMessage());
+
+                return;
             }
 
-            Log::warning('GitHub PRs sync failed', [
+            if ($e->wasRateLimited()) {
+                $delay = max($e->secondsUntilReset(), 60);
+                $delay = min($delay, 3600);
+
+                Log::info('GitHub PRs sync — rate-limited; releasing', [
+                    'repository_id' => $repository->id,
+                    'full_name' => $repository->full_name,
+                    'release_seconds' => $delay,
+                ]);
+
+                $this->markRateLimited($repository, $e->getMessage());
+                $this->release($delay);
+
+                return;
+            }
+
+            Log::warning('GitHub PRs sync — transient API failure', [
                 'repository_id' => $repository->id,
                 'full_name' => $repository->full_name,
                 'status' => $e->statusCode,
+                'attempt' => $this->attempts(),
                 'message' => $e->getMessage(),
             ]);
 
-            $this->markFailed($repository, $e->getMessage());
+            throw $e;
         } catch (Throwable $e) {
-            Log::error('GitHub PRs sync errored', [
+            Log::error('GitHub PRs sync — unexpected error', [
                 'repository_id' => $repository->id,
                 'full_name' => $repository->full_name,
                 'exception' => $e::class,
+                'attempt' => $this->attempts(),
                 'message' => $e->getMessage(),
             ]);
 
-            $this->markFailed($repository, $e->getMessage() !== '' ? $e->getMessage() : $e::class);
+            throw $e;
         }
+    }
+
+    /** Spec 037 — terminal-failure handler after `$tries` exhausted. */
+    public function failed(Throwable $e): void
+    {
+        $repository = Repository::query()->find($this->repositoryId);
+
+        if ($repository === null) {
+            return;
+        }
+
+        if ($e instanceof GitHubApiException && $e->isUnauthorized()) {
+            $this->markUnauthorized($repository, $e->getMessage());
+
+            return;
+        }
+
+        $reason = $e->getMessage() !== '' ? $e->getMessage() : $e::class;
+
+        $this->markFailed($repository, $reason);
     }
 
     private function resolveConnection(Repository $repository): ?GithubConnection
@@ -125,6 +180,23 @@ class SyncRepositoryPullRequestsJob implements ShouldQueue
     {
         $repository->forceFill([
             'prs_sync_status' => RepositorySyncStatus::Failed->value,
+            'prs_sync_error' => $reason !== null ? Str::limit($reason, 500, '…') : null,
+            'prs_sync_failed_at' => now(),
+        ])->save();
+    }
+
+    private function markRateLimited(Repository $repository, ?string $reason = null): void
+    {
+        $repository->forceFill([
+            'prs_sync_status' => RepositorySyncStatus::RateLimited->value,
+            'prs_sync_error' => $reason !== null ? Str::limit($reason, 500, '…') : null,
+        ])->save();
+    }
+
+    private function markUnauthorized(Repository $repository, ?string $reason = null): void
+    {
+        $repository->forceFill([
+            'prs_sync_status' => RepositorySyncStatus::Unauthorized->value,
             'prs_sync_error' => $reason !== null ? Str::limit($reason, 500, '…') : null,
             'prs_sync_failed_at' => now(),
         ])->save();

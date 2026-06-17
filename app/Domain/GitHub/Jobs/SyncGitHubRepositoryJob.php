@@ -39,10 +39,16 @@ class SyncGitHubRepositoryJob implements ShouldQueue
     use Queueable;
     use SerializesModels;
 
-    /** Number of retry attempts before the queue gives up. */
-    public int $tries = 1;
+    /** Spec 037 — 3 attempts on transient failures. */
+    public int $tries = 3;
 
     public function __construct(public readonly int $repositoryId) {}
+
+    /** Spec 037 — 1 min / 5 min / 15 min exponential backoff. */
+    public function backoff(): array
+    {
+        return [60, 300, 900];
+    }
 
     public function handle(): void
     {
@@ -88,27 +94,55 @@ class SyncGitHubRepositoryJob implements ShouldQueue
 
             $metadataSynced = true;
         } catch (GitHubApiException $e) {
+            // Spec 037 — see SyncRepositoryIssuesJob for the rationale.
             if ($e->isUnauthorized()) {
                 $this->expireConnection($connection);
+
+                Log::warning('GitHub repository sync — unauthorized', [
+                    'repository_id' => $repository->id,
+                    'full_name' => $repository->full_name,
+                ]);
+
+                $this->markUnauthorized($repository, $e->getMessage());
+
+                return;
             }
 
-            Log::warning('GitHub repository sync failed', [
+            if ($e->wasRateLimited()) {
+                $delay = max($e->secondsUntilReset(), 60);
+                $delay = min($delay, 3600);
+
+                Log::info('GitHub repository sync — rate-limited; releasing', [
+                    'repository_id' => $repository->id,
+                    'full_name' => $repository->full_name,
+                    'release_seconds' => $delay,
+                ]);
+
+                $this->markRateLimited($repository, $e->getMessage());
+                $this->release($delay);
+
+                return;
+            }
+
+            Log::warning('GitHub repository sync — transient API failure', [
                 'repository_id' => $repository->id,
                 'full_name' => $repository->full_name,
                 'status' => $e->statusCode,
+                'attempt' => $this->attempts(),
                 'message' => $e->getMessage(),
             ]);
 
-            $this->markFailed($repository, $e->getMessage());
+            throw $e;
         } catch (Throwable $e) {
-            Log::error('GitHub repository sync errored', [
+            Log::error('GitHub repository sync — unexpected error', [
                 'repository_id' => $repository->id,
                 'full_name' => $repository->full_name,
                 'exception' => $e::class,
+                'attempt' => $this->attempts(),
                 'message' => $e->getMessage(),
             ]);
 
-            $this->markFailed($repository, $e->getMessage() !== '' ? $e->getMessage() : $e::class);
+            throw $e;
         }
 
         // Chain spec 015's issues sync, spec 016's PRs sync, and spec
@@ -220,6 +254,47 @@ class SyncGitHubRepositoryJob implements ShouldQueue
             'sync_error' => $reason !== null ? Str::limit($reason, 500, '…') : null,
             'sync_failed_at' => now(),
         ])->save();
+    }
+
+    private function markRateLimited(Repository $repository, ?string $reason = null): void
+    {
+        $repository->forceFill([
+            'sync_status' => RepositorySyncStatus::RateLimited->value,
+            'sync_error' => $reason !== null ? Str::limit($reason, 500, '…') : null,
+        ])->save();
+    }
+
+    private function markUnauthorized(Repository $repository, ?string $reason = null): void
+    {
+        $repository->forceFill([
+            'sync_status' => RepositorySyncStatus::Unauthorized->value,
+            'sync_error' => $reason !== null ? Str::limit($reason, 500, '…') : null,
+            'sync_failed_at' => now(),
+        ])->save();
+    }
+
+    /**
+     * Spec 037 — terminal-failure handler. Runs once Laravel exhausts
+     * the retry pipeline. Defers to the specific status branch when
+     * we can recognise the cause.
+     */
+    public function failed(Throwable $e): void
+    {
+        $repository = Repository::query()->find($this->repositoryId);
+
+        if ($repository === null) {
+            return;
+        }
+
+        if ($e instanceof GitHubApiException && $e->isUnauthorized()) {
+            $this->markUnauthorized($repository, $e->getMessage());
+
+            return;
+        }
+
+        $reason = $e->getMessage() !== '' ? $e->getMessage() : $e::class;
+
+        $this->markFailed($repository, $reason);
     }
 
     /**

@@ -24,6 +24,7 @@ use App\Http\Controllers\RepositorySyncAllController;
 use App\Http\Controllers\RepositorySyncController;
 use App\Http\Controllers\RepositoryWorkflowRunsSyncController;
 use App\Http\Controllers\Settings\ThemeController;
+use App\Http\Controllers\Settings\WebhookDeliveryController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\Webhooks\GitHubWebhookController;
 use App\Http\Controllers\WorkItemController;
@@ -64,6 +65,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // `<html>` class toggle happens client-side in AppLayout.
     Route::post('/settings/theme', ThemeController::class)
         ->name('settings.theme.update');
+
+    // Spec 037 — webhook delivery list + retry. Filter strip lives on
+    // the index; retry is a single-row POST that re-dispatches the
+    // job against the stored payload.
+    Route::get('/settings/webhook-deliveries', WebhookDeliveryController::class)
+        ->name('settings.webhook-deliveries.index');
+    Route::post('/settings/webhook-deliveries/{delivery}/retry', [WebhookDeliveryController::class, 'retry'])
+        ->name('settings.webhook-deliveries.retry');
 
     Route::get('/integrations/github/connect', [GithubConnectionController::class, 'redirect'])
         ->name('integrations.github.connect');
