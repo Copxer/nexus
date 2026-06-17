@@ -101,6 +101,9 @@ class SyncRepositoryPullRequestsJob implements ShouldQueue
                 return;
             }
 
+            // Rate-limited: see SyncRepositoryIssuesJob for the
+            // `release()` semantics. Persistent rate-limiting exhausts
+            // `$tries` and falls through to `failed()`.
             if ($e->wasRateLimited()) {
                 $delay = max($e->secondsUntilReset(), 60);
                 $delay = min($delay, 3600);

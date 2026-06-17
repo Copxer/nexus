@@ -122,13 +122,17 @@ class SyncRepositoryIssuesJob implements ShouldQueue
             }
 
             // Rate-limited: release back to the queue with a delay
-            // calibrated to GitHub's `X-RateLimit-Reset`. `release()`
-            // does NOT consume a `$tries` attempt — the next run is a
-            // fresh first attempt against a healed quota.
+            // calibrated to GitHub's `X-RateLimit-Reset`. The next pop
+            // increments attempts like any other retry, so a job that
+            // keeps rate-limiting will exhaust `$tries` and hit
+            // `failed()` — terminal state will be `Failed`, not stuck
+            // in `RateLimited` forever.
             if ($e->wasRateLimited()) {
                 $delay = max($e->secondsUntilReset(), 60);
-                // Hard cap so a misbehaving reset header can't park the
-                // job for hours.
+                // Hard cap on a single release window — a misbehaving
+                // reset header could otherwise delay one attempt by
+                // days. Total budget across attempts is bounded by
+                // `$tries` × this cap, plus the `$backoff()` array.
                 $delay = min($delay, 3600);
 
                 Log::info('GitHub issues sync — rate-limited; releasing', [

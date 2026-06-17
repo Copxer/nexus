@@ -235,9 +235,18 @@ const runRepositorySync = () => {
 // latest status — a partial Inertia reload that re-fetches just the
 // sync-related props so the page updates without flashing or losing
 // scroll. Stops on its own as soon as all four flip out of `syncing`.
-// Spec 019 will replace this with Reverb broadcasts.
+//
+// Spec 037 — bounded by a wall-clock cap. Pre-037 a transient API error
+// flipped status to `Failed` immediately and polling stopped within a
+// tick. Post-037 a transient 5xx keeps status at `Syncing` during the
+// retry pipeline (potentially 1 + 5 + 15 = 21 min of backoff). Without
+// a cap a stuck row would fire ~500 reloads against the controller
+// while the queue worker is asleep. The cap stops polling after
+// ~5 minutes; the user can refresh manually past that.
 const POLL_INTERVAL_MS = 2500;
+const POLL_MAX_TICKS = 120; // 120 × 2.5s = 5 minutes
 let pollHandle: ReturnType<typeof setInterval> | null = null;
+let pollTicks = 0;
 
 const anySyncing = computed(
     () =>
@@ -252,11 +261,19 @@ const stopPolling = () => {
         clearInterval(pollHandle);
         pollHandle = null;
     }
+    pollTicks = 0;
 };
 
 const startPolling = () => {
     if (pollHandle !== null) return;
+    pollTicks = 0;
     pollHandle = setInterval(() => {
+        pollTicks += 1;
+        if (pollTicks >= POLL_MAX_TICKS) {
+            stopPolling();
+            return;
+        }
+
         // `router.reload` is a same-route partial fetch — no navigation, so
         // scroll + component state are preserved by default. `only` keeps
         // the payload tiny (just the sync-related props plus the lists

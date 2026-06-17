@@ -199,11 +199,6 @@ class SyncRepositoryWorkflowRunsJobTest extends TestCase
         $this->expectException(GitHubApiException::class);
 
         (new SyncRepositoryWorkflowRunsJob($context['repository']->id))->handle($this->action());
-
-        // PHP unit forces early return on expectException, but a guard
-        // just in case asserting the fall-through path stays untouched.
-        $repo = $context['repository']->fresh();
-        $this->assertSame(RepositorySyncStatus::Syncing, $repo->workflow_runs_sync_status);
         $this->assertNotNull($repo->workflow_runs_sync_error);
         $this->assertStringContainsString('404', $repo->workflow_runs_sync_error);
         $this->assertNotNull($repo->workflow_runs_sync_failed_at);
