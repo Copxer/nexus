@@ -1,10 +1,10 @@
 ---
 spec: reliability-hardening
 phase: 9
-status: in-progress   # not-started | in-progress | blocked | done
+status: done   # not-started | in-progress | blocked | done
 owner: Yoany
 created: 2026-06-16
-updated: 2026-06-16
+updated: 2026-06-17
 ---
 
 # 037 — Reliability hardening: retries, rate-limit handling, webhook retry UI
