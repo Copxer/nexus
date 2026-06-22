@@ -81,7 +81,17 @@ class AlertController extends Controller
 
         $alerts = Alert::query()
             ->with('project:id,slug,name,color,icon,owner_user_id')
-            ->whereHas('project', fn ($q) => $q->where('owner_user_id', $user->id))
+            // Spec 038 — `AlertSource::System` alerts have a null
+            // project_id (queue / GitHub-rate / webhook / agent-auth
+            // signals aren't project-scoped). Without this branch
+            // the `whereHas('project')` filter excludes them and the
+            // Settings system-health card's "View details" link
+            // would land on an empty list.
+            ->where(function ($outer) use ($user): void {
+                $outer
+                    ->whereHas('project', fn ($q) => $q->where('owner_user_id', $user->id))
+                    ->orWhere('source', AlertSource::System->value);
+            })
             ->when($severity, fn ($q) => $q->where('severity', $severity))
             ->when($source, fn ($q) => $q->where('source', $source))
             ->when($status, fn ($q) => $q->where('status', $status))

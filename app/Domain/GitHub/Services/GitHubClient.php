@@ -224,4 +224,39 @@ class GitHubClient
                 'User-Agent' => 'Nexus-Control-Center',
             ]);
     }
+
+    /**
+     * Spec 038 — query GitHub's rate-limit endpoint. Returns the
+     * `core` resource summary (`{limit, remaining, reset}`) which is
+     * the bucket all the REST sync jobs share. Used by
+     * `CheckGitHubRateLimitJob` to surface the live remaining quota
+     * on the Settings system-health card.
+     */
+    public function fetchRateLimit(): array
+    {
+        try {
+            $response = $this->request()->get(self::BASE_URL.'/rate_limit');
+
+            if ($response->failed()) {
+                throw GitHubApiException::fromResponse(
+                    $response,
+                    'GitHub /rate_limit failed',
+                );
+            }
+
+            $body = (array) $response->json();
+            $core = $body['resources']['core'] ?? [];
+
+            return [
+                'limit' => (int) ($core['limit'] ?? 0),
+                'remaining' => (int) ($core['remaining'] ?? 0),
+                'reset' => (int) ($core['reset'] ?? 0),
+            ];
+        } catch (RequestException $e) {
+            throw GitHubApiException::fromTransport(
+                $e,
+                'GitHub /rate_limit transport failure',
+            );
+        }
+    }
 }
