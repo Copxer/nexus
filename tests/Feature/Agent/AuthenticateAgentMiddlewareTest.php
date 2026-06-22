@@ -3,6 +3,7 @@
 namespace Tests\Feature\Agent;
 
 use App\Domain\Docker\Actions\IssueAgentTokenAction;
+use App\Models\ActivityEvent;
 use App\Models\AgentToken;
 use App\Models\Host;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -113,5 +114,53 @@ class AuthenticateAgentMiddlewareTest extends TestCase
         )->assertStatus(401);
 
         $this->assertNull($token->fresh()->last_used_at);
+    }
+
+    public function test_missing_bearer_dispatches_agent_auth_failure_event(): void
+    {
+        // Spec 038 — the system-health evaluator counts these for the
+        // `agent.auth_failures_high` signal. Every reject path needs
+        // to emit the activity event.
+        $this->postJson(route('agent.telemetry'), $this->payload())
+            ->assertStatus(401);
+
+        $event = ActivityEvent::query()
+            ->where('event_type', 'agent.auth.failure')
+            ->firstOrFail();
+        $this->assertSame('missing_bearer_token', $event->metadata['reason']);
+        $this->assertSame('agent', $event->source);
+    }
+
+    public function test_invalid_token_dispatches_agent_auth_failure_event(): void
+    {
+        $this->postJson(
+            route('agent.telemetry'),
+            $this->payload(),
+            ['Authorization' => 'Bearer nonsense-token-here'],
+        )->assertStatus(401);
+
+        $event = ActivityEvent::query()
+            ->where('event_type', 'agent.auth.failure')
+            ->firstOrFail();
+        $this->assertSame('invalid_token', $event->metadata['reason']);
+    }
+
+    public function test_valid_request_does_not_dispatch_agent_auth_failure(): void
+    {
+        $host = Host::factory()->create();
+        $result = app(IssueAgentTokenAction::class)->execute($host);
+
+        $this->postJson(
+            route('agent.telemetry'),
+            $this->payload(),
+            ['Authorization' => 'Bearer '.$result->plaintext],
+        )->assertNoContent();
+
+        $this->assertSame(
+            0,
+            ActivityEvent::query()
+                ->where('event_type', 'agent.auth.failure')
+                ->count(),
+        );
     }
 }

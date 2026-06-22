@@ -3,10 +3,14 @@ import StatusBadge from '@/Components/Dashboard/StatusBadge.vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import {
+    Activity,
     AlertTriangle,
+    Bell,
     CheckCircle2,
     ExternalLink,
+    Gauge,
     Github,
+    Inbox,
     Moon,
     Plug,
     PlugZap,
@@ -31,8 +35,28 @@ interface GithubConnectionShape {
     };
 }
 
+// Spec 038 — system health KPIs surfaced above Integrations.
+type HealthTone = 'success' | 'warning' | 'danger' | 'info' | 'muted';
+
+interface SystemHealth {
+    queue: { pending: number; failed_5m: number; status: HealthTone };
+    webhooks: {
+        deliveries_5m: number;
+        failures_5m: number;
+        failure_rate_percent: number | null;
+        status: HealthTone;
+    };
+    github_rate_limit: {
+        remaining: number | null;
+        reset_at_iso: string | null;
+        status: HealthTone;
+    };
+    agent_auth: { failures_5m: number; status: HealthTone };
+}
+
 const props = defineProps<{
     github: GithubConnectionShape | null;
+    systemHealth: SystemHealth;
 }>();
 
 const isConnected = computed(() => props.github !== null);
@@ -95,6 +119,144 @@ const disconnect = () => {
         </template>
 
         <div class="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+            <!-- Spec 038 — system health card. 4-up KPI grid showing
+                 the live signals the every-minute evaluator alerts on.
+                 Each card carries a status badge + a context link. -->
+            <header class="flex items-center justify-between gap-3">
+                <div>
+                    <h2 class="text-base font-semibold text-text-primary">
+                        System health
+                    </h2>
+                    <p class="mt-1 text-sm text-text-secondary">
+                        Page-load snapshot. The every-minute evaluator
+                        fires internal alerts on threshold breach.
+                    </p>
+                </div>
+            </header>
+
+            <section
+                aria-label="System health"
+                class="grid grid-cols-1 gap-3 sm:grid-cols-2"
+            >
+                <a
+                    href="/horizon"
+                    target="_blank"
+                    rel="noopener"
+                    class="glass-card flex items-center justify-between gap-4 p-5 transition hover:border-accent-cyan/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
+                >
+                    <div class="flex items-center gap-3">
+                        <span
+                            class="flex h-10 w-10 items-center justify-center rounded-lg border border-border-subtle bg-background-panel-hover"
+                        >
+                            <Gauge
+                                class="h-5 w-5 text-accent-cyan"
+                                aria-hidden="true"
+                            />
+                        </span>
+                        <div class="flex flex-col">
+                            <span class="text-[11px] font-semibold uppercase tracking-[0.18em] text-text-muted">
+                                Queue
+                            </span>
+                            <span class="font-mono text-sm text-text-primary">
+                                {{ props.systemHealth.queue.pending }} pending
+                                · {{ props.systemHealth.queue.failed_5m }} failed/5m
+                            </span>
+                        </div>
+                    </div>
+                    <StatusBadge :tone="props.systemHealth.queue.status">
+                        {{ props.systemHealth.queue.status }}
+                    </StatusBadge>
+                </a>
+
+                <Link
+                    :href="route('settings.webhook-deliveries.index')"
+                    class="glass-card flex items-center justify-between gap-4 p-5 transition hover:border-accent-cyan/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
+                >
+                    <div class="flex items-center gap-3">
+                        <span
+                            class="flex h-10 w-10 items-center justify-center rounded-lg border border-border-subtle bg-background-panel-hover"
+                        >
+                            <Webhook
+                                class="h-5 w-5 text-accent-cyan"
+                                aria-hidden="true"
+                            />
+                        </span>
+                        <div class="flex flex-col">
+                            <span class="text-[11px] font-semibold uppercase tracking-[0.18em] text-text-muted">
+                                Webhooks (5m)
+                            </span>
+                            <span class="font-mono text-sm text-text-primary">
+                                {{ props.systemHealth.webhooks.deliveries_5m }} delivered
+                                · {{ props.systemHealth.webhooks.failures_5m }} failed
+                            </span>
+                        </div>
+                    </div>
+                    <StatusBadge :tone="props.systemHealth.webhooks.status">
+                        {{ props.systemHealth.webhooks.failure_rate_percent !== null
+                            ? `${props.systemHealth.webhooks.failure_rate_percent}%`
+                            : props.systemHealth.webhooks.status }}
+                    </StatusBadge>
+                </Link>
+
+                <div
+                    class="glass-card flex items-center justify-between gap-4 p-5"
+                >
+                    <div class="flex items-center gap-3">
+                        <span
+                            class="flex h-10 w-10 items-center justify-center rounded-lg border border-border-subtle bg-background-panel-hover"
+                        >
+                            <Github
+                                class="h-5 w-5 text-text-primary"
+                                aria-hidden="true"
+                            />
+                        </span>
+                        <div class="flex flex-col">
+                            <span class="text-[11px] font-semibold uppercase tracking-[0.18em] text-text-muted">
+                                GitHub rate-limit
+                            </span>
+                            <span class="font-mono text-sm text-text-primary">
+                                <template v-if="props.systemHealth.github_rate_limit.remaining !== null">
+                                    {{ props.systemHealth.github_rate_limit.remaining }} remaining
+                                </template>
+                                <template v-else>
+                                    No snapshot yet
+                                </template>
+                            </span>
+                        </div>
+                    </div>
+                    <StatusBadge :tone="props.systemHealth.github_rate_limit.status">
+                        {{ props.systemHealth.github_rate_limit.status }}
+                    </StatusBadge>
+                </div>
+
+                <Link
+                    :href="route('alerts.index')"
+                    class="glass-card flex items-center justify-between gap-4 p-5 transition hover:border-accent-cyan/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
+                >
+                    <div class="flex items-center gap-3">
+                        <span
+                            class="flex h-10 w-10 items-center justify-center rounded-lg border border-border-subtle bg-background-panel-hover"
+                        >
+                            <Bell
+                                class="h-5 w-5 text-accent-cyan"
+                                aria-hidden="true"
+                            />
+                        </span>
+                        <div class="flex flex-col">
+                            <span class="text-[11px] font-semibold uppercase tracking-[0.18em] text-text-muted">
+                                Agent auth (5m)
+                            </span>
+                            <span class="font-mono text-sm text-text-primary">
+                                {{ props.systemHealth.agent_auth.failures_5m }} rejections
+                            </span>
+                        </div>
+                    </div>
+                    <StatusBadge :tone="props.systemHealth.agent_auth.status">
+                        {{ props.systemHealth.agent_auth.status }}
+                    </StatusBadge>
+                </Link>
+            </section>
+
             <!-- Section header -->
             <header class="flex items-center justify-between gap-3">
                 <div>

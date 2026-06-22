@@ -43,8 +43,12 @@ class TriggerAlertAction
     ) {}
 
     /**
+     * Spec 038 — `project_id` is nullable for `AlertSource::System`
+     * alerts (queue / GitHub-rate / webhook / agent). Project-scoped
+     * alerts still pass a real id.
+     *
      * @param  array{
-     *     project_id: int,
+     *     project_id: int|null,
      *     source: AlertSource|string,
      *     source_id: int|null,
      *     type: string,
@@ -86,7 +90,7 @@ class TriggerAlertAction
         }
 
         $alert = Alert::query()->create([
-            'project_id' => $attrs['project_id'],
+            'project_id' => $attrs['project_id'] ?? null,
             'source' => $source,
             'source_id' => $attrs['source_id'],
             'type' => $attrs['type'],

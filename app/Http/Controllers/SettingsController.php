@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Observability\Queries\GetSystemHealthQuery;
 use App\Models\GithubConnection;
 use App\Models\Project;
 use App\Models\Repository;
@@ -12,12 +13,16 @@ use Inertia\Response;
 
 class SettingsController extends Controller
 {
-    public function __invoke(Request $request): Response
+    public function __invoke(Request $request, GetSystemHealthQuery $systemHealth): Response
     {
         $connection = $request->user()?->githubConnection;
 
         return Inertia::render('Settings/Index', [
             'github' => $this->serializeConnection($connection, $request),
+            // Spec 038 — system health KPIs (queue, webhooks, GitHub
+            // rate-limit, agent auth) rendered as a 4-up card above
+            // the Integrations block.
+            'systemHealth' => $systemHealth->execute(),
         ]);
     }
 

@@ -2,6 +2,8 @@
 
 namespace App\Http\Middleware;
 
+use App\Domain\Activity\Actions\CreateActivityEventAction;
+use App\Enums\ActivitySeverity;
 use App\Models\AgentToken;
 use Closure;
 use Illuminate\Http\Request;
@@ -42,6 +44,8 @@ class AuthenticateAgent
         $bearer = $request->bearerToken();
 
         if (! is_string($bearer) || $bearer === '') {
+            $this->recordAuthFailure($request, 'missing_bearer_token');
+
             return response('', 401);
         }
 
@@ -55,11 +59,15 @@ class AuthenticateAgent
             || $token->host === null
             || $token->host->archived_at !== null
         ) {
+            $this->recordAuthFailure($request, 'invalid_token');
+
             return response('', 401);
         }
 
         $key = self::rateLimitKey($token);
         if (RateLimiter::tooManyAttempts($key, self::RATE_LIMIT_PER_MINUTE)) {
+            $this->recordAuthFailure($request, 'rate_limited');
+
             return response('', 429)->header(
                 'Retry-After',
                 (string) RateLimiter::availableIn($key),
@@ -84,5 +92,30 @@ class AuthenticateAgent
     public static function rateLimitKey(AgentToken $token): string
     {
         return 'agent-telemetry:'.$token->getKey();
+    }
+
+    /**
+     * Spec 038 — capture every rejected agent request as an activity
+     * event so `EvaluateSystemHealthJob` can count "auth failures in
+     * the last 5 min" without a dedicated table. IP + reason metadata
+     * give an operator enough to triage (token leaked? wrong host
+     * shipping the binary? rate-limit thrash?).
+     *
+     * Resolved out of the container so the existing constructor stays
+     * dependency-free.
+     */
+    private function recordAuthFailure(Request $request, string $reason): void
+    {
+        app(CreateActivityEventAction::class)->execute([
+            'event_type' => 'agent.auth.failure',
+            'severity' => ActivitySeverity::Warning,
+            'source' => 'agent',
+            'title' => 'Agent token rejected',
+            'occurred_at' => now(),
+            'metadata' => [
+                'ip' => $request->ip(),
+                'reason' => $reason,
+            ],
+        ]);
     }
 }

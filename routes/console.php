@@ -3,6 +3,8 @@
 use App\Domain\Analytics\Jobs\RecomputeAllProjectHealthScoresJob;
 use App\Domain\Docker\Jobs\DetectOfflineHostsJob;
 use App\Domain\Monitoring\Jobs\DispatchDueWebsiteChecksJob;
+use App\Domain\Observability\Jobs\CheckGitHubRateLimitJob;
+use App\Domain\Observability\Jobs\EvaluateSystemHealthJob;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -53,3 +55,22 @@ Schedule::job(new RecomputeAllProjectHealthScoresJob)
     ->everyFiveMinutes()
     ->name('analytics:recompute-health-scores')
     ->withoutOverlapping(10);
+
+// Spec 038 — every-minute self-monitoring evaluator. Reads
+// `GetSystemHealthQuery` + triggers / resolves internal alerts on
+// the four §17 signals (queue / webhooks / GitHub rate / agent
+// auth). `withoutOverlapping` keyed on the job middleware so a slow
+// tick doesn't stack onto the next minute.
+Schedule::job(new EvaluateSystemHealthJob)
+    ->everyMinute()
+    ->name('observability:evaluate-system-health')
+    ->withoutOverlapping();
+
+// Spec 038 — every-10-minute poll of GitHub's `/rate_limit` per
+// connected user. Persists one snapshot per user; the system-health
+// query reads the latest row. Bounded HTTP volume (1 call per
+// connection per 10 min); stays well under any per-token quota.
+Schedule::job(new CheckGitHubRateLimitJob)
+    ->everyTenMinutes()
+    ->name('observability:check-github-rate-limit')
+    ->withoutOverlapping();
