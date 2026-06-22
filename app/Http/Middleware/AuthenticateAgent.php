@@ -101,21 +101,35 @@ class AuthenticateAgent
      * give an operator enough to triage (token leaked? wrong host
      * shipping the binary? rate-limit thrash?).
      *
-     * Resolved out of the container so the existing constructor stays
-     * dependency-free.
+     * Deduped per-IP-per-reason-per-minute via `RateLimiter::attempt`
+     * so a misbehaving agent in a tight retry loop doesn't pump the
+     * `activity_events` table at request rate. The 5-min count
+     * threshold (10 events → warning) still trips cleanly: one
+     * offender for 10 minutes, or 10 distinct IPs at any rate.
+     *
+     * Severity is `Info` — a single rejection isn't alarming; the
+     * evaluator decides when the *count* across IPs is.
+     *
+     * Resolved out of the container so the existing constructor
+     * stays dependency-free.
      */
     private function recordAuthFailure(Request $request, string $reason): void
     {
-        app(CreateActivityEventAction::class)->execute([
-            'event_type' => 'agent.auth.failure',
-            'severity' => ActivitySeverity::Warning,
-            'source' => 'agent',
-            'title' => 'Agent token rejected',
-            'occurred_at' => now(),
-            'metadata' => [
-                'ip' => $request->ip(),
-                'reason' => $reason,
-            ],
-        ]);
+        RateLimiter::attempt(
+            'agent-auth-failure-event:'.$request->ip().':'.$reason,
+            maxAttempts: 1,
+            callback: fn () => app(CreateActivityEventAction::class)->execute([
+                'event_type' => 'agent.auth.failure',
+                'severity' => ActivitySeverity::Info,
+                'source' => 'agent',
+                'title' => 'Agent token rejected',
+                'occurred_at' => now(),
+                'metadata' => [
+                    'ip' => $request->ip(),
+                    'reason' => $reason,
+                ],
+            ]),
+            decaySeconds: 60,
+        );
     }
 }

@@ -41,12 +41,16 @@ class CheckGitHubRateLimitJob implements ShouldQueue
 
     public function handle(): void
     {
+        // `access_token` is encrypted at-rest — a literal `!= ''`
+        // SQL filter is a no-op against ciphertext. Spec 037's
+        // expire-connection path always sets `expires_at = now()`
+        // alongside blanking the token, so the time-based filter
+        // alone is enough to exclude expired connections.
         $connections = GithubConnection::query()
             ->where(function ($q): void {
                 $q->whereNull('expires_at')
                     ->orWhere('expires_at', '>', Carbon::now());
             })
-            ->where('access_token', '!=', '')
             ->get();
 
         if ($connections->isEmpty()) {

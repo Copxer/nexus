@@ -2,6 +2,7 @@
 
 namespace App\Domain\Observability\Queries;
 
+use App\Domain\Observability\SystemHealthThresholds;
 use App\Enums\WebhookDeliveryStatus;
 use App\Models\GithubRateLimitSnapshot;
 use App\Models\WebhookDelivery;
@@ -90,7 +91,7 @@ class GetSystemHealthQuery
 
         // Below the min-sample floor, don't surface a percentage —
         // 1 of 1 failed reads as 100% but isn't a signal.
-        $rate = $total >= 5
+        $rate = $total >= SystemHealthThresholds::WEBHOOK_MIN_SAMPLE
             ? round(($failed / $total) * 100, 2)
             : null;
 
@@ -149,10 +150,16 @@ class GetSystemHealthQuery
     /** @return 'success'|'warning'|'danger'|'muted' */
     private function queueStatus(int $pending, int $failed5m): string
     {
-        if ($pending >= 500 || $failed5m >= 20) {
+        if (
+            $pending >= SystemHealthThresholds::QUEUE_BACKLOG_CRITICAL
+            || $failed5m >= SystemHealthThresholds::QUEUE_FAILURES_5M_CRIT
+        ) {
             return 'danger';
         }
-        if ($pending >= 100 || $failed5m >= 5) {
+        if (
+            $pending >= SystemHealthThresholds::QUEUE_BACKLOG_WARNING
+            || $failed5m >= SystemHealthThresholds::QUEUE_FAILURES_5M_WARN
+        ) {
             return 'warning';
         }
 
@@ -166,10 +173,10 @@ class GetSystemHealthQuery
             // Either no traffic or below the sample floor — quiet.
             return $total === 0 ? 'muted' : 'success';
         }
-        if ($rate >= 50.0) {
+        if ($rate >= SystemHealthThresholds::WEBHOOK_FAILRATE_CRIT_PCT) {
             return 'danger';
         }
-        if ($rate >= 20.0) {
+        if ($rate >= SystemHealthThresholds::WEBHOOK_FAILRATE_WARN_PCT) {
             return 'warning';
         }
 
@@ -182,10 +189,10 @@ class GetSystemHealthQuery
         if ($remaining === null) {
             return 'muted';
         }
-        if ($remaining < 20) {
+        if ($remaining < SystemHealthThresholds::GITHUB_RATE_REMAINING_CRIT) {
             return 'danger';
         }
-        if ($remaining < 100) {
+        if ($remaining < SystemHealthThresholds::GITHUB_RATE_REMAINING_WARN) {
             return 'warning';
         }
 
@@ -195,10 +202,10 @@ class GetSystemHealthQuery
     /** @return 'success'|'warning'|'danger'|'muted' */
     private function agentAuthStatus(int $failures): string
     {
-        if ($failures >= 50) {
+        if ($failures >= SystemHealthThresholds::AGENT_AUTH_FAILURES_5M_CRIT) {
             return 'danger';
         }
-        if ($failures >= 10) {
+        if ($failures >= SystemHealthThresholds::AGENT_AUTH_FAILURES_5M_WARN) {
             return 'warning';
         }
 

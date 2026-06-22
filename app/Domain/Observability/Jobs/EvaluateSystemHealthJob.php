@@ -5,6 +5,7 @@ namespace App\Domain\Observability\Jobs;
 use App\Domain\Alerts\Actions\ResolveAlertAction;
 use App\Domain\Alerts\Actions\TriggerAlertAction;
 use App\Domain\Observability\Queries\GetSystemHealthQuery;
+use App\Domain\Observability\SystemHealthThresholds;
 use App\Enums\AlertSeverity;
 use App\Enums\AlertSource;
 use Illuminate\Bus\Queueable;
@@ -39,27 +40,9 @@ class EvaluateSystemHealthJob implements ShouldQueue
 
     public int $tries = 1;
 
-    public const QUEUE_BACKLOG_WARNING = 100;
-
-    public const QUEUE_BACKLOG_CRITICAL = 500;
-
-    public const QUEUE_FAILURES_5M_WARN = 5;
-
-    public const QUEUE_FAILURES_5M_CRIT = 20;
-
-    public const WEBHOOK_FAILRATE_WARN_PCT = 20.0;
-
-    public const WEBHOOK_FAILRATE_CRIT_PCT = 50.0;
-
-    public const WEBHOOK_MIN_SAMPLE = 5;
-
-    public const GITHUB_RATE_REMAINING_WARN = 100;
-
-    public const GITHUB_RATE_REMAINING_CRIT = 20;
-
-    public const AGENT_AUTH_FAILURES_5M_WARN = 10;
-
-    public const AGENT_AUTH_FAILURES_5M_CRIT = 50;
+    // Spec 038 — thresholds live in `SystemHealthThresholds` so the
+    // query (decides what tone to render) and the job (decides what
+    // alert to fire) read the same numbers.
 
     /** @return array<int, object> */
     public function middleware(): array
@@ -85,13 +68,13 @@ class EvaluateSystemHealthJob implements ShouldQueue
      */
     private function evaluateQueue(array $slice, TriggerAlertAction $trigger, ResolveAlertAction $resolve): void
     {
-        $severity = $slice['pending'] >= self::QUEUE_BACKLOG_CRITICAL
-            || $slice['failed_5m'] >= self::QUEUE_FAILURES_5M_CRIT
-            ? AlertSeverity::Critical
-            : ($slice['pending'] >= self::QUEUE_BACKLOG_WARNING
-                || $slice['failed_5m'] >= self::QUEUE_FAILURES_5M_WARN
-                    ? AlertSeverity::Warning
-                    : null);
+        $severity = match (true) {
+            $slice['pending'] >= SystemHealthThresholds::QUEUE_BACKLOG_CRITICAL,
+            $slice['failed_5m'] >= SystemHealthThresholds::QUEUE_FAILURES_5M_CRIT => AlertSeverity::Critical,
+            $slice['pending'] >= SystemHealthThresholds::QUEUE_BACKLOG_WARNING,
+            $slice['failed_5m'] >= SystemHealthThresholds::QUEUE_FAILURES_5M_WARN => AlertSeverity::Warning,
+            default => null,
+        };
 
         if ($severity === null) {
             $this->resolveType($resolve, 'queue.backlog_high');
@@ -121,7 +104,7 @@ class EvaluateSystemHealthJob implements ShouldQueue
         // returns `success`/`muted` accordingly. The evaluator's job
         // is to act only on a real signal.
         if (
-            $slice['deliveries_5m'] < self::WEBHOOK_MIN_SAMPLE
+            $slice['deliveries_5m'] < SystemHealthThresholds::WEBHOOK_MIN_SAMPLE
             || $slice['failure_rate_percent'] === null
         ) {
             $this->resolveType($resolve, 'webhook.failure_rate_high');
@@ -131,11 +114,11 @@ class EvaluateSystemHealthJob implements ShouldQueue
 
         $rate = $slice['failure_rate_percent'];
 
-        $severity = $rate >= self::WEBHOOK_FAILRATE_CRIT_PCT
-            ? AlertSeverity::Critical
-            : ($rate >= self::WEBHOOK_FAILRATE_WARN_PCT
-                ? AlertSeverity::Warning
-                : null);
+        $severity = match (true) {
+            $rate >= SystemHealthThresholds::WEBHOOK_FAILRATE_CRIT_PCT => AlertSeverity::Critical,
+            $rate >= SystemHealthThresholds::WEBHOOK_FAILRATE_WARN_PCT => AlertSeverity::Warning,
+            default => null,
+        };
 
         if ($severity === null) {
             $this->resolveType($resolve, 'webhook.failure_rate_high');
@@ -168,11 +151,11 @@ class EvaluateSystemHealthJob implements ShouldQueue
             return;
         }
 
-        $severity = $slice['remaining'] < self::GITHUB_RATE_REMAINING_CRIT
-            ? AlertSeverity::Critical
-            : ($slice['remaining'] < self::GITHUB_RATE_REMAINING_WARN
-                ? AlertSeverity::Warning
-                : null);
+        $severity = match (true) {
+            $slice['remaining'] < SystemHealthThresholds::GITHUB_RATE_REMAINING_CRIT => AlertSeverity::Critical,
+            $slice['remaining'] < SystemHealthThresholds::GITHUB_RATE_REMAINING_WARN => AlertSeverity::Warning,
+            default => null,
+        };
 
         if ($severity === null) {
             $this->resolveType($resolve, 'github.rate_limit_low');
@@ -197,11 +180,11 @@ class EvaluateSystemHealthJob implements ShouldQueue
      */
     private function evaluateAgentAuth(array $slice, TriggerAlertAction $trigger, ResolveAlertAction $resolve): void
     {
-        $severity = $slice['failures_5m'] >= self::AGENT_AUTH_FAILURES_5M_CRIT
-            ? AlertSeverity::Critical
-            : ($slice['failures_5m'] >= self::AGENT_AUTH_FAILURES_5M_WARN
-                ? AlertSeverity::Warning
-                : null);
+        $severity = match (true) {
+            $slice['failures_5m'] >= SystemHealthThresholds::AGENT_AUTH_FAILURES_5M_CRIT => AlertSeverity::Critical,
+            $slice['failures_5m'] >= SystemHealthThresholds::AGENT_AUTH_FAILURES_5M_WARN => AlertSeverity::Warning,
+            default => null,
+        };
 
         if ($severity === null) {
             $this->resolveType($resolve, 'agent.auth_failures_high');
