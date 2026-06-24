@@ -72,6 +72,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/settings/webhook-deliveries', WebhookDeliveryController::class)
         ->name('settings.webhook-deliveries.index');
     Route::post('/settings/webhook-deliveries/{delivery}/retry', [WebhookDeliveryController::class, 'retry'])
+        ->middleware('throttle:30,1') // spec 039
         ->name('settings.webhook-deliveries.retry');
 
     Route::get('/integrations/github/connect', [GithubConnectionController::class, 'redirect'])
@@ -91,30 +92,39 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Re-dispatches the parent SyncGitHubRepositoryJob, which refreshes
     // metadata (default branch, language, stars, push timestamps) and
     // cascades into the issues + PR sync jobs below.
+    // Spec 039 — `throttle:10,1` (10 syncs per minute per user)
+    // stops a thumb-on-button spam from queueing thousands of jobs.
+    // The 429 surfaces through Inertia's `errors` shared prop.
     Route::post('/repositories/{repository}/sync', RepositorySyncController::class)
+        ->middleware('throttle:10,1')
         ->where('repository', '[\w.-]+/[\w.-]+')
         ->name('repositories.sync');
 
     // Spec 015 — manual "Run sync" button on the Repository Issues tab.
     Route::post('/repositories/{repository}/issues/sync', RepositoryIssuesSyncController::class)
+        ->middleware('throttle:10,1')
         ->where('repository', '[\w.-]+/[\w.-]+')
         ->name('repositories.issues.sync');
 
     // Spec 016 — manual "Run sync" button on the Repository PRs tab.
     Route::post('/repositories/{repository}/pulls/sync', RepositoryPullRequestsSyncController::class)
+        ->middleware('throttle:10,1')
         ->where('repository', '[\w.-]+/[\w.-]+')
         ->name('repositories.pulls.sync');
 
     // Spec 020 — manual "Run sync" button on the Repository Workflow Runs tab.
     Route::post('/repositories/{repository}/workflow-runs/sync', RepositoryWorkflowRunsSyncController::class)
+        ->middleware('throttle:10,1')
         ->where('repository', '[\w.-]+/[\w.-]+')
         ->name('repositories.workflow-runs.sync');
 
     // Global "Run sync" — the Cmd+K command-palette action. Bulk sibling
     // of the per-repo sync above; re-syncs every repo under the user's
     // projects. Literal path, so it never collides with the slash-keyed
-    // `{repository}` routes.
+    // `{repository}` routes. Spec 039 — tighter 2/min limit because
+    // a single call fans out across every repo.
     Route::post('/repositories/sync-all', RepositorySyncAllController::class)
+        ->middleware('throttle:2,1')
         ->name('repositories.sync-all');
 
     // Spec 016 — unified Work Items queue (issues + PRs).
@@ -136,6 +146,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->parameters(['websites' => 'website'])
         ->names('monitoring.websites');
     Route::post('/monitoring/websites/{website}/probe', WebsiteProbeController::class)
+        ->middleware('throttle:20,1') // spec 039
         ->name('monitoring.websites.probe');
 
     // Spec 026 — Docker hosts CRUD + agent token lifecycle. Telemetry

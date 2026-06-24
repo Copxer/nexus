@@ -13,8 +13,12 @@ class HorizonServiceProvider extends HorizonApplicationServiceProvider
      * In local + testing environments any authenticated, email-verified
      * user gets in — phase 0 is single-developer dev, an explicit allow-
      * list is friction without value. In any other environment the
-     * gate falls back to an explicit allow-list, populated when the
-     * production deploy flow lands in phase 9.
+     * gate consults `config('horizon.allow_list')`, populated from the
+     * `HORIZON_ALLOW_LIST` env var (comma-separated emails).
+     *
+     * Spec 039 — empty allow-list = no access in production. The
+     * deploy flow MUST set `HORIZON_ALLOW_LIST` before the dashboard
+     * is reachable.
      */
     protected function gate(): void
     {
@@ -27,9 +31,10 @@ class HorizonServiceProvider extends HorizonApplicationServiceProvider
                 return $user->hasVerifiedEmail();
             }
 
-            return in_array($user->email, [
-                // TODO(phase-9): populate this allow-list before deploying.
-            ], strict: true);
+            /** @var array<int, string> $allowList */
+            $allowList = config('horizon.allow_list', []);
+
+            return in_array($user->email, $allowList, strict: true);
         });
     }
 }

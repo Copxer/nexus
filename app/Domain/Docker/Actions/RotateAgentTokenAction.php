@@ -20,11 +20,22 @@ class RotateAgentTokenAction
     public function execute(Host $host, ?string $name = null, ?User $rotatedBy = null): AgentTokenIssueResult
     {
         return DB::transaction(function () use ($host, $name, $rotatedBy): AgentTokenIssueResult {
+            // Spec 039 — carry the fingerprint opt-in forward from the
+            // most-recent active token so rotation doesn't silently
+            // weaken the binding. The new token's `fingerprint_hash`
+            // stays null until the first request rebinds it.
+            $previousActive = $host->agentTokens()
+                ->whereNull('revoked_at')
+                ->latest('id')
+                ->first();
+
+            $fingerprintEnabled = $previousActive?->fingerprint_enabled ?? false;
+
             $host->agentTokens()
                 ->whereNull('revoked_at')
                 ->update(['revoked_at' => now()]);
 
-            return $this->issue->execute($host, $name, $rotatedBy);
+            return $this->issue->execute($host, $name, $rotatedBy, $fingerprintEnabled);
         });
     }
 }

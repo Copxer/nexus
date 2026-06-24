@@ -21,10 +21,12 @@ class AgentTokenController extends Controller
 {
     public function store(StoreAgentTokenRequest $request, Host $host, IssueAgentTokenAction $issue): RedirectResponse
     {
+        $validated = $request->validated();
         $result = $issue->execute(
             $host,
-            $request->validated()['name'] ?? null,
+            $validated['name'] ?? null,
             $request->user(),
+            fingerprintEnabled: (bool) ($validated['fingerprint_enabled'] ?? false),
         );
 
         return redirect()
@@ -37,6 +39,10 @@ class AgentTokenController extends Controller
     {
         $this->ensureBelongs($host, $token);
 
+        // Spec 039 — `RotateAgentTokenAction` carries the previous
+        // token's `fingerprint_enabled` forward automatically. Form
+        // input is ignored on rotation to keep the flow minimal;
+        // operators who want to flip the opt-in revoke + issue fresh.
         $result = $rotate->execute(
             $host,
             $request->validated()['name'] ?? null,
