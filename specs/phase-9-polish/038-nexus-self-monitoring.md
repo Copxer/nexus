@@ -1,10 +1,10 @@
 ---
 spec: nexus-self-monitoring
 phase: 9
-status: in-progress   # not-started | in-progress | blocked | done
+status: done   # not-started | in-progress | blocked | done
 owner: Yoany
 created: 2026-06-18
-updated: 2026-06-18
+updated: 2026-06-22
 ---
 
 # 038 — Nexus self-monitoring: internal alerts + health card
