@@ -12,12 +12,12 @@ A future polish spec can convert this into a runtime self-check
 
 | Secret | Storage | Cast / hash | Hidden in serialization | Test |  |
 |--------|---------|-------------|-------------------------|------|---|
-| GitHub access token | `github_connections.access_token` | `encrypted` (Laravel APP_KEY) | yes | [`GithubConnectionSecretTest`](../tests/Feature/Security/GithubConnectionSecretTest.php) | ☐ |
-| GitHub refresh token | `github_connections.refresh_token` | `encrypted` | yes | [`GithubConnectionSecretTest`](../tests/Feature/Security/GithubConnectionSecretTest.php) | ☐ |
-| User password | `users.password` | `hashed` (bcrypt) | yes | [`UserPasswordSecretTest`](../tests/Feature/Security/UserPasswordSecretTest.php) | ☐ |
-| Agent bearer token | `agent_tokens.hashed_token` | SHA-256 hash; plaintext shown once at issuance, never persisted | yes | [`AgentTokenSecretTest`](../tests/Feature/Security/AgentTokenSecretTest.php) | ☐ |
-| Webhook signature audit | `github_webhook_deliveries.signature` | Raw `X-Hub-Signature-256` header stored verbatim for forensic replay (NOT a secret to protect; the secret is in env) | n/a | [`WebhookSignatureAuditTest`](../tests/Feature/Security/WebhookSignatureAuditTest.php) | ☐ |
-| GitHub webhook secret | `config('services.github.webhook_secret')` ← env `GITHUB_WEBHOOK_SECRET` | env-only; never persisted | env | [`WebhookSignatureAuditTest`](../tests/Feature/Security/WebhookSignatureAuditTest.php) | ☐ |
+| GitHub access token | `github_connections.access_token` | `encrypted` (Laravel APP_KEY) | yes | [`GithubConnectionSecretTest`](../../tests/Feature/Security/GithubConnectionSecretTest.php) | ☐ |
+| GitHub refresh token | `github_connections.refresh_token` | `encrypted` | yes | [`GithubConnectionSecretTest`](../../tests/Feature/Security/GithubConnectionSecretTest.php) | ☐ |
+| User password | `users.password` | `hashed` (bcrypt) | yes | [`UserPasswordSecretTest`](../../tests/Feature/Security/UserPasswordSecretTest.php) | ☐ |
+| Agent bearer token | `agent_tokens.hashed_token` | SHA-256 hash; plaintext shown once at issuance, never persisted | yes | [`AgentTokenSecretTest`](../../tests/Feature/Security/AgentTokenSecretTest.php) | ☐ |
+| Webhook signature audit | `github_webhook_deliveries.signature` | Raw `X-Hub-Signature-256` header stored verbatim for forensic replay (NOT a secret to protect; the secret is in env) | n/a | [`WebhookSignatureAuditTest`](../../tests/Feature/Security/WebhookSignatureAuditTest.php) | ☐ |
+| GitHub webhook secret | `config('services.github.webhook_secret')` ← env `GITHUB_WEBHOOK_SECRET` | env-only; never persisted | env | [`WebhookSignatureAuditTest`](../../tests/Feature/Security/WebhookSignatureAuditTest.php) | ☐ |
 
 **Sign-off:** No plaintext secrets land in the database. The encrypted
 casts decrypt only when accessed via the model; `$hidden` keeps every
@@ -34,9 +34,9 @@ secret out of `toArray()` / Inertia / JSON responses.
   `github_webhook_deliveries`.
 
 **Sign-off ☐:** Tested in
-[`WebhookSignatureAuditTest`](../tests/Feature/Security/WebhookSignatureAuditTest.php)
+[`WebhookSignatureAuditTest`](../../tests/Feature/Security/WebhookSignatureAuditTest.php)
 + the existing
-[`VerifyGitHubWebhookSignatureActionTest`](../tests/Feature/GitHub/Webhooks/VerifyGitHubWebhookSignatureActionTest.php).
+[`VerifyGitHubWebhookSignatureActionTest`](../../tests/Feature/GitHub/Webhooks/VerifyGitHubWebhookSignatureActionTest.php).
 
 ## 3. Horizon dashboard allow-list
 
@@ -48,7 +48,7 @@ secret out of `toArray()` / Inertia / JSON responses.
 
 **Sign-off ☐:** Confirm `HORIZON_ALLOW_LIST` is set in the production
 `.env` before the dashboard becomes reachable. Tested in
-[`HorizonGateTest`](../tests/Feature/Security/HorizonGateTest.php).
+[`HorizonGateTest`](../../tests/Feature/Security/HorizonGateTest.php).
 
 ## 4. Agent telemetry endpoint
 
@@ -65,9 +65,9 @@ secret out of `toArray()` / Inertia / JSON responses.
   re-binding.
 
 **Sign-off ☐:** Tested in
-[`AuthenticateAgentMiddlewareTest`](../tests/Feature/Agent/AuthenticateAgentMiddlewareTest.php)
-+ [`AgentFingerprintTest`](../tests/Feature/Agent/AgentFingerprintTest.php)
-+ [`AgentTokenSecretTest`](../tests/Feature/Security/AgentTokenSecretTest.php).
+[`AuthenticateAgentMiddlewareTest`](../../tests/Feature/Agent/AuthenticateAgentMiddlewareTest.php)
++ [`AgentFingerprintTest`](../../tests/Feature/Agent/AgentFingerprintTest.php)
++ [`AgentTokenSecretTest`](../../tests/Feature/Security/AgentTokenSecretTest.php).
 
 ## 5. Rate-limit coverage on authenticated endpoints
 
@@ -86,9 +86,25 @@ Per-user limits via Laravel's `throttle:N,1` middleware:
 | `POST /email/verification-notification` | 6/min (existing) |
 
 **Sign-off ☐:** Tested in
-[`ManualSyncRateLimitTest`](../tests/Feature/Security/ManualSyncRateLimitTest.php).
+[`ManualSyncRateLimitTest`](../../tests/Feature/Security/ManualSyncRateLimitTest.php).
 
-## 6. Deferred to follow-ups
+## 6. Operational constraints
+
+- **`HORIZON_ALLOW_LIST` email format.** Comma-separated, no
+  embedded commas. RFC 5321 permits commas inside quoted local-
+  parts (`"a,b"@example.com`) but they'd split the list — keep
+  operator emails plain.
+- **Agent fingerprint binding under proxies.** The middleware
+  computes the fingerprint from `$request->ip()` + User-Agent.
+  `bootstrap/app.php` trusts only loopback proxies, so an agent
+  ingressing through a CDN / load balancer that forwards
+  `X-Forwarded-For` would bind to the **proxy's** IP, not the
+  agent's. Today agents talk directly to the server, so this
+  isn't a problem; if production routing changes, expand the
+  `trustProxies` list before turning fingerprinting on for
+  production tokens.
+
+## 7. Deferred to follow-ups
 
 Documented for visibility; not blockers for spec 039 sign-off:
 

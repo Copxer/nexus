@@ -10,7 +10,6 @@ use App\Models\Website;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Queue;
-use Illuminate\Support\Facades\RateLimiter;
 use Tests\TestCase;
 
 /**
@@ -41,12 +40,10 @@ class ManualSyncRateLimitTest extends TestCase
         return $count;
     }
 
-    protected function tearDown(): void
-    {
-        // Reset Laravel's rate-limiter so tests don't leak state.
-        RateLimiter::clear('throttle');
-        parent::tearDown();
-    }
+    // No tearDown needed — each test creates a fresh `User`, and the
+    // throttle bucket keys are derived from the user id, so state
+    // never leaks between tests. PHPUnit's per-test isolation handles
+    // the rest.
 
     public function test_repositories_sync_throttled_at_10_per_minute(): void
     {
@@ -60,10 +57,13 @@ class ManualSyncRateLimitTest extends TestCase
 
         $url = route('repositories.sync', $repository->full_name);
 
+        // Laravel's throttle middleware: requests 1–10 pass + increment,
+        // request 11 hits `tooManyAttempts(10 >= 10)` → 429. Strict
+        // equality so an off-by-one regression in a future Laravel
+        // upgrade fails loudly.
         $crossed = $this->hammer($url, 12, $user);
 
-        // 10 requests pass; the 11th gets 429.
-        $this->assertLessThanOrEqual(11, $crossed);
+        $this->assertSame(11, $crossed);
     }
 
     public function test_repositories_sync_all_throttled_at_2_per_minute(): void
@@ -76,7 +76,7 @@ class ManualSyncRateLimitTest extends TestCase
 
         $crossed = $this->hammer($url, 4, $user);
 
-        $this->assertLessThanOrEqual(3, $crossed);
+        $this->assertSame(3, $crossed);
     }
 
     public function test_website_probe_throttled_at_20_per_minute(): void
@@ -90,7 +90,7 @@ class ManualSyncRateLimitTest extends TestCase
 
         $crossed = $this->hammer($url, 22, $user);
 
-        $this->assertLessThanOrEqual(21, $crossed);
+        $this->assertSame(21, $crossed);
     }
 
     public function test_webhook_delivery_retry_throttled_at_30_per_minute(): void
@@ -106,7 +106,7 @@ class ManualSyncRateLimitTest extends TestCase
 
         $crossed = $this->hammer($url, 32, $user);
 
-        $this->assertLessThanOrEqual(31, $crossed);
+        $this->assertSame(31, $crossed);
     }
 
     public function test_throttled_response_carries_retry_after_header(): void

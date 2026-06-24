@@ -80,6 +80,13 @@ class AuthenticateAgent
         // User-Agent). First successful request binds; subsequent
         // requests must match. Skipped when the opt-in is off, which
         // is the default for backward compatibility.
+        //
+        // The rate-limit gate above runs FIRST by design: a wrong-
+        // fingerprint flood is capped at 60 req/min by the per-token
+        // bucket before it can pump `activity_events`. The dedupe
+        // bucket on `recordAuthFailure` is a second layer of defense
+        // (1 event/min per IP+reason), but the rate-limit is the
+        // primary throttle.
         if ($token->fingerprint_enabled) {
             $expected = self::fingerprint($request);
 
