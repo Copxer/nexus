@@ -2,6 +2,9 @@
 
 namespace Tests\Feature\Security;
 
+use App\Domain\Monitoring\Actions\RunWebsiteProbeAction;
+use App\Domain\Monitoring\Probes\WebsiteProbeResult;
+use App\Enums\WebsiteCheckStatus;
 use App\Models\Project;
 use App\Models\Repository;
 use App\Models\User;
@@ -85,6 +88,27 @@ class ManualSyncRateLimitTest extends TestCase
         $user = $this->verifiedUser();
         $project = Project::factory()->create(['owner_user_id' => $user->id]);
         $website = Website::factory()->create(['project_id' => $project->id]);
+
+        // Stub the probe action so each request completes in ms.
+        // Without this, CI's network-less environment makes every
+        // probe time out at ~10s, the 22-call loop runs 220s, and
+        // the 60s throttle window resets mid-loop — the test then
+        // fails because no request ever hits 429.
+        $this->app->bind(
+            RunWebsiteProbeAction::class,
+            fn () => new class
+            {
+                public function execute(Website $website): WebsiteProbeResult
+                {
+                    return new WebsiteProbeResult(
+                        status: WebsiteCheckStatus::Up,
+                        httpStatusCode: 200,
+                        responseTimeMs: 50,
+                        errorMessage: null,
+                    );
+                }
+            },
+        );
 
         $url = route('monitoring.websites.probe', $website->id);
 
