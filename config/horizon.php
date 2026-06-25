@@ -251,4 +251,22 @@ return [
         'composer.json',
         '.env',
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Production Dashboard Allow-List (spec 039)
+    |--------------------------------------------------------------------------
+    |
+    | Comma-separated emails from the `HORIZON_ALLOW_LIST` env var.
+    | Consulted by `HorizonServiceProvider::gate()` when the app is
+    | not in `local` / `testing` env. Empty list = no access — fail
+    | closed. The deploy flow MUST populate this before the
+    | dashboard is reachable.
+    |
+    */
+
+    'allow_list' => array_values(array_filter(array_map(
+        'trim',
+        explode(',', (string) env('HORIZON_ALLOW_LIST', '')),
+    ))),
 ];

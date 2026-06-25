@@ -21,6 +21,8 @@ class AgentToken extends Model
         'host_id',
         'name',
         'hashed_token',
+        'fingerprint_enabled',
+        'fingerprint_hash',
         'last_used_at',
         'revoked_at',
         'created_by_user_id',
@@ -28,15 +30,19 @@ class AgentToken extends Model
 
     /**
      * The hash is the secret — keep it out of every default
-     * serialisation (Inertia props, JSON, logs).
+     * serialisation (Inertia props, JSON, logs). The fingerprint
+     * hash is also secret-adjacent (an attacker who learned it
+     * could craft a matching request).
      */
     protected $hidden = [
         'hashed_token',
+        'fingerprint_hash',
     ];
 
     protected function casts(): array
     {
         return [
+            'fingerprint_enabled' => 'boolean',
             'last_used_at' => 'datetime',
             'revoked_at' => 'datetime',
         ];

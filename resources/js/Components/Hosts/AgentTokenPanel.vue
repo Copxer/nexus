@@ -48,11 +48,15 @@ const copyToClipboard = async () => {
     }
 };
 
+// Spec 039 — opt-in fingerprint binding. Checkbox controls whether
+// the new token binds to the first observed IP + User-Agent.
+const fingerprintEnabled = ref(false);
+
 const issueToken = () => {
     if (!props.canManageTokens) return;
     router.post(
         route('monitoring.hosts.tokens.store', props.hostId),
-        {},
+        { fingerprint_enabled: fingerprintEnabled.value },
         { preserveScroll: true },
     );
 };
@@ -191,6 +195,25 @@ const revokeToken = () => {
             v-if="canManageTokens"
             class="flex flex-wrap items-center justify-end gap-2"
         >
+            <!-- Spec 039 — opt-in fingerprint binding. Only shown
+                 on the initial issue path; rotation carries the
+                 existing flag forward automatically. Operators who
+                 want to flip it revoke + re-issue. -->
+            <label
+                v-if="!activeToken"
+                class="mr-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-text-muted"
+                :title="
+                    'Lock this token to the first IP + User-Agent that uses it. ' +
+                    'Tighter security, but a host migration needs a fresh token.'
+                "
+            >
+                <input
+                    v-model="fingerprintEnabled"
+                    type="checkbox"
+                    class="h-4 w-4 rounded border-border-subtle bg-background-panel-hover text-accent-cyan focus:ring-accent-cyan/60"
+                >
+                Bind to first IP + agent
+            </label>
             <PrimaryButton
                 v-if="!activeToken"
                 type="button"

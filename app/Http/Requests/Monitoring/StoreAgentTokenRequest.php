@@ -25,6 +25,10 @@ class StoreAgentTokenRequest extends FormRequest
     {
         return [
             'name' => ['nullable', 'string', 'max:80'],
+            // Spec 039 — opt-in fingerprint binding. Falls back to
+            // false (off) when the form field is missing so existing
+            // clients keep working.
+            'fingerprint_enabled' => ['sometimes', 'boolean'],
         ];
     }
 }

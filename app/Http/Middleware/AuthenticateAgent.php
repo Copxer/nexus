@@ -75,8 +75,33 @@ class AuthenticateAgent
         }
         RateLimiter::hit($key, 60);
 
-        // Stamped after the rate-limit check so a flood of throttled
-        // requests doesn't keep the token's last_used_at fresh.
+        // Spec 039 — opt-in fingerprint binding. Token issuance can
+        // request a per-request fingerprint check (sha256 of IP +
+        // User-Agent). First successful request binds; subsequent
+        // requests must match. Skipped when the opt-in is off, which
+        // is the default for backward compatibility.
+        //
+        // The rate-limit gate above runs FIRST by design: a wrong-
+        // fingerprint flood is capped at 60 req/min by the per-token
+        // bucket before it can pump `activity_events`. The dedupe
+        // bucket on `recordAuthFailure` is a second layer of defense
+        // (1 event/min per IP+reason), but the rate-limit is the
+        // primary throttle.
+        if ($token->fingerprint_enabled) {
+            $expected = self::fingerprint($request);
+
+            if ($token->fingerprint_hash === null) {
+                $token->forceFill(['fingerprint_hash' => $expected])->save();
+            } elseif (! hash_equals($token->fingerprint_hash, $expected)) {
+                $this->recordAuthFailure($request, 'fingerprint_mismatch');
+
+                return response('', 401);
+            }
+        }
+
+        // Stamped after the rate-limit + fingerprint checks so a flood
+        // of throttled or mismatched requests doesn't keep the token's
+        // last_used_at fresh.
         $token->forceFill(['last_used_at' => now()])->save();
 
         $request->attributes->set('agent_host', $token->host);
@@ -92,6 +117,22 @@ class AuthenticateAgent
     public static function rateLimitKey(AgentToken $token): string
     {
         return 'agent-telemetry:'.$token->getKey();
+    }
+
+    /**
+     * Spec 039 — per-request fingerprint hash. Combines the client
+     * IP and User-Agent string; not a strong identifier on its own
+     * (a determined attacker who already has the token can spoof
+     * both), but raises the bar against casual token leakage.
+     *
+     * Public + static so tests can pin the hash deterministically.
+     */
+    public static function fingerprint(Request $request): string
+    {
+        return hash(
+            'sha256',
+            ($request->ip() ?? '').'|'.($request->userAgent() ?? ''),
+        );
     }
 
     /**
