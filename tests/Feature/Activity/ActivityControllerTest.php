@@ -5,7 +5,6 @@ namespace Tests\Feature\Activity;
 use App\Models\ActivityEvent;
 use App\Models\Project;
 use App\Models\Repository;
-use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia;
 use Tests\TestCase;
@@ -13,11 +12,6 @@ use Tests\TestCase;
 class ActivityControllerTest extends TestCase
 {
     use RefreshDatabase;
-
-    private function verifiedUser(): User
-    {
-        return User::factory()->create(['email_verified_at' => now()]);
-    }
 
     public function test_index_renders_with_events_scoped_to_the_user(): void
     {

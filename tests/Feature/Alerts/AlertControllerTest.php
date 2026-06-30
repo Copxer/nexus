@@ -7,7 +7,6 @@ use App\Enums\AlertSource;
 use App\Models\Alert;
 use App\Models\Host;
 use App\Models\Project;
-use App\Models\User;
 use App\Models\Website;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia;
@@ -16,11 +15,6 @@ use Tests\TestCase;
 class AlertControllerTest extends TestCase
 {
     use RefreshDatabase;
-
-    private function verifiedUser(): User
-    {
-        return User::factory()->create(['email_verified_at' => now()]);
-    }
 
     public function test_index_lists_open_alerts_under_users_projects_by_default(): void
     {

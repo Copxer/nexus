@@ -24,6 +24,9 @@ class DatabaseSeeder extends Seeder
         ]);
 
         $this->call(ProjectSeeder::class);
-        $this->call(RepositorySeeder::class);
+        $this->call(RepositorySeeder::class); // also seeds issues + PRs + workflow runs
+        $this->call(HostSeeder::class);       // spec 040 — 2 hosts (1 online + 1 offline)
+        $this->call(WebsiteSeeder::class);    // spec 040 — 3 websites with 20m check history
+        $this->call(AlertSeeder::class);      // spec 040 — 4 alerts across the lifecycle
     }
 }

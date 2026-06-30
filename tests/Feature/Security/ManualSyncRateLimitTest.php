@@ -25,11 +25,6 @@ class ManualSyncRateLimitTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function verifiedUser(): User
-    {
-        return User::factory()->create(['email_verified_at' => now()]);
-    }
-
     private function hammer(string $url, int $count, User $user): int
     {
         // Returns the HTTP status of the request that crosses the limit.

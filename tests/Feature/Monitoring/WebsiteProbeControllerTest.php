@@ -5,7 +5,6 @@ namespace Tests\Feature\Monitoring;
 use App\Enums\WebsiteCheckStatus;
 use App\Enums\WebsiteStatus;
 use App\Models\Project;
-use App\Models\User;
 use App\Models\Website;
 use App\Models\WebsiteCheck;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -15,11 +14,6 @@ use Tests\TestCase;
 class WebsiteProbeControllerTest extends TestCase
 {
     use RefreshDatabase;
-
-    private function verifiedUser(): User
-    {
-        return User::factory()->create(['email_verified_at' => now()]);
-    }
 
     public function test_owner_can_probe_and_a_check_is_persisted(): void
     {

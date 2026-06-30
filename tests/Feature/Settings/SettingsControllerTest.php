@@ -3,7 +3,6 @@
 namespace Tests\Feature\Settings;
 
 use App\Models\GithubConnection;
-use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia;
 use Tests\TestCase;
@@ -11,11 +10,6 @@ use Tests\TestCase;
 class SettingsControllerTest extends TestCase
 {
     use RefreshDatabase;
-
-    private function verifiedUser(): User
-    {
-        return User::factory()->create(['email_verified_at' => now()]);
-    }
 
     public function test_settings_page_renders_disconnected_state_for_users_without_a_connection(): void
     {

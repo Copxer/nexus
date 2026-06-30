@@ -11,11 +11,6 @@ class ProjectPolicyTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function verifiedUser(): User
-    {
-        return User::factory()->create(['email_verified_at' => now()]);
-    }
-
     public function test_non_owner_cannot_update_or_delete(): void
     {
         $owner = $this->verifiedUser();

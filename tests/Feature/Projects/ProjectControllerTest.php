@@ -6,7 +6,6 @@ use App\Models\ActivityEvent;
 use App\Models\Host;
 use App\Models\Project;
 use App\Models\Repository;
-use App\Models\User;
 use App\Models\Website;
 use App\Models\WorkflowRun;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -16,11 +15,6 @@ use Tests\TestCase;
 class ProjectControllerTest extends TestCase
 {
     use RefreshDatabase;
-
-    private function verifiedUser(): User
-    {
-        return User::factory()->create(['email_verified_at' => now()]);
-    }
 
     public function test_index_lists_projects_for_a_verified_user(): void
     {

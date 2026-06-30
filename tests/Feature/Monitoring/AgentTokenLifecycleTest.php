@@ -7,7 +7,6 @@ use App\Domain\Docker\Actions\RotateAgentTokenAction;
 use App\Models\AgentToken;
 use App\Models\Host;
 use App\Models\Project;
-use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Log;
 use Tests\TestCase;
@@ -15,11 +14,6 @@ use Tests\TestCase;
 class AgentTokenLifecycleTest extends TestCase
 {
     use RefreshDatabase;
-
-    private function verifiedUser(): User
-    {
-        return User::factory()->create(['email_verified_at' => now()]);
-    }
 
     public function test_issue_returns_plaintext_once_and_persists_only_the_hash(): void
     {

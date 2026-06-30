@@ -4,7 +4,6 @@ namespace Tests\Feature\Middleware;
 
 use App\Models\Alert;
 use App\Models\Project;
-use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia;
 use Tests\TestCase;
@@ -19,11 +18,6 @@ use Tests\TestCase;
 class HandleInertiaRequestsTest extends TestCase
 {
     use RefreshDatabase;
-
-    private function verifiedUser(): User
-    {
-        return User::factory()->create(['email_verified_at' => now()]);
-    }
 
     public function test_alerts_active_count_counts_open_plus_acknowledged_for_the_auth_user(): void
     {

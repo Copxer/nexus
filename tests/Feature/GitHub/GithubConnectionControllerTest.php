@@ -3,7 +3,6 @@
 namespace Tests\Feature\GitHub;
 
 use App\Models\GithubConnection;
-use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -11,11 +10,6 @@ use Tests\TestCase;
 class GithubConnectionControllerTest extends TestCase
 {
     use RefreshDatabase;
-
-    private function verifiedUser(): User
-    {
-        return User::factory()->create(['email_verified_at' => now()]);
-    }
 
     public function test_redirect_sends_user_to_github_with_state_in_session(): void
     {
