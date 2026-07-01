@@ -1,10 +1,10 @@
 ---
 spec: core-flow-test-coverage
 phase: 9
-status: in-progress   # not-started | in-progress | blocked | done
+status: done   # not-started | in-progress | blocked | done
 owner: Yoany
 created: 2026-06-25
-updated: 2026-06-25
+updated: 2026-07-01
 ---
 
 # 040 — Core-flow test coverage + believable seeder
