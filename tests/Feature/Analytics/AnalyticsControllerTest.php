@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\Analytics;
 
-use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia;
 use Tests\TestCase;
@@ -10,11 +9,6 @@ use Tests\TestCase;
 class AnalyticsControllerTest extends TestCase
 {
     use RefreshDatabase;
-
-    private function verifiedUser(): User
-    {
-        return User::factory()->create(['email_verified_at' => now()]);
-    }
 
     public function test_renders_for_a_verified_user_with_default_range(): void
     {

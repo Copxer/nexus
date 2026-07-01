@@ -14,11 +14,6 @@ class DeploymentControllerTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function verifiedUser(): User
-    {
-        return User::factory()->create(['email_verified_at' => now()]);
-    }
-
     public function test_unauthenticated_user_is_redirected(): void
     {
         $this->get(route('deployments.index'))

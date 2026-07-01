@@ -3,8 +3,11 @@
 namespace Database\Seeders;
 
 use App\Enums\RepositorySyncStatus;
+use App\Models\GithubIssue;
+use App\Models\GithubPullRequest;
 use App\Models\Project;
 use App\Models\Repository;
+use App\Models\WorkflowRun;
 use Illuminate\Database\Seeder;
 
 /**
@@ -83,6 +86,36 @@ class RepositorySeeder extends Seeder
                     ],
                 );
             }
+        }
+
+        // Spec 040 — drop a small mix of issues / PRs / workflow
+        // runs onto each seeded repository so the Work Items page,
+        // the Deployments timeline, and the repository Show tabs
+        // all render with believable data on a fresh `db:seed`.
+        $this->seedWorkItems();
+    }
+
+    private function seedWorkItems(): void
+    {
+        $repositories = Repository::query()
+            ->where('sync_status', RepositorySyncStatus::Synced->value)
+            ->get();
+
+        foreach ($repositories as $repo) {
+            GithubIssue::factory()
+                ->count(5)
+                ->create(['repository_id' => $repo->id]);
+
+            GithubPullRequest::factory()
+                ->count(3)
+                ->create(['repository_id' => $repo->id]);
+
+            WorkflowRun::factory()
+                ->count(4)
+                ->create([
+                    'repository_id' => $repo->id,
+                    'head_branch' => 'main',
+                ]);
         }
     }
 }

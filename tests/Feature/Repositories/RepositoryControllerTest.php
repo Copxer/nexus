@@ -9,7 +9,6 @@ use App\Models\GithubIssue;
 use App\Models\GithubPullRequest;
 use App\Models\Project;
 use App\Models\Repository;
-use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Inertia\Testing\AssertableInertia;
@@ -18,11 +17,6 @@ use Tests\TestCase;
 class RepositoryControllerTest extends TestCase
 {
     use RefreshDatabase;
-
-    private function verifiedUser(): User
-    {
-        return User::factory()->create(['email_verified_at' => now()]);
-    }
 
     public function test_index_lists_all_repositories(): void
     {

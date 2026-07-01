@@ -3,7 +3,6 @@
 namespace Tests\Feature\Settings;
 
 use App\Enums\WebhookDeliveryStatus;
-use App\Models\User;
 use App\Models\WebhookDelivery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia;
@@ -12,11 +11,6 @@ use Tests\TestCase;
 class WebhookDeliveriesIndexTest extends TestCase
 {
     use RefreshDatabase;
-
-    private function verifiedUser(): User
-    {
-        return User::factory()->create(['email_verified_at' => now()]);
-    }
 
     public function test_index_renders_for_a_verified_user(): void
     {

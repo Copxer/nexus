@@ -4,7 +4,6 @@ namespace Tests\Feature\Settings;
 
 use App\Domain\GitHub\Jobs\ProcessGitHubWebhookJob;
 use App\Enums\WebhookDeliveryStatus;
-use App\Models\User;
 use App\Models\WebhookDelivery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
@@ -13,11 +12,6 @@ use Tests\TestCase;
 class WebhookDeliveryRetryTest extends TestCase
 {
     use RefreshDatabase;
-
-    private function verifiedUser(): User
-    {
-        return User::factory()->create(['email_verified_at' => now()]);
-    }
 
     public function test_retry_flips_failed_delivery_back_to_received_and_dispatches_job(): void
     {

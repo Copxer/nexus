@@ -14,11 +14,6 @@ class RepositorySyncAllControllerTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function verifiedUser(): User
-    {
-        return User::factory()->create(['email_verified_at' => now()]);
-    }
-
     public function test_it_queues_a_sync_job_for_each_of_the_users_repositories(): void
     {
         Queue::fake();

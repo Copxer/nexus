@@ -4,18 +4,12 @@ namespace Tests\Feature\Monitoring;
 
 use App\Models\Host;
 use App\Models\Project;
-use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class HostPolicyTest extends TestCase
 {
     use RefreshDatabase;
-
-    private function verifiedUser(): User
-    {
-        return User::factory()->create(['email_verified_at' => now()]);
-    }
 
     public function test_create_requires_a_project_the_user_owns(): void
     {

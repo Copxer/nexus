@@ -21,11 +21,6 @@ class SharedActivityPropTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function verifiedUser(): User
-    {
-        return User::factory()->create(['email_verified_at' => now()]);
-    }
-
     public function test_authenticated_request_sees_activity_recent_populated(): void
     {
         $user = $this->verifiedUser();

@@ -7,18 +7,12 @@ use App\Enums\AlertStatus;
 use App\Models\ActivityEvent;
 use App\Models\Alert;
 use App\Models\Project;
-use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class AlertResolveControllerTest extends TestCase
 {
     use RefreshDatabase;
-
-    private function verifiedUser(): User
-    {
-        return User::factory()->create(['email_verified_at' => now()]);
-    }
 
     public function test_owner_can_resolve_an_open_alert_and_emits_activity(): void
     {

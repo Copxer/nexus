@@ -5,18 +5,12 @@ namespace Tests\Feature\Alerts;
 use App\Enums\AlertStatus;
 use App\Models\Alert;
 use App\Models\Project;
-use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class AlertAcknowledgeControllerTest extends TestCase
 {
     use RefreshDatabase;
-
-    private function verifiedUser(): User
-    {
-        return User::factory()->create(['email_verified_at' => now()]);
-    }
 
     public function test_owner_can_acknowledge_an_open_alert(): void
     {

@@ -14,11 +14,6 @@ class WebsiteControllerTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function verifiedUser(): User
-    {
-        return User::factory()->create(['email_verified_at' => now()]);
-    }
-
     public function test_index_lists_websites_under_users_projects(): void
     {
         $user = $this->verifiedUser();
