@@ -15,6 +15,7 @@ use App\Http\Controllers\Monitoring\HostController;
 use App\Http\Controllers\Monitoring\WebsiteController;
 use App\Http\Controllers\Monitoring\WebsiteProbeController;
 use App\Http\Controllers\OverviewController;
+use App\Http\Controllers\PaletteSearchController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\RepositoryController;
@@ -60,6 +61,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->where(['repository' => '[\w.-]+/[\w.-]+']);
 
     Route::get('/settings', SettingsController::class)->name('settings.index');
+
+    // Spec 043 — command palette async search. Debounced client-side
+    // (200ms); throttled server-side (30/min per §5 operator checklist).
+    Route::get('/palette/search', PaletteSearchController::class)
+        ->middleware('throttle:30,1')
+        ->name('palette.search');
 
     // Spec 036 — per-user theme preference. The persisted value
     // surfaces via `auth.user.theme` (HandleInertiaRequests); the

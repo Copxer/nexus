@@ -39,7 +39,34 @@ export type PageProps<
     alerts?: {
         activeCount: number;
     } | null;
+    /**
+     * Spec 043 — pre-loaded command palette entity bundle. Each list
+     * is bounded (50 projects, 100 repos, 50 hosts, 50 websites) so
+     * the shared prop stays cheap even for heavy users. `null` for
+     * guests.
+     */
+    palette?: {
+        entities: {
+            projects: PaletteEntity[];
+            repositories: PaletteEntity[];
+            hosts: PaletteEntity[];
+            websites: PaletteEntity[];
+        };
+    } | null;
 };
+
+/**
+ * Serialized entity row surfaced by `GetPaletteEntitiesQuery`. The
+ * shape is deliberately narrow — enough to render a palette row
+ * (label + subtitle + keywords) and navigate on click (url), no more.
+ */
+export interface PaletteEntity {
+    id: number;
+    label: string;
+    subtitle: string | null;
+    keywords: string[];
+    url: string;
+}
 
 /**
  * Status token used by KPI cards and other dashboard widgets to drive

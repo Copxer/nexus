@@ -23,7 +23,7 @@ live.
 | # | Task | Status |
 |---|------|--------|
 | 042 | `AlertNotificationService` — email + Slack + generic webhook channels, per-user routing preferences (severity, source, channel), rate-limit + dedupe, delivery observability | 🟢 |
-| 043 | Global command palette — `Cmd+K` fuzzy search across routes + entities (projects, repos, alerts, hosts, websites) via a shared indexer, keyboard-only navigation, recent actions | ⬜ |
+| 043 | Global command palette — `Cmd+K` fuzzy search across routes + entities (projects, repos, alerts, hosts, websites) via a shared indexer, keyboard-only navigation, recent actions | 🟢 |
 | 044 | AI daily briefing — LLM-generated morning digest ("yesterday: X new issues, Y merged PRs, Z alerts, N things that look off"), delivered via spec 042, per-user opt-in + delivery time | ⬜ |
 | 045 | AI PR risk score + project health explanation — LLM-scored PR risk tag on webhook arrival, natural-language "why" overlay on Phase 8 health-score card | ⬜ |
 | 046 | User-tunable health-score weights + metric-driven alert rules — settings page for Phase 8's formula, §6.8 specification pattern for alert evaluators (queue backlog trend, deploy frequency drop, uptime slope) | ⬜ |

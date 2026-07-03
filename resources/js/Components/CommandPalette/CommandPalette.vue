@@ -1,15 +1,23 @@
 <script setup lang="ts">
 import CommandPaletteRow from '@/Components/CommandPalette/CommandPaletteRow.vue';
 import {
+    buildAsyncCommands,
+    buildEntityCommands,
     commandGroupLabels,
     compareGroups,
     getCommands,
+    pickRecentCommands,
     type Command,
     type CommandGroup,
+    type PaletteEntityBundle,
 } from '@/lib/commands';
 import { fuzzyMatch } from '@/lib/fuzzyMatch';
-import { Search } from 'lucide-vue-next';
+import { getRecentCommandIds, pushRecentCommand } from '@/lib/paletteRecent';
+import { searchPaletteEntities } from '@/lib/paletteSearch';
+import { router, usePage } from '@inertiajs/vue3';
+import { Loader2, Search } from 'lucide-vue-next';
 import { computed, nextTick, ref, watch } from 'vue';
+import type { PageProps } from '@/types';
 
 const props = defineProps<{
     open: boolean;
@@ -19,7 +27,37 @@ const emit = defineEmits<{
     (e: 'close'): void;
 }>();
 
-const commands = getCommands();
+const staticCommands = getCommands();
+
+/**
+ * Pre-loaded entity bundle shared by `HandleInertiaRequests` (spec 043).
+ * Empty bundle when the user hasn't created any entities yet — still
+ * safe to iterate.
+ */
+const entityBundle = computed<PaletteEntityBundle | null>(() => {
+    const page = usePage<PageProps>();
+    return page.props.palette?.entities ?? null;
+});
+
+const entityCommands = computed<Command[]>(() =>
+    buildEntityCommands(entityBundle.value),
+);
+
+/** Async server-side search results, refreshed on debounce. */
+const asyncResults = ref<Command[]>([]);
+const asyncLoading = ref(false);
+let asyncAbort: AbortController | null = null;
+let debounceHandle: ReturnType<typeof setTimeout> | null = null;
+
+const recentCommands = ref<Command[]>([]);
+
+/** Rebuild the recent-commands slice from localStorage. */
+const refreshRecent = () => {
+    recentCommands.value = pickRecentCommands(
+        staticCommands,
+        getRecentCommandIds(),
+    );
+};
 
 const query = ref('');
 const highlightedIndex = ref(0);
@@ -37,16 +75,29 @@ const mouseMovedSinceOpen = ref(false);
 let returnFocusTo: HTMLElement | null = null;
 
 /**
- * Filter + score commands. Empty query returns the full registry in
- * declaration order (stable). Non-empty query runs fuzzyMatch against
- * label + keywords, drops misses, sorts by score (desc), and pushes
- * disabled rows to the bottom of each group so real matches come first.
+ * Filter + score commands.
+ *
+ * Empty query: recent (if any) + full static registry in declaration
+ * order. Entity groups are skipped because rendering hundreds of
+ * pre-loaded entities without a query would be noise.
+ *
+ * Non-empty query: fuzzy-match against static + entity + async pools,
+ * drop misses, sort by score (desc), push disabled rows to bottom.
  */
 const filtered = computed<Command[]>(() => {
     const q = query.value.trim();
-    if (!q) return commands;
 
-    const scored = fuzzyMatch(commands, q, (c) => [c.label, ...(c.keywords ?? [])]);
+    if (!q) {
+        return [...recentCommands.value, ...staticCommands];
+    }
+
+    const pool: Command[] = [
+        ...staticCommands,
+        ...entityCommands.value,
+        ...asyncResults.value,
+    ];
+
+    const scored = fuzzyMatch(pool, q, (c) => [c.label, ...(c.keywords ?? [])]);
     return scored
         .sort((a, b) => {
             // Disabled rows always sink below enabled rows.
@@ -58,12 +109,44 @@ const filtered = computed<Command[]>(() => {
         .map(({ item }) => item);
 });
 
+/** Result cap per entity group so a single project's 100 repos can't
+ *  push everything else off-screen. */
+const PER_GROUP_CAP = 8;
+
+/** Which groups are entity groups — subject to the per-group cap. */
+const ENTITY_GROUPS: readonly CommandGroup[] = [
+    'projects',
+    'repositories',
+    'hosts',
+    'websites',
+    'workItems',
+    'alerts',
+];
+
+/** Where the "Show all N" overflow row navigates for each entity kind. */
+const OVERFLOW_URL_BUILDERS: Partial<Record<CommandGroup, (q: string) => string>> = {
+    projects: () => route('projects.index'),
+    repositories: () => route('repositories.index'),
+    hosts: () => route('monitoring.hosts.index'),
+    websites: () => route('monitoring.websites.index'),
+    workItems: (q) => `${route('work-items.index')}?q=${encodeURIComponent(q)}`,
+    alerts: () => route('alerts.index'),
+};
+
+const overflowUrl = (group: CommandGroup): string | null => {
+    const builder = OVERFLOW_URL_BUILDERS[group];
+    return builder ? builder(query.value.trim()) : null;
+};
+
 /**
  * Group filtered commands for rendering. Returns an array of
- * `{ group, items }` in stable group order so the layout doesn't jitter
- * as the filter changes.
+ * `{ group, items, hiddenCount }` in stable group order so the layout
+ * doesn't jitter as the filter changes. Entity groups get capped at
+ * PER_GROUP_CAP with a `hiddenCount` marker surfaced by the template.
  */
-const grouped = computed<{ group: CommandGroup; items: Command[] }[]>(() => {
+const grouped = computed<
+    { group: CommandGroup; items: Command[]; hiddenCount: number }[]
+>(() => {
     const buckets = new Map<CommandGroup, Command[]>();
     for (const cmd of filtered.value) {
         if (!buckets.has(cmd.group)) buckets.set(cmd.group, []);
@@ -71,7 +154,16 @@ const grouped = computed<{ group: CommandGroup; items: Command[] }[]>(() => {
     }
     return [...buckets.entries()]
         .sort(([a], [b]) => compareGroups(a, b))
-        .map(([group, items]) => ({ group, items }));
+        .map(([group, items]) => {
+            if (ENTITY_GROUPS.includes(group) && items.length > PER_GROUP_CAP) {
+                return {
+                    group,
+                    items: items.slice(0, PER_GROUP_CAP),
+                    hiddenCount: items.length - PER_GROUP_CAP,
+                };
+            }
+            return { group, items, hiddenCount: 0 };
+        });
 });
 
 const noMatches = computed(() => filtered.value.length === 0);
@@ -88,16 +180,71 @@ watch(
         if (isOpen) {
             returnFocusTo = document.activeElement as HTMLElement | null;
             query.value = '';
+            asyncResults.value = [];
+            asyncLoading.value = false;
+            refreshRecent();
             highlightedIndex.value = firstEnabledIndex.value;
             mouseMovedSinceOpen.value = false;
             await nextTick();
             inputRef.value?.focus();
-        } else if (returnFocusTo && document.contains(returnFocusTo)) {
-            returnFocusTo.focus();
-            returnFocusTo = null;
+        } else {
+            // Cancel any in-flight async request when the palette closes.
+            asyncAbort?.abort();
+            asyncAbort = null;
+            if (debounceHandle) {
+                clearTimeout(debounceHandle);
+                debounceHandle = null;
+            }
+            if (returnFocusTo && document.contains(returnFocusTo)) {
+                returnFocusTo.focus();
+                returnFocusTo = null;
+            }
         }
     },
 );
+
+/**
+ * Debounced async server-side search. Fires 200ms after the last
+ * keystroke; aborts any in-flight request when a new keystroke lands.
+ * A two-character floor matches the server-side guard.
+ */
+watch(query, (next) => {
+    if (debounceHandle) {
+        clearTimeout(debounceHandle);
+        debounceHandle = null;
+    }
+    asyncAbort?.abort();
+    asyncAbort = null;
+
+    const trimmed = next.trim();
+    if (trimmed.length < 2) {
+        asyncResults.value = [];
+        asyncLoading.value = false;
+        return;
+    }
+
+    debounceHandle = setTimeout(async () => {
+        const controller = new AbortController();
+        asyncAbort = controller;
+        asyncLoading.value = true;
+
+        try {
+            const results = await searchPaletteEntities(trimmed, controller.signal);
+            if (asyncAbort === controller) {
+                asyncResults.value = buildAsyncCommands(
+                    results.workItems,
+                    results.alerts,
+                );
+                asyncLoading.value = false;
+            }
+        } catch {
+            if (asyncAbort === controller) {
+                asyncResults.value = [];
+                asyncLoading.value = false;
+            }
+        }
+    }, 200);
+});
 
 // Whenever the filter changes, reset the highlight to the first enabled row
 // so the user always sees a meaningful preselection after typing.
@@ -128,14 +275,43 @@ const moveHighlight = (delta: number) => {
 const runHighlighted = () => {
     const cmd = filtered.value[highlightedIndex.value];
     if (!cmd || cmd.disabled || !cmd.run) return;
+    trackRecent(cmd);
     cmd.run();
     emit('close');
 };
 
 const runCommand = (cmd: Command) => {
     if (cmd.disabled || !cmd.run) return;
+    trackRecent(cmd);
     cmd.run();
     emit('close');
+};
+
+/** Overflow row click: navigate to the entity's index page with the
+ *  current query preserved as a filter (where the target index supports one).
+ */
+const runOverflow = (group: CommandGroup) => {
+    const url = overflowUrl(group);
+    if (!url) return;
+    router.visit(url);
+    emit('close');
+};
+
+/**
+ * Only static commands land in Recent. Entity rows (projects, repos,
+ * hosts, websites, work items, alerts) skip tracking because they're
+ * already bookmarks in the sidebar / URL; surfacing them in Recent
+ * would push out the actually-repeated actions.
+ *
+ * A `recent-*` row that the user re-runs from the Recent group maps
+ * back to its canonical id so bumping doesn't create dupes.
+ */
+const trackRecent = (cmd: Command) => {
+    if (cmd.isEntity) return;
+    const canonicalId = cmd.id.startsWith('recent-')
+        ? cmd.id.slice('recent-'.length)
+        : cmd.id;
+    pushRecentCommand(canonicalId);
 };
 
 const onKeydown = (event: KeyboardEvent) => {
@@ -230,7 +406,19 @@ const indexOf = (cmd: Command) => filtered.value.indexOf(cmd);
                         spellcheck="false"
                         class="min-w-0 flex-1 border-0 bg-transparent p-0 text-sm text-text-primary placeholder:text-text-muted focus:border-transparent focus:outline-none focus:ring-0"
                     />
+                    <!-- Spec 043 — async search loading indicator. Announces to
+                         SRs via role="status" + aria-live. -->
+                    <span
+                        v-if="asyncLoading"
+                        role="status"
+                        aria-live="polite"
+                        class="shrink-0 text-text-muted"
+                        aria-label="Searching…"
+                    >
+                        <Loader2 class="h-4 w-4 animate-spin" aria-hidden="true" />
+                    </span>
                     <kbd
+                        v-else
                         class="hidden shrink-0 rounded border border-border-subtle bg-slate-950/40 px-1.5 py-0.5 font-mono text-[10px] text-text-muted sm:inline-block"
                     >
                         Esc
@@ -273,6 +461,21 @@ const indexOf = (cmd: Command) => filtered.value.indexOf(cmd);
                                     }
                                 "
                             />
+                            <li
+                                v-if="bucket.hiddenCount > 0"
+                                :class="[
+                                    'flex cursor-pointer items-center gap-3 rounded-lg px-4 py-1.5 text-[11px] text-text-muted transition',
+                                    'hover:bg-background-panel-hover hover:text-text-primary',
+                                    'focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60',
+                                ]"
+                                tabindex="0"
+                                role="option"
+                                @click="runOverflow(bucket.group)"
+                                @keydown.enter="runOverflow(bucket.group)"
+                            >
+                                Show all {{ bucket.items.length + bucket.hiddenCount }} in
+                                {{ commandGroupLabels[bucket.group] }} →
+                            </li>
                         </ul>
                     </template>
                 </div>
