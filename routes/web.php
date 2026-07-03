@@ -18,6 +18,10 @@ use App\Http\Controllers\OverviewController;
 use App\Http\Controllers\PaletteSearchController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\PublicStatus\ConfirmSubscriptionController;
+use App\Http\Controllers\PublicStatus\ShowController;
+use App\Http\Controllers\PublicStatus\SubscribeController;
+use App\Http\Controllers\PublicStatus\UnsubscribeController;
 use App\Http\Controllers\RepositoryController;
 use App\Http\Controllers\RepositoryIssuesSyncController;
 use App\Http\Controllers\RepositoryPullRequestsSyncController;
@@ -276,5 +280,22 @@ Route::middleware('auth')->group(function () {
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
+
+// Spec 047 — public status page + subscribers. Guest-safe;
+// throttled per §5 of the operator checklist. Placed at the bottom so
+// the auth-scoped `/settings/*` routes above shadow any accidental
+// name collision.
+Route::get('/status/{project:slug}', ShowController::class)
+    ->middleware('throttle:120,1')
+    ->name('public-status.show');
+Route::post('/status/{project:slug}/subscribe', SubscribeController::class)
+    ->middleware('throttle:20,1')
+    ->name('public-status.subscribe');
+Route::get('/status/{project:slug}/confirm/{token}', ConfirmSubscriptionController::class)
+    ->middleware('throttle:60,1')
+    ->name('public-status.confirm');
+Route::get('/status/subscribers/unsubscribe/{token}', UnsubscribeController::class)
+    ->middleware('throttle:60,1')
+    ->name('public-status.unsubscribe');
 
 require __DIR__.'/auth.php';

@@ -27,6 +27,8 @@ class Project extends Model
         'icon',
         'health_score',
         'last_activity_at',
+        'public_status_enabled',
+        'public_status_headline',
     ];
 
     protected function casts(): array
@@ -36,7 +38,13 @@ class Project extends Model
             'priority' => ProjectPriority::class,
             'health_score' => 'integer',
             'last_activity_at' => 'datetime',
+            'public_status_enabled' => 'boolean',
         ];
+    }
+
+    public function publicStatusSubscribers(): HasMany
+    {
+        return $this->hasMany(PublicStatusSubscriber::class);
     }
 
     /**

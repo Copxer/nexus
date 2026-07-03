@@ -33,6 +33,9 @@ class UpdateProjectRequest extends FormRequest
             'environment' => ['nullable', 'string', 'max:64'],
             'color' => ['nullable', Rule::in(ProjectPalette::COLORS)],
             'icon' => ['nullable', Rule::in(ProjectPalette::ICONS)],
+            // Spec 047 — per-project opt-in for the public status page.
+            'public_status_enabled' => ['sometimes', 'boolean'],
+            'public_status_headline' => ['sometimes', 'nullable', 'string', 'max:240'],
         ];
     }
 }

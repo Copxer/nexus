@@ -97,6 +97,10 @@ Per-user limits via Laravel's `throttle:N,1` middleware:
 | `POST /settings/rules` | 10/min (spec 046) |
 | `PATCH /settings/rules/{rule}` | 20/min (spec 046) |
 | `DELETE /settings/rules/{rule}` | 20/min (spec 046) |
+| `GET /status/{project:slug}` | 120/min (spec 047 — public traffic) |
+| `POST /status/{project:slug}/subscribe` | 20/min (spec 047) |
+| `GET /status/{project:slug}/confirm/{token}` | 60/min (spec 047) |
+| `GET /status/subscribers/unsubscribe/{token}` | 60/min (spec 047) |
 
 **Sign-off ☐:** Tested in
 [`ManualSyncRateLimitTest`](../../tests/Feature/Security/ManualSyncRateLimitTest.php).

@@ -218,6 +218,18 @@ class ProjectController extends Controller
                 'name' => $project->owner->name,
                 'initials' => $this->initialsFor($project->owner->name),
             ] : null,
+            // Spec 047 — surface the public status controls on the edit
+            // form. `subscriber_count` is a small aggregate for the
+            // operator's awareness; `public_url` renders once the toggle
+            // is on and the slug resolves.
+            'public_status_enabled' => (bool) $project->public_status_enabled,
+            'public_status_headline' => $project->public_status_headline,
+            'public_status_url' => $project->public_status_enabled
+                ? url("/status/{$project->slug}")
+                : null,
+            'public_status_subscriber_count' => $project->publicStatusSubscribers()
+                ->whereNotNull('confirmed_at')
+                ->count(),
         ];
     }
 
