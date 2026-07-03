@@ -11,9 +11,8 @@ Two things must be preserved:
 
 1. **The database** — every piece of state the app persists.
 2. **`.env`** — carries `APP_KEY`, which is the encryption key for
-   `github_connections.access_token`,
-   `github_connections.refresh_token`, and the `token` column on
-   the `github_webhook_deliveries` mirror.
+   `github_connections.access_token` and
+   `github_connections.refresh_token`.
 
 Everything else can be rebuilt from `git` + `composer install` +
 `npm run build`.
@@ -137,42 +136,53 @@ compromised in a breach.
 
 ## 4. Restore drill
 
-The full sequence for restoring onto a fresh host:
+The full sequence for restoring onto a fresh host. Order matters:
+`.env` (and `APP_KEY`) must be on-box **before** the DB restore, so
+the encrypted GitHub token columns can be read when the app boots.
 
 ```bash
 # 1. Provision the host per docs/installation.md steps 1-3.
 
-# 2. Restore .env FIRST.
+# 2. Fetch the code into the empty deploy directory.
+sudo mkdir -p /var/www/nexus
+sudo chown "$USER":"$USER" /var/www/nexus
+cd /var/www/nexus
+git clone https://github.com/Copxer/nexus.git .    # or your fork
+git checkout <deployed-tag>
+
+# 3. Restore .env into the deploy directory (BEFORE the DB restore,
+#    so APP_KEY is available to decrypt the github_connections rows).
 sudo cp /path/to/env-YYYY-MM-DD.decrypted /var/www/nexus/.env
 sudo chown www-data:www-data /var/www/nexus/.env
 sudo chmod 640 /var/www/nexus/.env
 
-# 3. Fetch the code + install deps.
-cd /var/www/nexus
-git clone https://github.com/Copxer/nexus.git .    # or your fork
-git checkout <deployed-tag>
+# 4. Install deps.
 composer install --no-dev --optimize-autoloader
 npm ci && npm run build
 
-# 4. Restore the database.
+# 5. Restore the database.
+#    The MySQL dump embeds `CREATE DATABASE`/`USE nexus` via
+#    `--databases`, so the target DB name comes from the dump itself
+#    -- restoring into a different DB name requires stripping those
+#    lines from the .sql first.
 
 # MySQL
 gunzip -c /path/to/db-YYYY-MM-DD.sql.gz \
-    | mysql --user=$DB_USERNAME --password nexus
+    | mysql --user=$DB_USERNAME --password
 
 # PostgreSQL
 pg_restore --username=$DB_USERNAME --dbname=nexus --clean \
     /path/to/db-YYYY-MM-DD.dump
 
-# 5. Verify migrations match the deployed code.
+# 6. Verify migrations match the deployed code.
 php artisan migrate:status
 # Every migration should say "Yes". If any say "No", run:
 php artisan migrate --force
 
-# 6. Rebuild caches.
+# 7. Rebuild caches.
 php artisan optimize
 
-# 7. Bring up the long-runners.
+# 8. Bring up the long-runners.
 sudo supervisorctl start nexus-horizon nexus-schedule nexus-reverb
 #   -- OR --
 sudo systemctl start nexus-horizon nexus-schedule nexus-reverb

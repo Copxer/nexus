@@ -265,12 +265,9 @@ git fetch --tags && git checkout <ref>
 composer install --no-dev --optimize-autoloader
 npm ci && npm run build
 
-# 3. Migrate + refresh caches
+# 3. Migrate + refresh caches (optimize bundles config + route + event + view caches).
 php artisan migrate --force
-php artisan config:cache
-php artisan route:cache
-php artisan event:cache
-php artisan view:cache
+php artisan optimize
 
 # 4. Restart the long-runners so they pick up the new code
 sudo supervisorctl restart nexus-horizon nexus-schedule nexus-reverb

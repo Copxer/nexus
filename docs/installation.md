@@ -20,7 +20,7 @@ distribution with the components below works.
 **PHP 8.4 or newer**, including these extensions:
 
 - `bcmath`, `intl`, `mbstring`, `pcntl`, `curl`, `zip`
-- Database driver: `mysql` or `pgsql`
+- Database driver: `mysql` **or** `pgsql` (pick one)
 - `redis` (the PECL extension) — cache / queue / session driver
 
 Confirm with `php -m` after install.
@@ -48,9 +48,12 @@ documented in `docs/deployment.md`. Pick one and stay consistent.
 
 ## 2. Provision the host
 
-On Debian/Ubuntu:
+On Debian/Ubuntu. The `php8.4-*` packages come from the
+[ondrej/php PPA](https://launchpad.net/~ondrej/+archive/ubuntu/php) —
+add it first if you're on stock Ubuntu, which ships older PHP:
 
 ```bash
+sudo add-apt-repository ppa:ondrej/php
 sudo apt update
 sudo apt install -y \
     php8.4-{cli,fpm,bcmath,intl,mbstring,pcntl,curl,zip,mysql,pgsql,redis} \
