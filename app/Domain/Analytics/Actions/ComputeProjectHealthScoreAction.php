@@ -2,6 +2,7 @@
 
 namespace App\Domain\Analytics\Actions;
 
+use App\Domain\Analytics\DataTransferObjects\HealthScoreWeights;
 use App\Enums\AlertSeverity;
 use App\Enums\AlertStatus;
 use App\Enums\HostStatus;
@@ -11,6 +12,7 @@ use App\Models\Alert;
 use App\Models\Container;
 use App\Models\Host;
 use App\Models\Project;
+use App\Models\User;
 use App\Models\Website;
 use App\Models\WorkflowRun;
 use Illuminate\Support\Carbon;
@@ -63,19 +65,41 @@ class ComputeProjectHealthScoreAction
 
     public const DEDUCT_GH_SYNC_FAILED = 5;
 
+    /**
+     * Compute the score using the class-level DEDUCT_* defaults.
+     * Every existing caller (spec 033 recompute job, spec 035 sweep,
+     * activity listener) stays green — this method's signature never
+     * changed.
+     */
     public function execute(Project $project): int
     {
+        return $this->executeWith($project, HealthScoreWeights::defaults());
+    }
+
+    /**
+     * Spec 046 — compute the score using the user's overridden weights
+     * (nulls falling back to defaults). Callers pass the owning user;
+     * `RefreshProjectHealthScoreAction` resolves it from
+     * `$project->owner_user_id` before delegating.
+     */
+    public function executeForUser(Project $project, User $user): int
+    {
+        return $this->executeWith($project, HealthScoreWeights::forUser($user));
+    }
+
+    private function executeWith(Project $project, HealthScoreWeights $weights): int
+    {
         $score = self::BASELINE
-            - $this->alertDeductions($project)
-            - $this->websiteDeductions($project)
-            - $this->hostDeductions($project)
-            - $this->containerDeductions($project)
-            - $this->deploymentDeductions($project);
+            - $this->alertDeductions($project, $weights)
+            - $this->websiteDeductions($project, $weights)
+            - $this->hostDeductions($project, $weights)
+            - $this->containerDeductions($project, $weights)
+            - $this->deploymentDeductions($project, $weights);
 
         return (int) max(0, min(100, $score));
     }
 
-    private function alertDeductions(Project $project): int
+    private function alertDeductions(Project $project, HealthScoreWeights $weights): int
     {
         $active = [AlertStatus::Open->value, AlertStatus::Acknowledged->value];
 
@@ -91,11 +115,11 @@ class ComputeProjectHealthScoreAction
             ->where('severity', AlertSeverity::Warning->value)
             ->count();
 
-        return ($critical * self::DEDUCT_ALERT_CRITICAL)
-            + ($warning * self::DEDUCT_ALERT_WARNING);
+        return ($critical * $weights->alertCritical())
+            + ($warning * $weights->alertWarning());
     }
 
-    private function websiteDeductions(Project $project): int
+    private function websiteDeductions(Project $project, HealthScoreWeights $weights): int
     {
         $down = Website::query()
             ->where('project_id', $project->id)
@@ -110,11 +134,11 @@ class ComputeProjectHealthScoreAction
             ->where('status', WebsiteStatus::Slow->value)
             ->count();
 
-        return ($down * self::DEDUCT_WEBSITE_DOWN)
-            + ($slow * self::DEDUCT_WEBSITE_SLOW);
+        return ($down * $weights->websiteDown())
+            + ($slow * $weights->websiteSlow());
     }
 
-    private function hostDeductions(Project $project): int
+    private function hostDeductions(Project $project, HealthScoreWeights $weights): int
     {
         $offline = Host::query()
             ->where('project_id', $project->id)
@@ -122,10 +146,10 @@ class ComputeProjectHealthScoreAction
             ->where('status', HostStatus::Offline->value)
             ->count();
 
-        return $offline * self::DEDUCT_HOST_OFFLINE;
+        return $offline * $weights->hostOffline();
     }
 
-    private function containerDeductions(Project $project): int
+    private function containerDeductions(Project $project, HealthScoreWeights $weights): int
     {
         // Docker daemon's `health_status` is opt-in: not every image
         // declares a HEALTHCHECK. Only count containers explicitly
@@ -136,10 +160,10 @@ class ComputeProjectHealthScoreAction
             ->where('health_status', 'unhealthy')
             ->count();
 
-        return $unhealthy * self::DEDUCT_CONTAINER_UNHEALTHY;
+        return $unhealthy * $weights->containerUnhealthy();
     }
 
-    private function deploymentDeductions(Project $project): int
+    private function deploymentDeductions(Project $project, HealthScoreWeights $weights): int
     {
         // "Failed deployment" in §14.2 maps to a failed default-branch
         // workflow run in the last 24h. We constrain to the run's
@@ -156,6 +180,6 @@ class ComputeProjectHealthScoreAction
             ->where('workflow_runs.run_completed_at', '>', $since)
             ->count('workflow_runs.id');
 
-        return $failed * self::DEDUCT_DEPLOY_FAILED;
+        return $failed * $weights->deployFailed();
     }
 }
