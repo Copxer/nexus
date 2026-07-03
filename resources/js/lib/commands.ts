@@ -269,6 +269,22 @@ export function getCommands(): Command[] {
             run: () =>
                 router.visit(route('monitoring.websites.index', { status: 'slow' })),
         },
+        {
+            id: 'go-rules',
+            label: 'Open rules & health weights',
+            group: 'actions',
+            icon: SettingsIcon,
+            keywords: [
+                'rules',
+                'weights',
+                'health',
+                'score',
+                'alerts',
+                'metric',
+                'threshold',
+            ],
+            run: () => router.visit(route('settings.rules.index')),
+        },
 
         // ────── System ────── //
         {

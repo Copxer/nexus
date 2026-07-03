@@ -92,6 +92,11 @@ Per-user limits via Laravel's `throttle:N,1` middleware:
 | `PATCH /settings/notifications/preferences/{preference}` | 20/min (spec 042) |
 | `DELETE /settings/notifications/preferences/{preference}` | 20/min (spec 042) |
 | `POST /settings/notifications/deliveries/{delivery}/retry` | 30/min (spec 042) |
+| `PATCH /settings/rules/weights` | 20/min (spec 046) |
+| `DELETE /settings/rules/weights` | 20/min (spec 046) |
+| `POST /settings/rules` | 10/min (spec 046) |
+| `PATCH /settings/rules/{rule}` | 20/min (spec 046) |
+| `DELETE /settings/rules/{rule}` | 20/min (spec 046) |
 
 **Sign-off ☐:** Tested in
 [`ManualSyncRateLimitTest`](../../tests/Feature/Security/ManualSyncRateLimitTest.php).

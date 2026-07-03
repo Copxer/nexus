@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Alerts\Jobs\EvaluateAlertRulesJob;
 use App\Domain\Analytics\Jobs\RecomputeAllProjectHealthScoresJob;
 use App\Domain\Docker\Jobs\DetectOfflineHostsJob;
 use App\Domain\Monitoring\Jobs\DispatchDueWebsiteChecksJob;
@@ -73,4 +74,15 @@ Schedule::job(new EvaluateSystemHealthJob)
 Schedule::job(new CheckGitHubRateLimitJob)
     ->everyTenMinutes()
     ->name('observability:check-github-rate-limit')
+    ->withoutOverlapping();
+
+// Spec 046 — every-5-minute evaluator for user-defined metric alert
+// rules. Iterates enabled `AlertRule` rows, delegates each to its
+// kind's evaluator (Strategy per §6.5), and dispatches
+// `TriggerAlertAction` on truth. Fired alerts ride spec 042's
+// delivery layer via `AlertSource::System`. Cool-down is per-rule
+// (default 30 min) so a stuck condition doesn't page every tick.
+Schedule::job(new EvaluateAlertRulesJob)
+    ->everyFiveMinutes()
+    ->name('alerts:evaluate-rules')
     ->withoutOverlapping();

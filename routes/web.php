@@ -25,6 +25,7 @@ use App\Http\Controllers\RepositorySyncAllController;
 use App\Http\Controllers\RepositorySyncController;
 use App\Http\Controllers\RepositoryWorkflowRunsSyncController;
 use App\Http\Controllers\Settings\NotificationsController;
+use App\Http\Controllers\Settings\RulesController;
 use App\Http\Controllers\Settings\ThemeController;
 use App\Http\Controllers\Settings\WebhookDeliveryController;
 use App\Http\Controllers\SettingsController;
@@ -112,6 +113,27 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/settings/notifications/deliveries/{delivery}/retry', [NotificationsController::class, 'retryDelivery'])
         ->middleware('throttle:30,1')
         ->name('settings.notifications.deliveries.retry');
+
+    // Spec 046 — user-tunable health-score weights + metric-driven
+    // alert rules. Single Inertia page with two tabs; controller
+    // handles both slices through per-tab endpoints.
+    Route::get('/settings/rules', [RulesController::class, 'index'])
+        ->name('settings.rules.index');
+    Route::patch('/settings/rules/weights', [RulesController::class, 'updateWeights'])
+        ->middleware('throttle:20,1')
+        ->name('settings.rules.weights.update');
+    Route::delete('/settings/rules/weights', [RulesController::class, 'resetWeights'])
+        ->middleware('throttle:20,1')
+        ->name('settings.rules.weights.reset');
+    Route::post('/settings/rules', [RulesController::class, 'storeRule'])
+        ->middleware('throttle:10,1')
+        ->name('settings.rules.store');
+    Route::patch('/settings/rules/{rule}', [RulesController::class, 'updateRule'])
+        ->middleware('throttle:20,1')
+        ->name('settings.rules.update');
+    Route::delete('/settings/rules/{rule}', [RulesController::class, 'destroyRule'])
+        ->middleware('throttle:20,1')
+        ->name('settings.rules.destroy');
 
     Route::get('/integrations/github/connect', [GithubConnectionController::class, 'redirect'])
         ->name('integrations.github.connect');
