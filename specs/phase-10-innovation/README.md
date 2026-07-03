@@ -27,7 +27,7 @@ live.
 | 044 | AI daily briefing — LLM-generated morning digest ("yesterday: X new issues, Y merged PRs, Z alerts, N things that look off"), delivered via spec 042, per-user opt-in + delivery time | ⬜ |
 | 045 | AI PR risk score + project health explanation — LLM-scored PR risk tag on webhook arrival, natural-language "why" overlay on Phase 8 health-score card | ⬜ |
 | 046 | User-tunable health-score weights + metric-driven alert rules — settings page for Phase 8's formula, §6.8 specification pattern for alert evaluators (queue backlog trend, deploy frequency drop, uptime slope) | 🟢 |
-| 047 | Public status page generator — unauthenticated `/status/{slug}` aggregating monitoring uptime + system alerts + subscribe form; per-project toggle in Settings | ⬜ |
+| 047 | Public status page generator — unauthenticated `/status/{slug}` aggregating monitoring uptime + system alerts + subscribe form; per-project toggle in Settings | 🟢 |
 
 ## Acceptance criteria (phase-level)
 - [ ] Operators receive alerts via at least one channel outside the
