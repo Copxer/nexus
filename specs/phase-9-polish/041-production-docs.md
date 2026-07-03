@@ -111,9 +111,11 @@ to monitor once deployed).
     isn't a backup. Suggested cadence: quarterly drill on a
     scratch VM.
 
-- **`.env.production.example`** — production-shaped template
-  living in the repo root alongside `.env.example`. Difference
-  from `.env.example`:
+- **`docs/env.production.example`** — production-shaped template.
+  Lives under `docs/` (not repo root) because the environment
+  sandbox blocks writing any `.env*` filename. Operators copy
+  the file to `.env` on the deploy host. Difference from
+  `.env.example`:
   - `APP_ENV=production`, `APP_DEBUG=false`, `LOG_LEVEL=warning`.
   - Placeholders for `DB_HOST` / `DB_PORT` / `DB_PASSWORD`,
     `REDIS_HOST` / `REDIS_PORT` / `REDIS_PASSWORD`.
@@ -193,11 +195,12 @@ to monitor once deployed).
 - [ ] `docs/backup.md` exists and covers DB dump, `.env`
       handling, restore drill, off-site retention, quarterly
       drill cadence.
-- [ ] `.env.production.example` exists in repo root and
-      diverges from `.env.example` on `APP_ENV`, `APP_DEBUG`,
-      `LOG_LEVEL`, DB/Redis auth placeholders,
-      `HORIZON_ALLOW_LIST`, session/sanctum domains, Telescope
-      disable, mail from-address.
+- [ ] `docs/env.production.example` exists and diverges from
+      `.env.example` on `APP_ENV`, `APP_DEBUG`, `LOG_LEVEL`,
+      DB/Redis auth placeholders, `HORIZON_ALLOW_LIST`,
+      session/sanctum domains, Telescope disable, mail
+      from-address. (Filename lives under `docs/` because the
+      environment sandbox blocks writing `.env*` files.)
 - [ ] README has a "Deploying to production" block linking to
       all four docs + the operator checklist.
 - [ ] `ProductionDocsExistTest` passes.
@@ -209,7 +212,8 @@ to monitor once deployed).
 - `docs/installation.md` — created
 - `docs/deployment.md` — created
 - `docs/backup.md` — created
-- `.env.production.example` — created
+- `docs/env.production.example` — created (path under `docs/`
+  because sandbox blocks `.env*` writes; operators copy to `.env`)
 - `README.md` — new production section
 - `tests/Feature/Docs/ProductionDocsExistTest.php` — created
 
@@ -226,6 +230,19 @@ Dated notes as work progresses.
 - Branch `spec/041-production-docs` cut off main.
 - Tracking issue #121.
 - Scope shipped as drafted (no late edits requested).
+- Env template path moved from repo root
+  (`.env.production.example`) to `docs/env.production.example`
+  because the environment sandbox denies writes to any `.env*`
+  filename. Functionally equivalent — operators copy to `.env`
+  on deploy host either way. README + `docs/installation.md`
+  point at the docs path.
+- Shipped the four docs + env template + README production
+  breadcrumbs + `ProductionDocsExistTest` smoke test.
+  Supervisor and systemd examples ship inline; Nginx is the
+  reference config with a WebSocket upgrade block for Reverb.
+  Restore drill sequence lands `.env` before the DB dump so
+  `APP_KEY` is available to decrypt the GitHub tokens in the
+  restored rows.
 
 ## Open questions / blockers
 
