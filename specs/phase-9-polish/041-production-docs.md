@@ -1,7 +1,7 @@
 ---
 spec: production-docs
 phase: 9
-status: in-progress   # not-started | in-progress | blocked | done
+status: done   # not-started | in-progress | blocked | done
 owner: Yoany
 created: 2026-07-01
 updated: 2026-07-02
