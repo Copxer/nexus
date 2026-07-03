@@ -14,7 +14,7 @@ import {
 import { fuzzyMatch } from '@/lib/fuzzyMatch';
 import { getRecentCommandIds, pushRecentCommand } from '@/lib/paletteRecent';
 import { searchPaletteEntities } from '@/lib/paletteSearch';
-import { usePage } from '@inertiajs/vue3';
+import { router, usePage } from '@inertiajs/vue3';
 import { Loader2, Search } from 'lucide-vue-next';
 import { computed, nextTick, ref, watch } from 'vue';
 import type { PageProps } from '@/types';
@@ -122,6 +122,21 @@ const ENTITY_GROUPS: readonly CommandGroup[] = [
     'workItems',
     'alerts',
 ];
+
+/** Where the "Show all N" overflow row navigates for each entity kind. */
+const OVERFLOW_URL_BUILDERS: Partial<Record<CommandGroup, (q: string) => string>> = {
+    projects: () => route('projects.index'),
+    repositories: () => route('repositories.index'),
+    hosts: () => route('monitoring.hosts.index'),
+    websites: () => route('monitoring.websites.index'),
+    workItems: (q) => `${route('work-items.index')}?q=${encodeURIComponent(q)}`,
+    alerts: () => route('alerts.index'),
+};
+
+const overflowUrl = (group: CommandGroup): string | null => {
+    const builder = OVERFLOW_URL_BUILDERS[group];
+    return builder ? builder(query.value.trim()) : null;
+};
 
 /**
  * Group filtered commands for rendering. Returns an array of
@@ -269,6 +284,16 @@ const runCommand = (cmd: Command) => {
     if (cmd.disabled || !cmd.run) return;
     trackRecent(cmd);
     cmd.run();
+    emit('close');
+};
+
+/** Overflow row click: navigate to the entity's index page with the
+ *  current query preserved as a filter (where the target index supports one).
+ */
+const runOverflow = (group: CommandGroup) => {
+    const url = overflowUrl(group);
+    if (!url) return;
+    router.visit(url);
     emit('close');
 };
 
@@ -438,9 +463,18 @@ const indexOf = (cmd: Command) => filtered.value.indexOf(cmd);
                             />
                             <li
                                 v-if="bucket.hiddenCount > 0"
-                                class="px-4 py-1.5 text-[11px] text-text-muted"
+                                :class="[
+                                    'flex cursor-pointer items-center gap-3 rounded-lg px-4 py-1.5 text-[11px] text-text-muted transition',
+                                    'hover:bg-background-panel-hover hover:text-text-primary',
+                                    'focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60',
+                                ]"
+                                tabindex="0"
+                                role="option"
+                                @click="runOverflow(bucket.group)"
+                                @keydown.enter="runOverflow(bucket.group)"
                             >
-                                + {{ bucket.hiddenCount }} more · keep typing to narrow
+                                Show all {{ bucket.items.length + bucket.hiddenCount }} in
+                                {{ commandGroupLabels[bucket.group] }} →
                             </li>
                         </ul>
                     </template>

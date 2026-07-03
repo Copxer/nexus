@@ -1,7 +1,7 @@
 ---
 spec: command-palette
 phase: 10
-status: in-progress   # not-started | in-progress | blocked | done
+status: done   # not-started | in-progress | blocked | done
 owner: Yoany
 created: 2026-07-02
 updated: 2026-07-02
@@ -293,6 +293,19 @@ Dated notes as work progresses.
   contract.
 - Branch `spec/043-command-palette` cut off main.
 - Tracking issue #125.
+- Dropped custom LIKE-escape from `SearchPaletteEntitiesQuery`
+  after the SQLite-vs-MySQL escape-clause mismatch caused a test
+  fail; `%` / `_` in `q` flow through as wildcards. Result-cap
+  per kind + 30/min throttle mitigate wildcard-expansion.
+- Self-review caught pre-push: made the overflow row a real
+  clickable navigation target (per spec §Result cap plan);
+  dropped a misleading `RateLimiter::clear('*')` call in the
+  throttle test (relies on the array cache driver instead).
+- Deferred to a follow-up: wrap `palette.entities` in
+  `Inertia::defer()` so the 4-query serializer only runs after
+  the palette actually opens. Reviewer flagged as a legitimate
+  perf win but explicitly not a blocker; ships as its own spec
+  when we want to optimize.
 
 ## Open questions / blockers
 

@@ -14,23 +14,20 @@ use App\Models\Project;
 use App\Models\Repository;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\RateLimiter;
 use Tests\TestCase;
 
 /**
  * Spec 043 — async server-side palette search endpoint. Scopes results
  * to the auth user's projects; system alerts (spec 038, no project)
  * are included since the operator still needs to reach them.
+ *
+ * Rate-limit isolation across tests is provided by the array cache
+ * driver configured in `phpunit.xml` — each PHPUnit process starts
+ * with an empty bucket.
  */
 class PaletteSearchControllerTest extends TestCase
 {
     use RefreshDatabase;
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-        RateLimiter::clear('*');
-    }
 
     public function test_returns_matching_work_items_and_alerts_scoped_to_owner(): void
     {
