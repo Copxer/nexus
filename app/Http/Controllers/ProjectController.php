@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Domain\Activity\Queries\RecentActivityForProjectQuery;
 use App\Domain\GitHub\Queries\DeploymentTimelineQuery;
+use App\Domain\PublicStatus\Queries\GetPublicStatusPageQuery;
 use App\Enums\HealthScoreBand;
 use App\Enums\ProjectPriority;
 use App\Enums\ProjectStatus;
@@ -15,6 +16,7 @@ use App\Models\Website;
 use App\Support\ProjectPalette;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -171,9 +173,23 @@ class ProjectController extends Controller
 
     public function update(UpdateProjectRequest $request, Project $project): RedirectResponse
     {
-        $project->fill($request->validated());
+        $validated = $request->validated();
+
+        // Spec 047 — if the public-status headline or the enable-toggle
+        // just changed, flush the cached snapshot so the next public
+        // visitor sees fresh data instead of a 60-second-stale page.
+        $publicChanged = array_key_exists('public_status_headline', $validated)
+            && $project->public_status_headline !== ($validated['public_status_headline'] ?? null);
+        $enabledChanged = array_key_exists('public_status_enabled', $validated)
+            && $project->public_status_enabled !== (bool) $validated['public_status_enabled'];
+
+        $project->fill($validated);
         $project->last_activity_at = now();
         $project->save();
+
+        if ($publicChanged || $enabledChanged) {
+            Cache::forget(GetPublicStatusPageQuery::cacheKey($project->id));
+        }
 
         return redirect()
             ->route('projects.show', $project)

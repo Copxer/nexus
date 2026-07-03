@@ -38,16 +38,10 @@ const props = defineProps<{
 }>();
 
 const publicForm = useForm({
-    // Spec 047 — the projects.update endpoint accepts every field via
-    // full PATCH replace, so we mirror the main form's fields here to
-    // avoid clobbering them when saving the public-status slice alone.
-    name: props.project.name,
-    description: props.project.description,
-    status: props.project.status,
-    priority: props.project.priority,
-    environment: props.project.environment,
-    color: props.project.color,
-    icon: props.project.icon,
+    // Spec 047 — only ship the public-status fields. UpdateProjectRequest
+    // treats every field as `sometimes`, so the main form's values stay
+    // untouched even if the operator saves this panel after editing the
+    // main form without a refresh.
     public_status_enabled: props.project.public_status_enabled,
     public_status_headline: props.project.public_status_headline ?? '',
 });
