@@ -343,3 +343,7 @@ Dated notes as work progresses.
   `queue_backlog_trend` — kept dots to match the existing
   `type` conventions on alerts (`website.down`, `host.offline`,
   `workflow.failed`) so the Deliveries tab reads consistently.
+
+### 2026-07-02 (branch)
+- Branch `spec/046-alert-rules-and-health-weights` cut off main.
+- Tracking issue #127.
