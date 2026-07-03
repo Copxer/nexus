@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Domain\Activity\Queries\RecentActivityForUserQuery;
+use App\Domain\Palette\Queries\GetPaletteEntitiesQuery;
 use App\Enums\AlertStatus;
 use App\Models\Alert;
 use App\Models\User;
@@ -72,6 +73,14 @@ class HandleInertiaRequests extends Middleware
             // the TopBar's Echo subscription.
             'alerts' => fn () => $request->user() !== null
                 ? ['activeCount' => $this->activeAlertsCount($request->user())]
+                : null,
+            // Spec 043 — pre-loaded command palette entity bundle.
+            // Bounded by hard row caps in `GetPaletteEntitiesQuery`; the
+            // async server-side endpoint fills the gap for alerts +
+            // work items where scale is unbounded. Guests never see the
+            // palette — `null` skips the query entirely.
+            'palette' => fn () => $request->user() !== null
+                ? ['entities' => app(GetPaletteEntitiesQuery::class)->execute($request->user())]
                 : null,
         ];
     }

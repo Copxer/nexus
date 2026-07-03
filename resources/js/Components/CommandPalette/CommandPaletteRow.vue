@@ -43,7 +43,15 @@ defineEmits<{
             ]"
             aria-hidden="true"
         />
-        <span class="min-w-0 flex-1 truncate">{{ command.label }}</span>
+        <span class="flex min-w-0 flex-1 flex-col">
+            <span class="truncate">{{ command.label }}</span>
+            <span
+                v-if="command.subtitle"
+                class="truncate text-[11px] text-text-muted"
+            >
+                {{ command.subtitle }}
+            </span>
+        </span>
 
         <!-- Right-side pill: "Soon" for disabled rows, shortcut hint or
              "Enter ↵" when the row is the active selection. -->

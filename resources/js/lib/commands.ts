@@ -1,8 +1,11 @@
+import type { PaletteEntity } from '@/types';
 import { router } from '@inertiajs/vue3';
 import {
     Activity,
+    AlertTriangle,
     BarChart3,
     Bell,
+    Clock,
     Flame,
     FolderKanban,
     GitBranch,
@@ -22,7 +25,44 @@ import {
     type LucideIcon,
 } from 'lucide-vue-next';
 
-export type CommandGroup = 'navigation' | 'actions' | 'system';
+export type CommandGroup =
+    | 'recent'
+    | 'navigation'
+    | 'actions'
+    | 'projects'
+    | 'repositories'
+    | 'hosts'
+    | 'websites'
+    | 'workItems'
+    | 'alerts'
+    | 'system';
+
+
+const groupOrder: CommandGroup[] = [
+    'recent',
+    'navigation',
+    'actions',
+    'projects',
+    'repositories',
+    'hosts',
+    'websites',
+    'workItems',
+    'alerts',
+    'system',
+];
+
+export const commandGroupLabels: Record<CommandGroup, string> = {
+    recent: 'Recent',
+    navigation: 'Navigation',
+    actions: 'Actions',
+    projects: 'Projects',
+    repositories: 'Repositories',
+    hosts: 'Hosts',
+    websites: 'Websites',
+    workItems: 'Work items',
+    alerts: 'Alerts',
+    system: 'System',
+};
 
 export interface Command {
     /** Stable identifier used as a Vue list key. */
@@ -46,21 +86,35 @@ export interface Command {
     disabled?: boolean;
     /** Pill text shown on disabled rows; defaults to "Soon". */
     soonLabel?: string;
+    /**
+     * Spec 043 — secondary line under the label, used by entity rows to
+     * show a subtitle (`ops@example.com`, `#42 opened 3d ago`, …).
+     * Static commands don't set this.
+     */
+    subtitle?: string | null;
+    /**
+     * Spec 043 — marker so palette recent-tracking skips entity rows.
+     * Only static commands are LRU-tracked; entity rows are already
+     * bookmarks in their own right (sidebar / URL).
+     */
+    isEntity?: boolean;
 }
 
-const groupOrder: CommandGroup[] = ['navigation', 'actions', 'system'];
-
-export const commandGroupLabels: Record<CommandGroup, string> = {
-    navigation: 'Navigation',
-    actions: 'Actions',
-    system: 'System',
-};
+export interface PaletteEntityBundle {
+    projects: PaletteEntity[];
+    repositories: PaletteEntity[];
+    hosts: PaletteEntity[];
+    websites: PaletteEntity[];
+}
 
 /**
- * Build the command registry. Real commands (`run` defined) navigate or
- * trigger Inertia actions today. Disabled "Soon" entries advertise the
- * roadmap and stay inert until their owning spec ships — same treatment as
- * the sidebar nav.
+ * Build the static command registry — navigation + actions + system.
+ * Real commands (`run` defined) navigate or trigger Inertia actions
+ * today. Disabled "Soon" entries advertise the roadmap and stay inert
+ * until their owning spec ships — same treatment as the sidebar nav.
+ *
+ * Live entity rows (spec 043) are appended via `buildEntityCommands()`
+ * so the pure static registry stays cheap + deterministic.
  */
 export function getCommands(): Command[] {
     return [
@@ -227,6 +281,120 @@ export function getCommands(): Command[] {
         },
     ];
 }
+
+/**
+ * Convert the pre-loaded entity bundle from the shared Inertia prop
+ * into `Command` rows appended to the palette registry (spec 043).
+ * Callers only include these when the palette has a non-empty query;
+ * the empty-query view stays focused on static commands + recent.
+ */
+export function buildEntityCommands(bundle: PaletteEntityBundle | null): Command[] {
+    if (!bundle) return [];
+
+    const projects = bundle.projects.map((p): Command => ({
+        id: `entity-project-${p.id}`,
+        label: `Project · ${p.label}`,
+        subtitle: p.subtitle,
+        group: 'projects',
+        icon: FolderKanban,
+        keywords: p.keywords,
+        isEntity: true,
+        run: () => router.visit(p.url),
+    }));
+
+    const repositories = bundle.repositories.map((r): Command => ({
+        id: `entity-repo-${r.id}`,
+        label: `Repo · ${r.label}`,
+        subtitle: r.subtitle,
+        group: 'repositories',
+        icon: GitBranch,
+        keywords: r.keywords,
+        isEntity: true,
+        run: () => router.visit(r.url),
+    }));
+
+    const hosts = bundle.hosts.map((h): Command => ({
+        id: `entity-host-${h.id}`,
+        label: `Host · ${h.label}`,
+        subtitle: h.subtitle,
+        group: 'hosts',
+        icon: Server,
+        keywords: h.keywords,
+        isEntity: true,
+        run: () => router.visit(h.url),
+    }));
+
+    const websites = bundle.websites.map((w): Command => ({
+        id: `entity-website-${w.id}`,
+        label: `Website · ${w.label}`,
+        subtitle: w.subtitle,
+        group: 'websites',
+        icon: Globe,
+        keywords: w.keywords,
+        isEntity: true,
+        run: () => router.visit(w.url),
+    }));
+
+    return [...projects, ...repositories, ...hosts, ...websites];
+}
+
+/**
+ * Convert async server-side results (work items + alerts) into `Command`
+ * rows for palette rendering (spec 043).
+ */
+export function buildAsyncCommands(
+    workItems: Array<{ id: number; label: string; subtitle: string | null; url: string }>,
+    alerts: Array<{ id: number; label: string; subtitle: string | null; url: string }>,
+): Command[] {
+    const workItemRows = workItems.map((w): Command => ({
+        id: `async-workitem-${w.id}`,
+        label: w.label,
+        subtitle: w.subtitle,
+        group: 'workItems',
+        icon: GitPullRequest,
+        isEntity: true,
+        run: () => router.visit(w.url),
+    }));
+
+    const alertRows = alerts.map((a): Command => ({
+        id: `async-alert-${a.id}`,
+        label: a.label,
+        subtitle: a.subtitle,
+        group: 'alerts',
+        icon: AlertTriangle,
+        isEntity: true,
+        run: () => router.visit(a.url),
+    }));
+
+    return [...workItemRows, ...alertRows];
+}
+
+/**
+ * Filter the static command list to just the ids the user has recently
+ * run, sorted by recency. Skips ids that no longer exist in the
+ * registry (e.g. a command was renamed since it was last recorded).
+ */
+export function pickRecentCommands(
+    all: readonly Command[],
+    recentIds: readonly string[],
+): Command[] {
+    const byId = new Map<string, Command>();
+    for (const cmd of all) byId.set(cmd.id, cmd);
+
+    return recentIds
+        .map((id) => byId.get(id))
+        .filter((cmd): cmd is Command => cmd !== undefined && !cmd.disabled)
+        .map((cmd): Command => ({
+            ...cmd,
+            group: 'recent',
+            // Fresh id so Vue lists don't collide with the "canonical"
+            // command row in the Navigation/Actions groups.
+            id: `recent-${cmd.id}`,
+        }));
+}
+
+/** Icon used by CommandPalette for the loading indicator. */
+export { Clock as PaletteLoadingIcon };
 
 /**
  * Stable group ordering — palette rendering uses this to lay groups out in
