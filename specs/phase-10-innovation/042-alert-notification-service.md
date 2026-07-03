@@ -1,7 +1,7 @@
 ---
 spec: alert-notification-service
 phase: 10
-status: in-progress   # not-started | in-progress | blocked | done
+status: done   # not-started | in-progress | blocked | done
 owner: Yoany
 created: 2026-07-02
 updated: 2026-07-02
@@ -323,6 +323,25 @@ Dated notes as work progresses.
 - Branch `spec/042-alert-notification-service` cut off main.
 - Tracking issue #123.
 - Phase 10 folder + README created in the same commit.
+- Self-review caught two real bugs pre-push:
+  - **Cross-tenant leak** — `matchingPreferences()` didn't scope
+    by user. Fixed: project-scoped alerts now filter preferences
+    by `project.owner_user_id`; system alerts (no project) still
+    fan out to every configured preference. Added two regression
+    tests (`project_scoped_alert_never_fires_a_stranger_users_preference`,
+    `system_alert_with_no_project_fans_out_to_every_configured_preference`).
+  - **Dead clause in `isDeduped`** — `->where('id', '<',
+    PHP_INT_MAX)` was a no-op that looked load-bearing; the
+    intent (exclude the current alert's own row) required
+    `alert_id != $alert->id`. Fixed.
+- Also fixed pre-push: atomic `attempts` increment via
+  `DB::raw('attempts + 1')` to prevent concurrent retry drift,
+  unique constraint on `(alert_id, channel_id)` to make the
+  `firstOrCreate` invariant enforceable, and added the missing
+  `docs/env.production.example` + `docs/security/operator-checklist.md`
+  updates the spec plan called for.
+- Added `ResolveAlertActionNotificationDispatchTest` (2 cases)
+  pinning the `notify_on_resolve` gating that had no test.
 
 ## Open questions / blockers
 

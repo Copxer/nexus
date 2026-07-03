@@ -110,4 +110,62 @@ class TriggerAlertActionNotificationDispatchTest extends TestCase
 
         Bus::assertNotDispatched(DispatchAlertNotificationJob::class);
     }
+
+    public function test_project_scoped_alert_never_fires_a_stranger_users_preference(): void
+    {
+        Bus::fake();
+
+        $owner = User::factory()->create();
+        $stranger = User::factory()->create();
+        $ownerProject = Project::factory()->create(['owner_user_id' => $owner->id]);
+
+        // Stranger has a preference matching the alert's severity + source.
+        // It must NOT be dispatched — the alert belongs to $owner's project.
+        $strangerSlack = AlertNotificationChannel::factory()->slack()->for($stranger)->create();
+        AlertNotificationPreference::factory()
+            ->for($stranger)
+            ->for($strangerSlack, 'channel')
+            ->create(['min_severity' => AlertSeverity::Info->value]);
+
+        // Owner has NO preferences → no dispatches, but we're not
+        // testing that here. We're testing that the stranger's
+        // preferences are excluded from cross-tenant fan-out.
+
+        app(TriggerAlertAction::class)->execute([
+            'project_id' => $ownerProject->id,
+            'source' => AlertSource::Website,
+            'source_id' => 1,
+            'type' => 'website.down',
+            'severity' => AlertSeverity::Critical,
+            'title' => 'Owner site down',
+        ]);
+
+        Bus::assertNotDispatched(DispatchAlertNotificationJob::class);
+    }
+
+    public function test_system_alert_with_no_project_fans_out_to_every_configured_preference(): void
+    {
+        Bus::fake();
+
+        // Spec 038 — AlertSource::System alerts have no project. They
+        // still need to notify the operator; the service falls back to
+        // matching every enabled preference in that case.
+        $operator = User::factory()->create();
+        $slack = AlertNotificationChannel::factory()->slack()->for($operator)->create();
+        AlertNotificationPreference::factory()
+            ->for($operator)
+            ->for($slack, 'channel')
+            ->create(['min_severity' => AlertSeverity::Warning->value]);
+
+        app(TriggerAlertAction::class)->execute([
+            'project_id' => null,
+            'source' => AlertSource::System,
+            'source_id' => null,
+            'type' => 'queue.backlog',
+            'severity' => AlertSeverity::Critical,
+            'title' => 'Queue backlog exceeded threshold',
+        ]);
+
+        Bus::assertDispatchedTimes(DispatchAlertNotificationJob::class, 1);
+    }
 }

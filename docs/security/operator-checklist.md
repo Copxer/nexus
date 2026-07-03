@@ -84,6 +84,14 @@ Per-user limits via Laravel's `throttle:N,1` middleware:
 | `POST /settings/webhook-deliveries/{delivery}/retry` | 30/min |
 | `POST /verify-email/*` | 6/min (existing) |
 | `POST /email/verification-notification` | 6/min (existing) |
+| `POST /settings/notifications/channels` | 10/min (spec 042) |
+| `PATCH /settings/notifications/channels/{channel}` | 20/min (spec 042) |
+| `DELETE /settings/notifications/channels/{channel}` | 20/min (spec 042) |
+| `POST /settings/notifications/channels/{channel}/test` | 10/min (spec 042) |
+| `POST /settings/notifications/preferences` | 20/min (spec 042) |
+| `PATCH /settings/notifications/preferences/{preference}` | 20/min (spec 042) |
+| `DELETE /settings/notifications/preferences/{preference}` | 20/min (spec 042) |
+| `POST /settings/notifications/deliveries/{delivery}/retry` | 30/min (spec 042) |
 
 **Sign-off ☐:** Tested in
 [`ManualSyncRateLimitTest`](../../tests/Feature/Security/ManualSyncRateLimitTest.php).
@@ -103,6 +111,23 @@ Per-user limits via Laravel's `throttle:N,1` middleware:
   isn't a problem; if production routing changes, expand the
   `trustProxies` list before turning fingerprinting on for
   production tokens.
+
+### Outbound notifications (spec 042)
+
+Nexus can fan out alerts to email, Slack, and generic webhooks
+configured under `/settings/notifications`. Two extra postures:
+
+- **Slack webhook URLs + generic-webhook signing secrets are
+  encrypted at rest.** `alert_notification_channels.config` is
+  cast to `encrypted:array` and hidden from serialization. A
+  `configPreview()` helper renders only non-secret fields
+  (`to` for email, `webhook_host` for Slack, `url_host` +
+  `signed: bool` for webhook) to Inertia props.
+- **Outbound HMAC signatures.** When a generic-webhook channel
+  has a `signing_secret`, deliveries carry
+  `X-Nexus-Signature: sha256=<hmac-sha256(body, secret)>` so
+  the receiving side can `hash_equals`-verify them (mirrors the
+  inbound GitHub-webhook shape).
 
 ## 7. Deferred to follow-ups
 
@@ -129,4 +154,6 @@ Documented for visibility; not blockers for spec 039 sign-off:
 - [ ] §3: `HORIZON_ALLOW_LIST` populated for production env.
 - [ ] §4: Agent fingerprinting opt-in available on token issuance.
 - [ ] §5: Manual sync / probe / retry endpoints all throttled.
+- [ ] §5 (spec 042): Notification channel `config` encrypted at
+      rest; outbound webhook HMAC available on demand.
 - [ ] Run the suite: `php artisan test --filter=Security` passes.

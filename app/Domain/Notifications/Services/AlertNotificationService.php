@@ -101,6 +101,21 @@ class AlertNotificationService
             ->with(['channel'])
             ->where('enabled', true);
 
+        // Cross-tenant guard: project-scoped alerts (spec 030 emitters
+        // for website / docker / deployment / github) only fire the
+        // owner's preferences — a stranger user's Slack must never
+        // ring for another operator's outage. `AlertSource::System`
+        // alerts (spec 038 self-checks) carry no project so they fan
+        // out to every configured preference; today this equals "the
+        // operator" but the fallback remains correct if the app grows
+        // to a multi-user operator team.
+        $alert->loadMissing('project:id,owner_user_id');
+        $ownerUserId = $alert->project?->owner_user_id;
+
+        if ($ownerUserId !== null) {
+            $query->where('user_id', $ownerUserId);
+        }
+
         if ($resolution) {
             $query->where('notify_on_resolve', true);
         }
@@ -143,13 +158,13 @@ class AlertNotificationService
     {
         return AlertDelivery::query()
             ->where('channel_id', $channel->id)
+            ->where('alert_id', '!=', $alert->id)
             ->whereHas('alert', function ($q) use ($alert): void {
                 $q->where('source', $alert->source->value)
                     ->where('source_id', $alert->source_id)
                     ->where('type', $alert->type);
             })
             ->where('created_at', '>=', Carbon::now()->subMinutes(self::DEDUPE_WINDOW_MINUTES))
-            ->where('id', '<', $alert->id ? PHP_INT_MAX : 0)
             ->exists();
     }
 

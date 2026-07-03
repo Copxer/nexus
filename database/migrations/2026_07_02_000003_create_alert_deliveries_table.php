@@ -38,8 +38,11 @@ return new class extends Migration
 
             $table->timestamps();
 
-            // Retry / dedup lookups.
-            $table->index(['alert_id', 'channel_id']);
+            // One delivery row per (alert, channel) pair. `firstOrNew`
+            // in DispatchAlertNotificationJob relies on this invariant
+            // so the retry / attempts accounting is coherent under
+            // concurrent worker + user-triggered retries.
+            $table->unique(['alert_id', 'channel_id']);
             $table->index(['channel_id', 'status']);
         });
     }

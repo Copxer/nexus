@@ -16,6 +16,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
 use Throwable;
 
@@ -100,30 +101,48 @@ class DispatchAlertNotificationJob implements ShouldBeUnique, ShouldQueue
         $driver = AlertNotificationService::driverFor($channel->kind);
 
         // Upsert the delivery row for observability + retry accounting.
-        $delivery = AlertDelivery::query()->firstOrNew([
-            'alert_id' => $alert->id,
-            'channel_id' => $channel->id,
-        ]);
+        // Uniqueness on `(alert_id, channel_id)` is enforced at the DB
+        // level so parallel worker + user-triggered retry can't split
+        // into two rows.
+        $delivery = AlertDelivery::query()->firstOrCreate(
+            ['alert_id' => $alert->id, 'channel_id' => $channel->id],
+            [
+                'status' => AlertDeliveryStatus::Pending->value,
+                'attempts' => 0,
+                'payload' => $payload->toArray(),
+            ],
+        );
+
+        // Atomic bump so concurrent handlers can't overwrite each
+        // other's counter (spec 042 self-review S3 fix).
+        DB::table('alert_deliveries')
+            ->where('id', $delivery->id)
+            ->update([
+                'attempts' => DB::raw('attempts + 1'),
+                'last_attempt_at' => Carbon::now(),
+                'payload' => json_encode($payload->toArray()),
+                'updated_at' => Carbon::now(),
+            ]);
 
         try {
             $driver->send($channel, $payload);
 
-            $delivery->forceFill([
-                'status' => AlertDeliveryStatus::Sent->value,
-                'attempts' => $delivery->attempts + 1,
-                'last_attempt_at' => Carbon::now(),
-                'sent_at' => Carbon::now(),
-                'error_message' => null,
-                'payload' => $payload->toArray(),
-            ])->save();
+            DB::table('alert_deliveries')
+                ->where('id', $delivery->id)
+                ->update([
+                    'status' => AlertDeliveryStatus::Sent->value,
+                    'sent_at' => Carbon::now(),
+                    'error_message' => null,
+                    'updated_at' => Carbon::now(),
+                ]);
         } catch (Throwable $e) {
-            $delivery->forceFill([
-                'status' => AlertDeliveryStatus::Pending->value,
-                'attempts' => $delivery->attempts + 1,
-                'last_attempt_at' => Carbon::now(),
-                'error_message' => $e->getMessage(),
-                'payload' => $payload->toArray(),
-            ])->save();
+            DB::table('alert_deliveries')
+                ->where('id', $delivery->id)
+                ->update([
+                    'status' => AlertDeliveryStatus::Pending->value,
+                    'error_message' => $e->getMessage(),
+                    'updated_at' => Carbon::now(),
+                ]);
 
             throw $e;
         }
