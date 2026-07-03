@@ -24,10 +24,10 @@ Status legend: ⬜ not started · 🟡 in progress · 🟢 done · 🔴 blocked
 | 3 | GitHub Webhooks & Activity Feed | 🟢 | 3/3 specs done (017–019). Phase complete. |
 | 4 | Deployments & CI/CD | 🟢 | 3/3 specs done (020–022) — workflow runs storage + sync, cross-repo timeline UI with realtime, Overview success-rate widget. |
 | 5 | Website Monitoring | 🟢 | 3/3 specs done (023–025) — monitor MVP + manual probe, scheduled checks + uptime calc + activity events, Overview uptime KPI + Reverb live updates + perf chart. |
-| 6 | Docker Host Agent MVP | ⬜ | — |
-| 7 | Alerts Engine | ⬜ | — |
-| 8 | Analytics & Health Scores | ⬜ | — |
-| 9 | Polish & Production Readiness | ⬜ | — |
+| 6 | Docker Host Agent MVP | 🟢 | 4/4 specs done (026–029). Phase complete. |
+| 7 | Alerts Engine | 🟢 | 3/3 specs done (030–032). Phase complete. |
+| 8 | Analytics & Health Scores | 🟢 | 3/3 specs done (033–035). Phase complete. |
+| 9 | Polish & Production Readiness | 🟢 | 6/6 specs done (036–041). Phase complete. |
 | 10 | Future Innovation | ⬜ | — |
 
 Detailed per-spec status lives in [`specs/README.md`](specs/README.md). Each spec is one GitHub issue + one branch + one PR — see [`.claude/skills/nexus-spec-workflow`](.claude/skills/nexus-spec-workflow) for the workflow.
