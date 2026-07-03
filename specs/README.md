@@ -45,7 +45,7 @@ Status legend: ⬜ not started · 🟡 in progress · 🟢 done · 🔴 blocked
 | 7 | Alerts Engine | 🟢 | 3/3 specs done (030–032). Phase complete. |
 | 8 | Analytics & Health Scores | 🟢 | 3/3 specs done (033–035). Phase complete. |
 | 9 | Polish & Production Readiness | 🟢 | 6/6 specs done (036–041). Phase complete. |
-| 10 | Future Innovation | ⬜ | — |
+| 10 | Future Innovation | 🟡 | 1/6 specs done (042). 043–047 remaining. |
 
 ## MVP scope (target for v1)
 
