@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Settings;
 use App\Domain\Alerts\Support\AlertRuleTemplate;
 use App\Domain\Analytics\Actions\ComputeProjectHealthScoreAction;
 use App\Domain\Analytics\DataTransferObjects\HealthScoreWeights;
-use App\Domain\Analytics\Jobs\RecomputeAllProjectHealthScoresJob;
+use App\Domain\Analytics\Jobs\RecomputeUserProjectHealthScoresJob;
 use App\Enums\AlertRuleKind;
 use App\Enums\AlertSeverity;
 use App\Http\Controllers\Controller;
@@ -123,7 +123,7 @@ class RulesController extends Controller
         // Fire-and-forget: reassert the score across every project this
         // user owns so the new formula lands without waiting for the
         // scheduled sweep.
-        RecomputeAllProjectHealthScoresJob::dispatch();
+        RecomputeUserProjectHealthScoresJob::dispatch($request->user()->id);
 
         return back()->with('status', 'Health-score weights updated.');
     }
@@ -134,7 +134,7 @@ class RulesController extends Controller
             ->where('user_id', $request->user()->id)
             ->delete();
 
-        RecomputeAllProjectHealthScoresJob::dispatch();
+        RecomputeUserProjectHealthScoresJob::dispatch($request->user()->id);
 
         return back()->with('status', 'Health-score weights reset to defaults.');
     }

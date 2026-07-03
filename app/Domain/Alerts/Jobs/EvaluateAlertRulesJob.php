@@ -52,6 +52,9 @@ class EvaluateAlertRulesJob implements ShouldBeUnique, ShouldQueue
 
     public function handle(TriggerAlertAction $trigger): void
     {
+        // chunkById orders by `id ASC`; the per-rule updates below only
+        // touch `last_evaluated_at` / `last_triggered_at`, never `id`,
+        // so the cursor is safe across ticks — no re-visit risk.
         AlertRule::query()
             ->where('enabled', true)
             ->chunkById(100, function ($rules) use ($trigger): void {
@@ -63,6 +66,19 @@ class EvaluateAlertRulesJob implements ShouldBeUnique, ShouldQueue
 
     private function evaluateOne(AlertRule $rule, TriggerAlertAction $trigger): void
     {
+        $now = Carbon::now();
+
+        // Cool-down gate ahead of the evaluator so a stuck condition
+        // doesn't pay the (potentially heavy — SQL joins on
+        // workflow_runs / website_checks) evaluator cost every tick.
+        // Still advance `last_evaluated_at` so the UI reads "last
+        // evaluated N min ago" instead of a stale timestamp.
+        if ($rule->isInCoolDown()) {
+            $rule->forceFill(['last_evaluated_at' => $now])->save();
+
+            return;
+        }
+
         try {
             $evaluator = $this->evaluatorFor($rule->kind);
         } catch (Throwable $e) {
@@ -74,8 +90,6 @@ class EvaluateAlertRulesJob implements ShouldBeUnique, ShouldQueue
 
             return;
         }
-
-        $now = Carbon::now();
 
         try {
             $evaluation = $evaluator->evaluate($rule);
@@ -93,10 +107,6 @@ class EvaluateAlertRulesJob implements ShouldBeUnique, ShouldQueue
         $rule->forceFill(['last_evaluated_at' => $now])->save();
 
         if (! $evaluation->triggered) {
-            return;
-        }
-
-        if ($rule->isInCoolDown()) {
             return;
         }
 

@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\Settings;
 
-use App\Domain\Analytics\Jobs\RecomputeAllProjectHealthScoresJob;
+use App\Domain\Analytics\Jobs\RecomputeUserProjectHealthScoresJob;
 use App\Enums\AlertRuleKind;
 use App\Enums\AlertSeverity;
 use App\Models\AlertRule;
@@ -56,7 +56,10 @@ class RulesControllerTest extends TestCase
             'deduct_alert_warning' => 20,
         ]);
 
-        Bus::assertDispatched(RecomputeAllProjectHealthScoresJob::class);
+        Bus::assertDispatched(
+            RecomputeUserProjectHealthScoresJob::class,
+            fn (RecomputeUserProjectHealthScoresJob $job) => $job->userId === $user->id,
+        );
     }
 
     public function test_update_weights_rejects_out_of_bounds(): void
@@ -87,7 +90,10 @@ class RulesControllerTest extends TestCase
             'user_id' => $user->id,
         ]);
 
-        Bus::assertDispatched(RecomputeAllProjectHealthScoresJob::class);
+        Bus::assertDispatched(
+            RecomputeUserProjectHealthScoresJob::class,
+            fn (RecomputeUserProjectHealthScoresJob $job) => $job->userId === $user->id,
+        );
     }
 
     public function test_store_rule_creates_row(): void

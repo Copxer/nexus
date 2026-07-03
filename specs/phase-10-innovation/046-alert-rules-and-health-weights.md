@@ -1,7 +1,7 @@
 ---
 spec: alert-rules-and-health-weights
 phase: 10
-status: in-progress   # not-started | in-progress | blocked | done
+status: done   # not-started | in-progress | blocked | done
 owner: Yoany
 created: 2026-07-02
 updated: 2026-07-02
@@ -347,3 +347,18 @@ Dated notes as work progresses.
 ### 2026-07-02 (branch)
 - Branch `spec/046-alert-rules-and-health-weights` cut off main.
 - Tracking issue #127.
+- Self-review caught pre-push:
+  - **Recompute-on-save was calling the global sweep** instead
+    of a per-user job — spec §Plan explicitly asked for per-user
+    scoping. Shipped a small `RecomputeUserProjectHealthScoresJob`
+    (20 lines) and wired the controller to use it.
+  - **Cool-down check ran after the evaluator** — wasteful on
+    chatty rules paying SQL-join cost every 5-min tick. Moved
+    the `isInCoolDown()` guard to the top of `evaluateOne`;
+    `last_evaluated_at` still advances so the UI reads
+    consistently.
+- Test consolidation deliberate — 9 files listed in the spec ↔
+  4 files shipped (`AlertRuleEvaluatorsTest` covers all four
+  evaluators with shared fixtures; `RulesControllerTest`
+  absorbs the weights-recompute happy path). Coverage matches
+  §Tests; the file-count trim keeps the boilerplate down.
