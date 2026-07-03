@@ -29,7 +29,7 @@ docs alone.
 | 038 | Nexus self-monitoring — internal alerts (queue / GitHub-rate / webhook / agent failures) + observability slice | 🟢 |
 | 039 | Security audit — token encryption pass, Horizon production allow-list, agent fingerprinting opt-in, rate-limit coverage | 🟢 |
 | 040 | Core-flow test coverage — auth → project → repo sync → webhook → alert → resolve, plus seeding-quality fixtures | 🟢 |
-| 041 | Production docs — installation guide, deployment playbook (supervisor / systemd), backup strategy, `.env.production.example` | ⬜ |
+| 041 | Production docs — installation guide, deployment playbook (supervisor / systemd), backup strategy, `.env.production.example` | 🟢 |
 
 ## Acceptance criteria (phase-level)
 - [ ] Every page renders a skeleton state during initial load and

@@ -44,7 +44,7 @@ Status legend: ⬜ not started · 🟡 in progress · 🟢 done · 🔴 blocked
 | 6 | Docker Host Agent MVP | 🟢 | 4/4 specs done (026–029). Phase complete. |
 | 7 | Alerts Engine | 🟢 | 3/3 specs done (030–032). Phase complete. |
 | 8 | Analytics & Health Scores | 🟢 | 3/3 specs done (033–035). Phase complete. |
-| 9 | Polish & Production Readiness | 🟡 | 5/6 specs done (036–040). 041 production-docs remaining to close Phase 9. |
+| 9 | Polish & Production Readiness | 🟢 | 6/6 specs done (036–041). Phase complete. |
 | 10 | Future Innovation | ⬜ | — |
 
 ## MVP scope (target for v1)

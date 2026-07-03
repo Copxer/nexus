@@ -24,10 +24,10 @@ Status legend: ⬜ not started · 🟡 in progress · 🟢 done · 🔴 blocked
 | 3 | GitHub Webhooks & Activity Feed | 🟢 | 3/3 specs done (017–019). Phase complete. |
 | 4 | Deployments & CI/CD | 🟢 | 3/3 specs done (020–022) — workflow runs storage + sync, cross-repo timeline UI with realtime, Overview success-rate widget. |
 | 5 | Website Monitoring | 🟢 | 3/3 specs done (023–025) — monitor MVP + manual probe, scheduled checks + uptime calc + activity events, Overview uptime KPI + Reverb live updates + perf chart. |
-| 6 | Docker Host Agent MVP | ⬜ | — |
-| 7 | Alerts Engine | ⬜ | — |
-| 8 | Analytics & Health Scores | ⬜ | — |
-| 9 | Polish & Production Readiness | ⬜ | — |
+| 6 | Docker Host Agent MVP | 🟢 | 4/4 specs done (026–029). Phase complete. |
+| 7 | Alerts Engine | 🟢 | 3/3 specs done (030–032). Phase complete. |
+| 8 | Analytics & Health Scores | 🟢 | 3/3 specs done (033–035). Phase complete. |
+| 9 | Polish & Production Readiness | 🟢 | 6/6 specs done (036–041). Phase complete. |
 | 10 | Future Innovation | ⬜ | — |
 
 Detailed per-spec status lives in [`specs/README.md`](specs/README.md). Each spec is one GitHub issue + one branch + one PR — see [`.claude/skills/nexus-spec-workflow`](.claude/skills/nexus-spec-workflow) for the workflow.
@@ -58,6 +58,15 @@ After Phase 5 (complete):
 - Spec 023 (done) — Website monitor MVP. `websites` + `website_checks` tables with `WebsiteStatus` (`pending|up|down|slow|error`) and `WebsiteCheckStatus` enums. `RunWebsiteProbeAction` is a pure HTTP probe (no DB writes) classifying the response into up / slow (>3000ms hard threshold) / down / error; `RecordWebsiteCheckAction` persists the check + updates `Website.{status,last_checked_at,last_success_at,last_failure_at}`. CRUD pages live under `/monitoring/websites/*`; per-site show page hosts a manual "Probe now" button (sync request → instant feedback ≤ `timeout_ms`). Sidebar `Monitoring` entry replaces the Phase 5 placeholder.
 - Spec 024 (done) — Scheduled checks + uptime calc + activity events. `DispatchDueWebsiteChecksJob` runs every minute (`Schedule::job(...)->everyMinute()->withoutOverlapping()` in `routes/console.php`), filters due websites in PHP (cross-DB compat), and dispatches `RunWebsiteCheckJob` per row. The per-website job reuses the spec-023 actions so manual probes and scheduled probes never drift. `RecordWebsiteCheckAction` detects healthy↔failed category transitions and emits `website.down` / `website.recovered` activity events on swings (steady-state runs stay silent). Spec 019's `ActivityEventCreated::broadcastOn()` was extended to resolve recipient channels for `source: monitoring` rows via `metadata.website_id → website → project → owner_user_id` so monitoring incidents broadcast in realtime. `GetWebsitePerformanceSummaryQuery` returns count-based uptime % over 24h / 7d / 30d windows + last-incident timestamp; the show page renders a 4-tile uptime stats strip. `RecentActivityForUserQuery` extended to surface monitoring events alongside repo events on the right rail.
 - Spec 025 (done) — Overview uptime KPI + Reverb live updates + perf chart. `GetMonitoringUptimeKpiQuery` aggregates `website_checks` volume-weighted across **all** the user's monitors over 24h (vs prior 24h) plus a 12-day daily sparkline; replaces the long-standing `MOCK_KPIS['uptime']` on Overview. Empty 24h window → null overall + muted status; status thresholds at 99 / 95. New `WebsiteCheckRecorded` event (`ShouldBroadcastNow`, pre-resolved owner id, `users.{id}.monitoring` channel, light-weight `{check_id, website_id}` pulse) fires from `RecordWebsiteCheckAction` on every persisted check (steady-state runs included; transition events stay separate). The website show page subscribes via Echo, filters client-side by `website_id`, and partial-reloads `website + summary + checks` on each pulse. Response-time `Sparkline` of the last 50 `response_time_ms` values renders in the recent-checks card with leading-null skip + carry-forward fill; `<2 data points` renders a "not enough data" placeholder.
+
+## Deploying to production
+
+Nexus is a standard Laravel app with three long-running side processes (queue worker, scheduler, websocket server). The docs below walk a fresh operator through a single-host install.
+
+- [`docs/installation.md`](docs/installation.md) — OS prerequisites (PHP 8.4+, MySQL 8+ / Postgres 15+, Redis 7+, Node 20+), database + Redis setup, code + dependency install, `.env` from [`docs/env.production.example`](docs/env.production.example), `APP_KEY` generation, initial migrate.
+- [`docs/deployment.md`](docs/deployment.md) — Supervisor **and** systemd unit files for Horizon / scheduler / Reverb, Nginx reference config (with the WebSocket upgrade block for Reverb), post-deploy checklist, zero-downtime deploy notes, health-check endpoints.
+- [`docs/backup.md`](docs/backup.md) — MySQL / Postgres dump commands, `.env` handling (encrypt off-box; `APP_KEY` decrypts the stored GitHub tokens), off-site retention, restore drill, quarterly rehearsal cadence.
+- [`docs/security/operator-checklist.md`](docs/security/operator-checklist.md) — pre-deploy sign-off: secrets-at-rest audit, webhook signature verification, `HORIZON_ALLOW_LIST` gate, agent telemetry auth + fingerprinting, rate-limit coverage.
 
 ## Local development
 
