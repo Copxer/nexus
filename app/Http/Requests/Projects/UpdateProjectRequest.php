@@ -19,20 +19,25 @@ class UpdateProjectRequest extends FormRequest
     }
 
     /**
-     * Same shape as the store request — Update is a full PATCH/PUT replace.
-     * If we move to partial updates later we'll switch to `sometimes`
-     * everywhere, but the form posts every field today.
+     * Spec 047 — every field is `sometimes` so partial forms don't
+     * clobber siblings. The main `ProjectForm` still posts every field
+     * today; the public-status panel on `Projects/Edit.vue` posts only
+     * `public_status_*` fields to prevent stale main-form state from
+     * overwriting a fresh save.
      */
     public function rules(): array
     {
         return [
-            'name' => ['required', 'string', 'min:2', 'max:120'],
-            'description' => ['nullable', 'string', 'max:2000'],
-            'status' => ['required', new Enum(ProjectStatus::class)],
-            'priority' => ['required', new Enum(ProjectPriority::class)],
-            'environment' => ['nullable', 'string', 'max:64'],
-            'color' => ['nullable', Rule::in(ProjectPalette::COLORS)],
-            'icon' => ['nullable', Rule::in(ProjectPalette::ICONS)],
+            'name' => ['sometimes', 'required', 'string', 'min:2', 'max:120'],
+            'description' => ['sometimes', 'nullable', 'string', 'max:2000'],
+            'status' => ['sometimes', 'required', new Enum(ProjectStatus::class)],
+            'priority' => ['sometimes', 'required', new Enum(ProjectPriority::class)],
+            'environment' => ['sometimes', 'nullable', 'string', 'max:64'],
+            'color' => ['sometimes', 'nullable', Rule::in(ProjectPalette::COLORS)],
+            'icon' => ['sometimes', 'nullable', Rule::in(ProjectPalette::ICONS)],
+            // Spec 047 — per-project opt-in for the public status page.
+            'public_status_enabled' => ['sometimes', 'boolean'],
+            'public_status_headline' => ['sometimes', 'nullable', 'string', 'max:240'],
         ];
     }
 }

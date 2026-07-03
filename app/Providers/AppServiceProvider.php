@@ -2,6 +2,10 @@
 
 namespace App\Providers;
 
+use App\Domain\PublicStatus\Listeners\InvalidatePublicStatusCacheListener;
+use App\Domain\PublicStatus\Listeners\NotifyPublicSubscribersOnAlertListener;
+use App\Events\AlertResolved;
+use App\Events\AlertTriggered;
 use App\Models\AgentToken;
 use App\Models\Alert;
 use App\Models\Host;
@@ -14,6 +18,7 @@ use App\Policies\HostPolicy;
 use App\Policies\ProjectPolicy;
 use App\Policies\RepositoryPolicy;
 use App\Policies\WebsitePolicy;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\Vite;
@@ -59,5 +64,14 @@ class AppServiceProvider extends ServiceProvider
         if (str_starts_with((string) config('app.url'), 'https://')) {
             URL::forceScheme('https');
         }
+
+        // Spec 047 — fan alert transitions out to public subscribers +
+        // flush the cached status snapshot. Registered explicitly
+        // (Laravel 11+ auto-discovery scans specific paths; the
+        // Domain/{Context}/Listeners layout isn't one of the defaults).
+        Event::listen(AlertTriggered::class, [NotifyPublicSubscribersOnAlertListener::class, 'handle']);
+        Event::listen(AlertResolved::class, [NotifyPublicSubscribersOnAlertListener::class, 'handle']);
+        Event::listen(AlertTriggered::class, [InvalidatePublicStatusCacheListener::class, 'handle']);
+        Event::listen(AlertResolved::class, [InvalidatePublicStatusCacheListener::class, 'handle']);
     }
 }
