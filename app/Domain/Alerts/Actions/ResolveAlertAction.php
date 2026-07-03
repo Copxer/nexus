@@ -3,6 +3,7 @@
 namespace App\Domain\Alerts\Actions;
 
 use App\Domain\Activity\Actions\CreateActivityEventAction;
+use App\Domain\Notifications\Services\AlertNotificationService;
 use App\Enums\ActivitySeverity;
 use App\Enums\AlertSource;
 use App\Enums\AlertStatus;
@@ -10,6 +11,8 @@ use App\Events\AlertResolved;
 use App\Models\Alert;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * Close every open or acknowledged Alert matching a recovery
@@ -50,6 +53,7 @@ class ResolveAlertAction
 {
     public function __construct(
         private readonly CreateActivityEventAction $createActivity,
+        private readonly AlertNotificationService $notifications,
     ) {}
 
     /**
@@ -147,6 +151,17 @@ class ResolveAlertAction
             // commit).
             $alert->loadMissing('project:id,owner_user_id');
             AlertResolved::dispatch($alert->id, $alert->project?->owner_user_id);
+
+            // Spec 042 — resolution notification is opt-in per
+            // preference row (`notify_on_resolve`). Fire-and-forget.
+            try {
+                $this->notifications->dispatchResolutionFor($alert);
+            } catch (Throwable $e) {
+                Log::warning('AlertNotificationService::dispatchResolutionFor failed', [
+                    'alert_id' => $alert->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
 
             return true;
         });

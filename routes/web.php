@@ -23,6 +23,7 @@ use App\Http\Controllers\RepositoryPullRequestsSyncController;
 use App\Http\Controllers\RepositorySyncAllController;
 use App\Http\Controllers\RepositorySyncController;
 use App\Http\Controllers\RepositoryWorkflowRunsSyncController;
+use App\Http\Controllers\Settings\NotificationsController;
 use App\Http\Controllers\Settings\ThemeController;
 use App\Http\Controllers\Settings\WebhookDeliveryController;
 use App\Http\Controllers\SettingsController;
@@ -74,6 +75,36 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/settings/webhook-deliveries/{delivery}/retry', [WebhookDeliveryController::class, 'retry'])
         ->middleware('throttle:30,1') // spec 039
         ->name('settings.webhook-deliveries.retry');
+
+    // Spec 042 — outbound alert notifications (email / Slack / webhook).
+    // Single Inertia page carrying three logical tabs; the controller
+    // fans out mutations across channels + preferences + deliveries.
+    Route::get('/settings/notifications', [NotificationsController::class, 'index'])
+        ->name('settings.notifications.index');
+    Route::post('/settings/notifications/channels', [NotificationsController::class, 'storeChannel'])
+        ->middleware('throttle:10,1')
+        ->name('settings.notifications.channels.store');
+    Route::patch('/settings/notifications/channels/{channel}', [NotificationsController::class, 'updateChannel'])
+        ->middleware('throttle:20,1')
+        ->name('settings.notifications.channels.update');
+    Route::delete('/settings/notifications/channels/{channel}', [NotificationsController::class, 'destroyChannel'])
+        ->middleware('throttle:20,1')
+        ->name('settings.notifications.channels.destroy');
+    Route::post('/settings/notifications/channels/{channel}/test', [NotificationsController::class, 'testChannel'])
+        ->middleware('throttle:10,1')
+        ->name('settings.notifications.channels.test');
+    Route::post('/settings/notifications/preferences', [NotificationsController::class, 'storePreference'])
+        ->middleware('throttle:20,1')
+        ->name('settings.notifications.preferences.store');
+    Route::patch('/settings/notifications/preferences/{preference}', [NotificationsController::class, 'updatePreference'])
+        ->middleware('throttle:20,1')
+        ->name('settings.notifications.preferences.update');
+    Route::delete('/settings/notifications/preferences/{preference}', [NotificationsController::class, 'destroyPreference'])
+        ->middleware('throttle:20,1')
+        ->name('settings.notifications.preferences.destroy');
+    Route::post('/settings/notifications/deliveries/{delivery}/retry', [NotificationsController::class, 'retryDelivery'])
+        ->middleware('throttle:30,1')
+        ->name('settings.notifications.deliveries.retry');
 
     Route::get('/integrations/github/connect', [GithubConnectionController::class, 'redirect'])
         ->name('integrations.github.connect');

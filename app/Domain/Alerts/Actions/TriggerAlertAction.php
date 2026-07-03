@@ -3,12 +3,15 @@
 namespace App\Domain\Alerts\Actions;
 
 use App\Domain\Activity\Actions\CreateActivityEventAction;
+use App\Domain\Notifications\Services\AlertNotificationService;
 use App\Enums\AlertSeverity;
 use App\Enums\AlertSource;
 use App\Enums\AlertStatus;
 use App\Events\AlertTriggered;
 use App\Models\Alert;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * Promote a transition event into a durable Alert row (spec 030).
@@ -40,6 +43,7 @@ class TriggerAlertAction
 {
     public function __construct(
         private readonly CreateActivityEventAction $createActivity,
+        private readonly AlertNotificationService $notifications,
     ) {}
 
     /**
@@ -126,6 +130,20 @@ class TriggerAlertAction
         // re-firing source doesn't double-toast.
         $alert->loadMissing('project:id,owner_user_id');
         AlertTriggered::dispatch($alert->id, $alert->project?->owner_user_id);
+
+        // Spec 042 — fan out to configured notification channels.
+        // Fire-and-forget: the trigger path never fails because a
+        // notification enqueue errored. The service enqueues jobs;
+        // driver failures land in `alert_deliveries` as `failed` and
+        // surface in Settings → Notifications → Deliveries.
+        try {
+            $this->notifications->dispatchFor($alert);
+        } catch (Throwable $e) {
+            Log::warning('AlertNotificationService::dispatchFor failed', [
+                'alert_id' => $alert->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
 
         return $alert;
     }
