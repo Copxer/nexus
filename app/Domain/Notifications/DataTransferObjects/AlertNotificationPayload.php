@@ -2,7 +2,10 @@
 
 namespace App\Domain\Notifications\DataTransferObjects;
 
+use App\Domain\Notifications\Contracts\NotificationPayload;
+use App\Mail\AlertNotificationMail;
 use App\Models\Alert;
+use Illuminate\Mail\Mailable;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\URL;
 
@@ -18,7 +21,7 @@ use Illuminate\Support\Facades\URL;
  * scalar values only, size bounded ≤ 2 KB before the payload as a
  * whole is bounded ≤ 4 KB at the delivery-log persist step.
  */
-final class AlertNotificationPayload
+final class AlertNotificationPayload implements NotificationPayload
 {
     /**
      * @param  array<string, scalar|null>  $metadata
@@ -87,6 +90,91 @@ final class AlertNotificationPayload
             'link' => $this->link,
             'triggered_at' => $this->triggeredAt->toIso8601String(),
             'metadata' => $this->metadata,
+        ];
+    }
+
+    public function title(): string
+    {
+        return $this->title;
+    }
+
+    public function message(): ?string
+    {
+        return $this->message;
+    }
+
+    public function link(): string
+    {
+        return $this->link;
+    }
+
+    public function event(): string
+    {
+        return $this->event;
+    }
+
+    public function toMail(): Mailable
+    {
+        return new AlertNotificationMail($this);
+    }
+
+    /** @return array<string, mixed> */
+    public function toSlackPayload(): array
+    {
+        $emoji = match ($this->severity) {
+            'critical' => ':rotating_light:',
+            'warning' => ':warning:',
+            default => ':information_source:',
+        };
+
+        $header = $this->event === 'alert.resolved'
+            ? ":white_check_mark: {$this->title} resolved"
+            : "{$emoji} {$this->title}";
+
+        return [
+            'text' => $header,
+            'blocks' => [
+                [
+                    'type' => 'header',
+                    'text' => [
+                        'type' => 'plain_text',
+                        'text' => $header,
+                        'emoji' => true,
+                    ],
+                ],
+                [
+                    'type' => 'section',
+                    'fields' => array_filter([
+                        [
+                            'type' => 'mrkdwn',
+                            'text' => "*Severity*\n".ucfirst($this->severity),
+                        ],
+                        [
+                            'type' => 'mrkdwn',
+                            'text' => "*Source*\n".ucfirst($this->source),
+                        ],
+                    ]),
+                ],
+                ...($this->message !== null && $this->message !== '' ? [[
+                    'type' => 'section',
+                    'text' => [
+                        'type' => 'mrkdwn',
+                        'text' => $this->message,
+                    ],
+                ]] : []),
+                [
+                    'type' => 'actions',
+                    'elements' => [[
+                        'type' => 'button',
+                        'text' => [
+                            'type' => 'plain_text',
+                            'text' => 'View in Nexus',
+                            'emoji' => true,
+                        ],
+                        'url' => $this->link,
+                    ]],
+                ],
+            ],
         ];
     }
 

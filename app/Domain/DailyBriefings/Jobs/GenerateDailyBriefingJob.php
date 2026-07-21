@@ -78,7 +78,11 @@ class GenerateDailyBriefingJob implements ShouldBeUnique, ShouldQueue
             $preference->include_projects,
         );
 
-        $generate->execute($user, $snapshot);
+        $briefing = $generate->execute($user, $snapshot);
+
+        if ($briefing->status === DailyBriefingStatus::Generated) {
+            SendDailyBriefingJob::dispatch($briefing->id);
+        }
     }
 
     private function alreadyGeneratedOrQueued(int $userId): bool

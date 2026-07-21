@@ -7,6 +7,7 @@ use App\Domain\AI\DataTransferObjects\LlmPrompt;
 use App\Domain\AI\DataTransferObjects\LlmResponse;
 use App\Domain\DailyBriefings\Actions\GenerateDailyBriefingAction;
 use App\Domain\DailyBriefings\Jobs\GenerateDailyBriefingJob;
+use App\Domain\DailyBriefings\Jobs\SendDailyBriefingJob;
 use App\Domain\DailyBriefings\Queries\GetDailyBriefingInputQuery;
 use App\Enums\DailyBriefingStatus;
 use App\Models\DailyBriefing;
@@ -14,6 +15,7 @@ use App\Models\DailyBriefingPreference;
 use App\Models\Project;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class GenerateDailyBriefingJobTest extends TestCase
@@ -29,6 +31,7 @@ class GenerateDailyBriefingJobTest extends TestCase
 
     public function test_builds_input_snapshot_and_generates_briefing_for_enabled_user(): void
     {
+        Queue::fake();
         config(['services.llm.enabled' => true]);
         $user = User::factory()->create();
         $project = Project::factory()->create([
@@ -55,10 +58,12 @@ class GenerateDailyBriefingJobTest extends TestCase
         $this->assertSame('America/New_York', $briefing->input_snapshot['window']['timezone']);
         $this->assertSame($project->id, $briefing->input_snapshot['projects']['sample'][0]['id']);
         $this->assertNotNull($client->prompt);
+        Queue::assertPushed(SendDailyBriefingJob::class, fn (SendDailyBriefingJob $job): bool => $job->briefingId === $briefing->id);
     }
 
     public function test_does_not_regenerate_existing_generated_briefing(): void
     {
+        Queue::fake();
         config(['services.llm.enabled' => true]);
         $user = User::factory()->create();
         DailyBriefingPreference::factory()->enabled()->create(['user_id' => $user->id]);
@@ -76,10 +81,12 @@ class GenerateDailyBriefingJobTest extends TestCase
 
         $this->assertDatabaseCount('daily_briefings', 1);
         $this->assertNull($client->prompt);
+        Queue::assertNotPushed(SendDailyBriefingJob::class);
     }
 
     public function test_does_not_generate_when_user_is_not_opted_in_or_ai_is_disabled(): void
     {
+        Queue::fake();
         config(['services.llm.enabled' => false]);
         $user = User::factory()->create();
         DailyBriefingPreference::factory()->enabled()->create(['user_id' => $user->id]);
@@ -90,10 +97,12 @@ class GenerateDailyBriefingJobTest extends TestCase
         );
 
         $this->assertDatabaseCount('daily_briefings', 0);
+        Queue::assertNotPushed(SendDailyBriefingJob::class);
     }
 
     public function test_does_not_generate_when_user_is_not_opted_in(): void
     {
+        Queue::fake();
         config(['services.llm.enabled' => true]);
         $user = User::factory()->create();
 
@@ -103,6 +112,7 @@ class GenerateDailyBriefingJobTest extends TestCase
         );
 
         $this->assertDatabaseCount('daily_briefings', 0);
+        Queue::assertNotPushed(SendDailyBriefingJob::class);
     }
 }
 

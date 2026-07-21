@@ -287,11 +287,21 @@ Track actual files as implementation progresses. Expected touchpoints:
 - `tests/Feature/DailyBriefings/DispatchDueDailyBriefingsJobTest.php` — covered timezone due checks, opt-in, AI gate, `last_sent_for_date`, and generated-row idempotency.
 - `tests/Feature/DailyBriefings/GenerateDailyBriefingActionTest.php` — covered prompt construction, fake-client generation, output sanitization, failed LLM calls, disabled AI fail-closed behavior, invalid output, and same-day row reuse.
 - `tests/Feature/DailyBriefings/GenerateDailyBriefingJobTest.php` — covered unique ID, query-to-generate orchestration, opt-in/AI gates, and generated-row idempotency.
+- `app/Domain/Notifications/Contracts/NotificationPayload.php` — added a minimal payload contract so spec 042 channel drivers can send alert and daily briefing payloads.
+- `app/Domain/Notifications/Contracts/NotificationChannelDriver.php` — generalized driver input from alert-only payloads to the shared notification payload contract.
+- `app/Domain/Notifications/DataTransferObjects/AlertNotificationPayload.php` — adapted alert notifications to the shared payload contract without changing alert delivery semantics.
+- `app/Domain/Notifications/Drivers/EmailChannelDriver.php` — reused the existing email channel driver for any payload-provided mailable.
+- `app/Domain/Notifications/Drivers/SlackChannelDriver.php` — reused the existing Slack driver by delegating Block Kit payload construction to the notification payload.
+- `app/Domain/Notifications/Drivers/GenericWebhookChannelDriver.php` — reused the existing generic webhook driver for daily briefing JSON payloads.
+- `app/Domain/DailyBriefings/DataTransferObjects/DailyBriefingPayload.php` — added the daily briefing payload adapter for email, Slack, and webhook delivery.
+- `app/Mail/DailyBriefingMail.php` — added the daily briefing email mailable.
+- `resources/views/emails/daily-briefing.blade.php` — added the operator-facing daily briefing email template.
+- `app/Domain/DailyBriefings/Jobs/SendDailyBriefingJob.php` — added delivery through selected verified channel or fallback verified email, delivered/failure persistence, and `last_sent_for_date` update only after successful delivery.
+- `app/Domain/DailyBriefings/Jobs/GenerateDailyBriefingJob.php` — dispatches `SendDailyBriefingJob` after successful generated persistence.
+- `tests/Feature/DailyBriefings/SendDailyBriefingJobTest.php` — covered selected channel delivery, fallback verified email delivery, failure handling, successful retry of failed generated rows, delivered status/timestamps, and `last_sent_for_date` semantics.
 
 Expected future touchpoints:
 
-- `app/Domain/DailyBriefings/DataTransferObjects/DailyBriefingPayload.php`
-- `app/Domain/DailyBriefings/Jobs/SendDailyBriefingJob.php`
 - `app/Http/Controllers/Settings/DailyBriefingPreferenceController.php`
 - `app/Http/Controllers/DailyBriefingController.php`
 - `resources/js/Pages/Settings/DailyBriefing.vue`
@@ -302,8 +312,6 @@ Expected future touchpoints:
 - `docs/env.production.example`
 - `docs/security/operator-checklist.md`
 - `tests/Feature/DailyBriefings/DailyBriefingPreferenceControllerTest.php`
-- `tests/Feature/DailyBriefings/SendDailyBriefingJobTest.php`
-- `tests/Feature/DailyBriefings/GetDailyBriefingInputQueryTest.php`
 - `tests/Feature/DailyBriefings/DailyBriefingHistoryControllerTest.php`
 
 ## Work log
@@ -374,13 +382,21 @@ Dated notes as work progresses.
   `GenerateDailyBriefingAction`. Deliberately deferred delivery,
   `SendDailyBriefingJob`, settings UI/controller, history UI, palette, and
   docs.
+- Implemented the delivery work unit: generalized spec 042 channel drivers
+  behind a small `NotificationPayload` contract, kept alert notification
+  semantics intact, added `DailyBriefingPayload`, email rendering, and
+  `SendDailyBriefingJob`. The send job resolves the selected verified
+  channel, falls back to the user's first verified email channel only when no
+  channel is selected, marks the briefing delivered with `delivered_at`, and
+  updates `last_sent_for_date` only inside the successful-delivery path.
+  Delivery failures mark the existing generated briefing `failed` while
+  keeping its generated content so it can be retried. `GenerateDailyBriefingJob`
+  now dispatches the send job after successful generation. Deliberately
+  deferred settings UI/controller, history UI/controller, command palette, and
+  docs.
 
 ## Open questions / blockers
 
-- **Delivery adapter shape.** Confirm during implementation whether spec
-  042 exposes reusable notification drivers for non-alert payloads. If
-  not, ship a small briefing-specific payload adapter without changing
-  alert semantics.
 - **Default channel behavior.** Draft assumes "selected verified channel,
   else first verified email channel." If operators should receive Slack
   by default when available, adjust before implementation.

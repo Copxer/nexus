@@ -2,7 +2,6 @@
 
 namespace App\Domain\Notifications\Contracts;
 
-use App\Domain\Notifications\DataTransferObjects\AlertNotificationPayload;
 use App\Models\AlertNotificationChannel;
 
 /**
@@ -18,5 +17,5 @@ interface NotificationChannelDriver
     /**
      * @throws \Throwable when the channel refuses / errors out.
      */
-    public function send(AlertNotificationChannel $channel, AlertNotificationPayload $payload): void;
+    public function send(AlertNotificationChannel $channel, NotificationPayload $payload): void;
 }

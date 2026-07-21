@@ -3,15 +3,14 @@
 namespace App\Domain\Notifications\Drivers;
 
 use App\Domain\Notifications\Contracts\NotificationChannelDriver;
-use App\Domain\Notifications\DataTransferObjects\AlertNotificationPayload;
-use App\Mail\AlertNotificationMail;
+use App\Domain\Notifications\Contracts\NotificationPayload;
 use App\Models\AlertNotificationChannel;
 use Illuminate\Support\Facades\Mail;
 use InvalidArgumentException;
 
 class EmailChannelDriver implements NotificationChannelDriver
 {
-    public function send(AlertNotificationChannel $channel, AlertNotificationPayload $payload): void
+    public function send(AlertNotificationChannel $channel, NotificationPayload $payload): void
     {
         $to = $channel->config['to'] ?? null;
 
@@ -21,6 +20,6 @@ class EmailChannelDriver implements NotificationChannelDriver
             );
         }
 
-        Mail::to($to)->send(new AlertNotificationMail($payload));
+        Mail::to($to)->send($payload->toMail());
     }
 }
