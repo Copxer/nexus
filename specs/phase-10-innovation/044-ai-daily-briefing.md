@@ -304,17 +304,15 @@ Track actual files as implementation progresses. Expected touchpoints:
 - `resources/js/Pages/Settings/Index.vue` — linked Settings to the daily briefing settings page.
 - `routes/web.php` — added daily briefing settings routes with 20/min update and 5/min test-send throttles.
 - `tests/Feature/DailyBriefings/DailyBriefingPreferenceControllerTest.php` — covered settings render/update, guest rejection, channel ownership/verification/enabled guard, project ownership guard, test send, and throttling.
+- `app/Http/Controllers/DailyBriefingController.php` — added authenticated briefing history payloads scoped to the current user's generated content.
+- `resources/js/Pages/DailyBriefings/Index.vue` — added the `/daily-briefings` history list with status, date, configured channel, summary preview, empty state, and inline expandable detail panel for full content.
+- `tests/Feature/DailyBriefings/DailyBriefingHistoryControllerTest.php` — covered authenticated-only access, user scoping, generated-content filtering, row payloads, and detail drawer payloads.
 
 Expected future touchpoints:
 
-- `app/Http/Controllers/DailyBriefingController.php`
-- `resources/js/Pages/DailyBriefings/Index.vue`
-- `resources/js/Pages/DailyBriefings/Show.vue`
 - `resources/js/lib/commands.ts`
-- `routes/web.php`
 - `docs/env.production.example`
 - `docs/security/operator-checklist.md`
-- `tests/Feature/DailyBriefings/DailyBriefingHistoryControllerTest.php`
 
 ## Work log
 
@@ -405,6 +403,16 @@ Dated notes as work progresses.
   controller rejects channels that are not owned, enabled, and verified, and
   rejects project filters outside the authenticated user's ownership. Deliberately
   deferred history UI/controller, command palette entries, and docs.
+- Implemented the history UI/controller work unit: `/daily-briefings` now lists
+  the authenticated user's generated briefing rows only, with status, briefing
+  date, configured delivery channel, summary preview, and an inline expandable
+  detail panel showing full summary/highlights/risks/error context. Pending or
+  failed-before-generation rows are hidden because they have no generated content
+  to inspect. Deliberately deferred command palette entries and docs.
+- Hardened `GetDailyBriefingInputQueryTest` opened-issue fixtures by explicitly
+  setting open state and null close timestamps. The factory can randomly create
+  closed issues, which made opened-boundary sample assertions flaky when the full
+  DailyBriefings suite ran with different generated timestamps.
 
 ## Open questions / blockers
 

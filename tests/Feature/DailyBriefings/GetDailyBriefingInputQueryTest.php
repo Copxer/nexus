@@ -37,18 +37,24 @@ class GetDailyBriefingInputQueryTest extends TestCase
 
         GithubIssue::factory()->create([
             'repository_id' => $includedRepo->id,
+            'state' => GithubIssueState::Open->value,
             'title' => 'Visible issue',
             'created_at_github' => '2026-07-20 12:00:00',
+            'closed_at_github' => null,
         ]);
         GithubIssue::factory()->create([
             'repository_id' => $excludedRepo->id,
+            'state' => GithubIssueState::Open->value,
             'title' => 'Filtered issue',
             'created_at_github' => '2026-07-20 12:00:00',
+            'closed_at_github' => null,
         ]);
         GithubIssue::factory()->create([
             'repository_id' => $otherRepo->id,
+            'state' => GithubIssueState::Open->value,
             'title' => 'Leaked issue',
             'created_at_github' => '2026-07-20 12:00:00',
+            'closed_at_github' => null,
         ]);
 
         $snapshot = app(GetDailyBriefingInputQuery::class)->execute(
@@ -71,18 +77,24 @@ class GetDailyBriefingInputQueryTest extends TestCase
 
         GithubIssue::factory()->create([
             'repository_id' => $repository->id,
+            'state' => GithubIssueState::Open->value,
             'title' => 'Before local day',
             'created_at_github' => '2026-07-20 03:59:59',
+            'closed_at_github' => null,
         ]);
         GithubIssue::factory()->create([
             'repository_id' => $repository->id,
+            'state' => GithubIssueState::Open->value,
             'title' => 'Inside local day',
             'created_at_github' => '2026-07-20 04:00:00',
+            'closed_at_github' => null,
         ]);
         GithubIssue::factory()->create([
             'repository_id' => $repository->id,
+            'state' => GithubIssueState::Open->value,
             'title' => 'End boundary',
             'created_at_github' => '2026-07-21 04:00:00',
+            'closed_at_github' => null,
         ]);
 
         $snapshot = app(GetDailyBriefingInputQuery::class)->execute($user, '2026-07-20', 'America/New_York');

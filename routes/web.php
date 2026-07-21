@@ -7,6 +7,7 @@ use App\Http\Controllers\AlertController;
 use App\Http\Controllers\AlertMuteController;
 use App\Http\Controllers\AlertResolveController;
 use App\Http\Controllers\AnalyticsController;
+use App\Http\Controllers\DailyBriefingController;
 use App\Http\Controllers\DeploymentController;
 use App\Http\Controllers\GithubConnectionController;
 use App\Http\Controllers\GithubRepositoryImportController;
@@ -105,6 +106,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/settings/daily-briefing/test', [DailyBriefingPreferenceController::class, 'sendTest'])
         ->middleware('throttle:5,1')
         ->name('settings.daily-briefing.test');
+
+    // Spec 044 — generated daily briefing history. Read-only and scoped
+    // to the authenticated user's generated content.
+    Route::get('/daily-briefings', [DailyBriefingController::class, 'index'])
+        ->name('daily-briefings.index');
 
     Route::post('/settings/notifications/channels', [NotificationsController::class, 'storeChannel'])
         ->middleware('throttle:10,1')
