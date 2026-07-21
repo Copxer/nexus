@@ -50,6 +50,11 @@ class AlertNotificationChannel extends Model
         return $this->hasMany(AlertNotificationPreference::class, 'channel_id');
     }
 
+    public function dailyBriefingPreferences(): HasMany
+    {
+        return $this->hasMany(DailyBriefingPreference::class, 'channel_id');
+    }
+
     public function deliveries(): HasMany
     {
         return $this->hasMany(AlertDelivery::class, 'channel_id');

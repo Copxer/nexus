@@ -53,4 +53,12 @@ return [
         'webhook_secret' => env('GITHUB_WEBHOOK_SECRET', ''),
     ],
 
+    'llm' => [
+        'enabled' => env('AI_FEATURES_ENABLED', false),
+        'provider' => env('LLM_PROVIDER', 'anthropic'),
+        'api_key' => env('LLM_API_KEY'),
+        'model' => env('LLM_MODEL', 'claude-3-5-haiku-latest'),
+        'timeout' => (int) env('LLM_TIMEOUT', 20),
+    ],
+
 ];

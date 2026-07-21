@@ -261,13 +261,20 @@ README LLM dependencies, spec 042 delivery layer.
 
 Track actual files as implementation progresses. Expected touchpoints:
 
-- `database/migrations/*_create_daily_briefing_preferences_table.php`
-- `database/migrations/*_create_daily_briefings_table.php`
+- `config/services.php` — added disabled-by-default `services.llm.*` config.
+- `database/migrations/2026_07_21_140000_create_daily_briefing_preferences_table.php`
+- `database/migrations/2026_07_21_140001_create_daily_briefings_table.php`
 - `app/Enums/DailyBriefingStatus.php`
 - `app/Models/DailyBriefingPreference.php`
 - `app/Models/DailyBriefing.php`
+- `app/Models/User.php` — added daily briefing relationships.
+- `app/Models/AlertNotificationChannel.php` — added daily briefing preference relationship.
 - `database/factories/DailyBriefingPreferenceFactory.php`
 - `database/factories/DailyBriefingFactory.php`
+- `tests/Feature/DailyBriefings/DailyBriefingPersistenceTest.php`
+
+Expected future touchpoints:
+
 - `app/Domain/AI/Contracts/LlmClient.php`
 - `app/Domain/AI/DataTransferObjects/LlmPrompt.php`
 - `app/Domain/AI/DataTransferObjects/LlmResponse.php`
@@ -286,7 +293,6 @@ Track actual files as implementation progresses. Expected touchpoints:
 - `resources/js/lib/commands.ts`
 - `routes/web.php`
 - `routes/console.php`
-- `config/services.php`
 - `docs/env.production.example`
 - `docs/security/operator-checklist.md`
 - `tests/Feature/DailyBriefings/DailyBriefingPreferenceControllerTest.php`
@@ -322,6 +328,11 @@ Dated notes as work progresses.
 - Kept AI incident summaries and PR risk scoring out of scope because
   the roadmap lists them separately and spec 045 owns PR risk + health
   explanations.
+- Implemented the first backend-foundation work unit: disabled-by-default
+  AI/LLM config, daily briefing persistence migrations, enum, models,
+  factories, relationships, and persistence tests. Deliberately deferred
+  input query, LLM client, jobs, delivery, UI, palette, and docs to keep
+  the commit independently reviewable.
 
 ## Open questions / blockers
 
