@@ -22,6 +22,13 @@ class GetOverviewDashboardQueryTest extends TestCase
 
     private ?User $defaultUser = null;
 
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+
+        parent::tearDown();
+    }
+
     /**
      * Spec 035 — `handle()` accepts a User for the riskyProjects
      * scope. Tests that don't care about the user-scoped slice can
@@ -667,6 +674,8 @@ class GetOverviewDashboardQueryTest extends TestCase
 
     public function test_activity_heatmap_buckets_event_by_day_and_hour(): void
     {
+        Carbon::setTestNow(Carbon::parse('2026-05-15 12:00:00', 'UTC'));
+
         $repository = $this->setUpRepository();
 
         // Wednesday at 14:30 → day=3, hour=14, bucket=3 (12:00–16:00).
@@ -684,6 +693,8 @@ class GetOverviewDashboardQueryTest extends TestCase
 
     public function test_activity_heatmap_accumulates_multiple_events_in_same_bucket(): void
     {
+        Carbon::setTestNow(Carbon::parse('2026-05-15 12:00:00', 'UTC'));
+
         $repository = $this->setUpRepository();
 
         // Three events all on Monday at 09:00–10:30 → day=1, bucket=2 (08:00–12:00).
@@ -750,6 +761,8 @@ class GetOverviewDashboardQueryTest extends TestCase
      */
     public function test_activity_heatmap_bucket_boundary_contract(): void
     {
+        Carbon::setTestNow(Carbon::parse('2026-05-15 12:00:00', 'UTC'));
+
         $repository = $this->setUpRepository();
 
         // 2026-04-26 was a Sunday → day-of-week index 0. Seed one event

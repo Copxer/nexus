@@ -14,6 +14,7 @@ import {
     Globe2,
     LayoutDashboard,
     LogOut,
+    Newspaper,
     Plug,
     Plus,
     RefreshCw,
@@ -217,6 +218,14 @@ export function getCommands(): Command[] {
             keywords: ['preferences', 'integrations'],
             run: () => router.visit(route('settings.index')),
         },
+        {
+            id: 'open-daily-briefings',
+            label: 'Open daily briefings',
+            group: 'navigation',
+            icon: Newspaper,
+            keywords: ['ai', 'briefing', 'digest', 'history', 'summary'],
+            run: () => router.visit(route('daily-briefings.index')),
+        },
 
         // ────── Actions ────── //
         {
@@ -284,6 +293,14 @@ export function getCommands(): Command[] {
                 'threshold',
             ],
             run: () => router.visit(route('settings.rules.index')),
+        },
+        {
+            id: 'daily-briefing-settings',
+            label: 'Daily briefing settings',
+            group: 'actions',
+            icon: SettingsIcon,
+            keywords: ['ai', 'briefing', 'digest', 'preferences', 'schedule', 'delivery'],
+            run: () => router.visit(route('settings.daily-briefing.index')),
         },
 
         // ────── System ────── //
@@ -419,4 +436,3 @@ export { Clock as PaletteLoadingIcon };
 export function compareGroups(a: CommandGroup, b: CommandGroup): number {
     return groupOrder.indexOf(a) - groupOrder.indexOf(b);
 }
-

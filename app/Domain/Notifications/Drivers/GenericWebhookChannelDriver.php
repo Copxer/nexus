@@ -3,7 +3,7 @@
 namespace App\Domain\Notifications\Drivers;
 
 use App\Domain\Notifications\Contracts\NotificationChannelDriver;
-use App\Domain\Notifications\DataTransferObjects\AlertNotificationPayload;
+use App\Domain\Notifications\Contracts\NotificationPayload;
 use App\Models\AlertNotificationChannel;
 use Illuminate\Support\Facades\Http;
 use InvalidArgumentException;
@@ -11,7 +11,7 @@ use RuntimeException;
 
 class GenericWebhookChannelDriver implements NotificationChannelDriver
 {
-    public function send(AlertNotificationChannel $channel, AlertNotificationPayload $payload): void
+    public function send(AlertNotificationChannel $channel, NotificationPayload $payload): void
     {
         $url = $channel->config['url'] ?? null;
         $signingSecret = $channel->config['signing_secret'] ?? null;

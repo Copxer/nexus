@@ -7,6 +7,7 @@ use App\Http\Controllers\AlertController;
 use App\Http\Controllers\AlertMuteController;
 use App\Http\Controllers\AlertResolveController;
 use App\Http\Controllers\AnalyticsController;
+use App\Http\Controllers\DailyBriefingController;
 use App\Http\Controllers\DeploymentController;
 use App\Http\Controllers\GithubConnectionController;
 use App\Http\Controllers\GithubRepositoryImportController;
@@ -28,6 +29,7 @@ use App\Http\Controllers\RepositoryPullRequestsSyncController;
 use App\Http\Controllers\RepositorySyncAllController;
 use App\Http\Controllers\RepositorySyncController;
 use App\Http\Controllers\RepositoryWorkflowRunsSyncController;
+use App\Http\Controllers\Settings\DailyBriefingPreferenceController;
 use App\Http\Controllers\Settings\NotificationsController;
 use App\Http\Controllers\Settings\RulesController;
 use App\Http\Controllers\Settings\ThemeController;
@@ -93,6 +95,23 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // fans out mutations across channels + preferences + deliveries.
     Route::get('/settings/notifications', [NotificationsController::class, 'index'])
         ->name('settings.notifications.index');
+
+    // Spec 044 — per-user AI daily briefing settings. Updates are
+    // separate from the throttled immediate test-send action.
+    Route::get('/settings/daily-briefing', [DailyBriefingPreferenceController::class, 'index'])
+        ->name('settings.daily-briefing.index');
+    Route::patch('/settings/daily-briefing', [DailyBriefingPreferenceController::class, 'update'])
+        ->middleware('throttle:20,1')
+        ->name('settings.daily-briefing.update');
+    Route::post('/settings/daily-briefing/test', [DailyBriefingPreferenceController::class, 'sendTest'])
+        ->middleware('throttle:5,1')
+        ->name('settings.daily-briefing.test');
+
+    // Spec 044 — generated daily briefing history. Read-only and scoped
+    // to the authenticated user's generated content.
+    Route::get('/daily-briefings', [DailyBriefingController::class, 'index'])
+        ->name('daily-briefings.index');
+
     Route::post('/settings/notifications/channels', [NotificationsController::class, 'storeChannel'])
         ->middleware('throttle:10,1')
         ->name('settings.notifications.channels.store');

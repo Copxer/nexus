@@ -2,6 +2,7 @@
 
 use App\Domain\Alerts\Jobs\EvaluateAlertRulesJob;
 use App\Domain\Analytics\Jobs\RecomputeAllProjectHealthScoresJob;
+use App\Domain\DailyBriefings\Jobs\DispatchDueDailyBriefingsJob;
 use App\Domain\Docker\Jobs\DetectOfflineHostsJob;
 use App\Domain\Monitoring\Jobs\DispatchDueWebsiteChecksJob;
 use App\Domain\Observability\Jobs\CheckGitHubRateLimitJob;
@@ -85,4 +86,12 @@ Schedule::job(new CheckGitHubRateLimitJob)
 Schedule::job(new EvaluateAlertRulesJob)
     ->everyFiveMinutes()
     ->name('alerts:evaluate-rules')
+    ->withoutOverlapping();
+
+// Spec 044 — every-15-minute daily briefing dispatcher. It only fans
+// out generation jobs for opted-in users whose local delivery time has
+// passed; delivery stays in the later SendDailyBriefingJob slice.
+Schedule::job(new DispatchDueDailyBriefingsJob)
+    ->everyFifteenMinutes()
+    ->name('daily-briefings:dispatch-due')
     ->withoutOverlapping();
