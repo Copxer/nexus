@@ -20,19 +20,19 @@ class GenerateDailyBriefingAction
     /**
      * @param  array<string, mixed>  $inputSnapshot
      */
-    public function execute(User $user, array $inputSnapshot): DailyBriefing
+    public function execute(User $user, array $inputSnapshot, bool $isTest = false): DailyBriefing
     {
         $briefingDate = $this->briefingDate($inputSnapshot);
 
         if (! config('services.llm.enabled', false)) {
-            return $this->markFailed($user, $briefingDate, $inputSnapshot, 'AI features are disabled.');
+            return $this->markFailed($user, $briefingDate, $inputSnapshot, 'AI features are disabled.', $isTest);
         }
 
         try {
             $response = $this->llm->complete($this->prompt($inputSnapshot));
             $output = $this->validatedOutput($response->text);
 
-            return $this->writeBriefing($user, $briefingDate, [
+            return $this->writeBriefing($user, $briefingDate, $isTest, [
                 'status' => DailyBriefingStatus::Generated,
                 'input_snapshot' => $inputSnapshot,
                 'summary' => $output['summary'],
@@ -44,7 +44,7 @@ class GenerateDailyBriefingAction
                 'error_message' => null,
             ]);
         } catch (Throwable $exception) {
-            return $this->markFailed($user, $briefingDate, $inputSnapshot, $exception->getMessage());
+            return $this->markFailed($user, $briefingDate, $inputSnapshot, $exception->getMessage(), $isTest);
         }
     }
 
@@ -157,9 +157,9 @@ class GenerateDailyBriefingAction
     }
 
     /** @param array<string, mixed> $inputSnapshot */
-    private function markFailed(User $user, CarbonImmutable $briefingDate, array $inputSnapshot, string $error): DailyBriefing
+    private function markFailed(User $user, CarbonImmutable $briefingDate, array $inputSnapshot, string $error, bool $isTest): DailyBriefing
     {
-        return $this->writeBriefing($user, $briefingDate, [
+        return $this->writeBriefing($user, $briefingDate, $isTest, [
             'status' => DailyBriefingStatus::Failed,
             'input_snapshot' => $inputSnapshot,
             'summary' => null,
@@ -175,14 +175,16 @@ class GenerateDailyBriefingAction
     /**
      * @param  array<string, mixed>  $attributes
      */
-    private function writeBriefing(User $user, CarbonImmutable $briefingDate, array $attributes): DailyBriefing
+    private function writeBriefing(User $user, CarbonImmutable $briefingDate, bool $isTest, array $attributes): DailyBriefing
     {
         $briefing = DailyBriefing::query()
             ->where('user_id', $user->id)
             ->whereDate('briefing_date', $briefingDate->toDateString())
+            ->where('is_test', $isTest)
             ->first() ?? new DailyBriefing([
                 'user_id' => $user->id,
                 'briefing_date' => $briefingDate->toDateString(),
+                'is_test' => $isTest,
             ]);
 
         $briefing->fill($attributes);

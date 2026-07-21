@@ -28,7 +28,7 @@ class AnthropicLlmClient implements LlmClient
             'x-api-key' => $apiKey,
         ])
             ->timeout($timeout)
-            ->retry(1, 250, function ($exception, $request): bool {
+            ->retry(2, 250, function ($exception, $request): bool {
                 if ($exception instanceof ConnectionException) {
                     return true;
                 }

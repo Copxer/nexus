@@ -88,7 +88,7 @@ class DispatchDueDailyBriefingsJobTest extends TestCase
         Queue::assertNotPushed(GenerateDailyBriefingJob::class);
     }
 
-    public function test_skips_existing_pending_generated_or_delivered_briefing_rows(): void
+    public function test_dispatches_when_existing_briefing_still_needs_generation_or_delivery(): void
     {
         config(['services.llm.enabled' => true]);
         Carbon::setTestNow('2026-07-21 13:00:00');
@@ -102,7 +102,29 @@ class DispatchDueDailyBriefingsJobTest extends TestCase
         DailyBriefing::factory()->create([
             'user_id' => $user->id,
             'briefing_date' => '2026-07-20',
-            'status' => DailyBriefingStatus::Generated->value,
+            'status' => DailyBriefingStatus::Pending->value,
+        ]);
+
+        (new DispatchDueDailyBriefingsJob)->handle();
+
+        Queue::assertPushed(GenerateDailyBriefingJob::class);
+    }
+
+    public function test_skips_existing_delivered_briefing_rows(): void
+    {
+        config(['services.llm.enabled' => true]);
+        Carbon::setTestNow('2026-07-21 13:00:00');
+        Queue::fake();
+        $user = User::factory()->create();
+        DailyBriefingPreference::factory()->enabled()->create([
+            'user_id' => $user->id,
+            'delivery_time' => '08:00:00',
+            'timezone' => 'UTC',
+        ]);
+        DailyBriefing::factory()->generated()->create([
+            'user_id' => $user->id,
+            'briefing_date' => '2026-07-20',
+            'status' => DailyBriefingStatus::Delivered->value,
         ]);
 
         (new DispatchDueDailyBriefingsJob)->handle();

@@ -65,6 +65,7 @@ class DailyBriefingPersistenceTest extends TestCase
 
         $this->assertSame(DailyBriefingStatus::Generated, $briefing->status);
         $this->assertSame('2026-07-20', $briefing->briefing_date->toDateString());
+        $this->assertFalse($briefing->is_test);
         $this->assertSame(['counts' => ['alerts' => 2]], $briefing->input_snapshot);
         $this->assertSame(['Two alerts triggered', 'One deployment succeeded'], $briefing->highlights);
         $this->assertSame(['Billing API health score dropped'], $briefing->risks);
@@ -85,11 +86,15 @@ class DailyBriefingPersistenceTest extends TestCase
         DailyBriefingPreference::factory()->for($user)->create();
     }
 
-    public function test_daily_briefing_is_unique_per_user_and_briefing_date(): void
+    public function test_daily_briefing_is_unique_per_user_date_and_test_scope(): void
     {
         $user = User::factory()->create();
 
         DailyBriefing::factory()->for($user)->create(['briefing_date' => '2026-07-20']);
+        DailyBriefing::factory()->for($user)->create([
+            'briefing_date' => '2026-07-20',
+            'is_test' => true,
+        ]);
 
         $this->expectException(UniqueConstraintViolationException::class);
 

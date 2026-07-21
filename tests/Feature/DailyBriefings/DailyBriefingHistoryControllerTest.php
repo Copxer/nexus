@@ -39,6 +39,12 @@ class DailyBriefingHistoryControllerTest extends TestCase
             'summary' => 'Generated content remains visible after delivery failure.',
             'error_message' => 'Slack timed out',
         ]);
+        DailyBriefing::factory()->generated()->create([
+            'user_id' => $user->id,
+            'briefing_date' => '2026-07-20',
+            'is_test' => true,
+            'summary' => 'Test briefing must not appear in production history.',
+        ]);
         DailyBriefing::factory()->create([
             'user_id' => $user->id,
             'briefing_date' => '2026-07-18',

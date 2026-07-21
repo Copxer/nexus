@@ -130,7 +130,7 @@ class DailyBriefingPreferenceControllerTest extends TestCase
             ->assertSessionHasErrors('include_projects');
     }
 
-    public function test_test_send_generates_and_delivers_immediately(): void
+    public function test_test_send_generates_and_delivers_without_consuming_scheduled_briefing(): void
     {
         config(['services.llm.enabled' => true]);
         Mail::fake();
@@ -142,6 +142,11 @@ class DailyBriefingPreferenceControllerTest extends TestCase
             'channel_id' => $channel->id,
             'timezone' => 'UTC',
         ]);
+        $scheduled = DailyBriefing::factory()->generated()->create([
+            'user_id' => $user->id,
+            'briefing_date' => now('UTC')->subDay()->toDateString(),
+            'summary' => 'Production briefing must not be overwritten by a test send.',
+        ]);
         $this->app->instance(LlmClient::class, new PreferenceFakeLlmClient);
 
         $this->actingAs($user)
@@ -152,10 +157,16 @@ class DailyBriefingPreferenceControllerTest extends TestCase
         Mail::assertSent(DailyBriefingMail::class);
         $this->assertDatabaseHas('daily_briefings', [
             'user_id' => $user->id,
+            'is_test' => true,
             'status' => DailyBriefingStatus::Delivered->value,
             'error_message' => null,
         ]);
-        $this->assertNotNull(DailyBriefingPreference::query()->where('user_id', $user->id)->firstOrFail()->last_sent_for_date);
+        $this->assertDatabaseHas('daily_briefings', [
+            'id' => $scheduled->id,
+            'is_test' => false,
+            'summary' => 'Production briefing must not be overwritten by a test send.',
+        ]);
+        $this->assertNull(DailyBriefingPreference::query()->where('user_id', $user->id)->firstOrFail()->last_sent_for_date);
     }
 
     public function test_test_send_is_throttled(): void

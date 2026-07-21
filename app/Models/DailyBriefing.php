@@ -16,6 +16,7 @@ class DailyBriefing extends Model
     protected $fillable = [
         'user_id',
         'briefing_date',
+        'is_test',
         'status',
         'input_snapshot',
         'summary',
@@ -31,6 +32,7 @@ class DailyBriefing extends Model
     {
         return [
             'briefing_date' => 'immutable_date',
+            'is_test' => 'boolean',
             'status' => DailyBriefingStatus::class,
             'input_snapshot' => 'array',
             'highlights' => 'array',

@@ -16,6 +16,7 @@ return new class extends Migration
                 ->cascadeOnDelete();
 
             $table->date('briefing_date');
+            $table->boolean('is_test')->default(false);
             $table->string('status', 16)->default('pending');
             $table->json('input_snapshot')->nullable();
             $table->text('summary')->nullable();
@@ -28,7 +29,7 @@ return new class extends Migration
 
             $table->timestamps();
 
-            $table->unique(['user_id', 'briefing_date']);
+            $table->unique(['user_id', 'briefing_date', 'is_test']);
             $table->index(['user_id', 'status']);
         });
     }

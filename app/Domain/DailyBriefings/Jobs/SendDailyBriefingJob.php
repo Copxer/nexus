@@ -30,7 +30,10 @@ class SendDailyBriefingJob implements ShouldBeUnique, ShouldQueue
 
     public int $uniqueFor = 900;
 
-    public function __construct(public readonly int $briefingId) {}
+    public function __construct(
+        public readonly int $briefingId,
+        public readonly bool $updateLastSentForDate = true,
+    ) {}
 
     public function uniqueId(): string
     {
@@ -90,9 +93,11 @@ class SendDailyBriefingJob implements ShouldBeUnique, ShouldQueue
                     'error_message' => null,
                 ])->save();
 
-                $preference->forceFill([
-                    'last_sent_for_date' => $briefing->briefing_date->toDateString(),
-                ])->save();
+                if ($this->updateLastSentForDate && ! $briefing->is_test) {
+                    $preference->forceFill([
+                        'last_sent_for_date' => $briefing->briefing_date->toDateString(),
+                    ])->save();
+                }
             });
         } catch (Throwable $exception) {
             $this->markFailed($briefing, $exception->getMessage());

@@ -31,7 +31,7 @@ final class DailyBriefingPayload implements NotificationPayload
             summary: $briefing->summary ?? '',
             highlights: $briefing->highlights ?? [],
             risks: $briefing->risks ?? [],
-            link: URL::to('/daily-briefings/'.$briefing->id),
+            link: URL::route('daily-briefings.index'),
         );
     }
 

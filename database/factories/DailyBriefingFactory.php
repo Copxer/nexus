@@ -17,6 +17,7 @@ class DailyBriefingFactory extends Factory
         return [
             'user_id' => User::factory(),
             'briefing_date' => today()->subDay()->toDateString(),
+            'is_test' => false,
             'status' => DailyBriefingStatus::Pending->value,
             'input_snapshot' => null,
             'summary' => null,

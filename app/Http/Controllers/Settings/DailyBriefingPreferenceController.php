@@ -84,14 +84,14 @@ class DailyBriefingPreferenceController extends Controller
 
         $briefingDate = CarbonImmutable::now($preference->timezone)->subDay()->toDateString();
         $snapshot = $inputQuery->execute($user, $briefingDate, $preference->timezone, $preference->include_projects);
-        $briefing = $generate->execute($user, $snapshot);
+        $briefing = $generate->execute($user, $snapshot, isTest: true);
 
         if ($briefing->status !== DailyBriefingStatus::Generated) {
             return back()->with('error', 'Test briefing generation failed: '.$briefing->error_message);
         }
 
         try {
-            (new SendDailyBriefingJob($briefing->id))->handle();
+            (new SendDailyBriefingJob($briefing->id, updateLastSentForDate: false))->handle();
         } catch (Throwable $exception) {
             return back()->with('error', 'Test briefing delivery failed: '.$exception->getMessage());
         }

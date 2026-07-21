@@ -52,23 +52,20 @@ class DispatchDueDailyBriefingsJob implements ShouldQueue
             return;
         }
 
-        if ($this->briefingAlreadyQueuedOrGenerated((int) $preference->user_id, $briefingDate)) {
+        if ($this->briefingAlreadyDelivered((int) $preference->user_id, $briefingDate)) {
             return;
         }
 
         GenerateDailyBriefingJob::dispatch((int) $preference->user_id, $briefingDate);
     }
 
-    private function briefingAlreadyQueuedOrGenerated(int $userId, string $briefingDate): bool
+    private function briefingAlreadyDelivered(int $userId, string $briefingDate): bool
     {
         return DailyBriefing::query()
             ->where('user_id', $userId)
             ->whereDate('briefing_date', $briefingDate)
-            ->whereIn('status', [
-                DailyBriefingStatus::Pending->value,
-                DailyBriefingStatus::Generated->value,
-                DailyBriefingStatus::Delivered->value,
-            ])
+            ->where('is_test', false)
+            ->where('status', DailyBriefingStatus::Delivered->value)
             ->exists();
     }
 }

@@ -44,7 +44,8 @@ class SendDailyBriefingJobTest extends TestCase
         (new SendDailyBriefingJob($briefing->id))->handle();
 
         Http::assertSent(fn ($request): bool => str_contains($request->url(), 'hooks.slack.com')
-            && $request['text'] === 'Daily briefing for 2026-07-20');
+            && $request['text'] === 'Daily briefing for 2026-07-20'
+            && $request['blocks'][4]['elements'][0]['url'] === route('daily-briefings.index'));
         Mail::assertNothingSent();
         $this->assertDatabaseHas('daily_briefings', [
             'id' => $briefing->id,
@@ -146,5 +147,25 @@ class SendDailyBriefingJobTest extends TestCase
         $this->assertSame(DailyBriefingStatus::Delivered, $briefing->refresh()->status);
         $this->assertNull($briefing->error_message);
         $this->assertSame('2026-07-20', $briefing->user->dailyBriefingPreference->refresh()->last_sent_for_date->toDateString());
+    }
+
+    public function test_test_delivery_does_not_update_last_sent_date(): void
+    {
+        Mail::fake();
+
+        $user = User::factory()->create();
+        AlertNotificationChannel::factory()->email('ops@example.com')->for($user)->create();
+        DailyBriefingPreference::factory()->enabled()->create(['user_id' => $user->id]);
+        $briefing = DailyBriefing::factory()->generated()->create([
+            'user_id' => $user->id,
+            'briefing_date' => '2026-07-20',
+            'is_test' => true,
+        ]);
+
+        (new SendDailyBriefingJob($briefing->id, updateLastSentForDate: false))->handle();
+
+        Mail::assertSent(DailyBriefingMail::class);
+        $this->assertSame(DailyBriefingStatus::Delivered, $briefing->refresh()->status);
+        $this->assertNull($briefing->user->dailyBriefingPreference->refresh()->last_sent_for_date);
     }
 }

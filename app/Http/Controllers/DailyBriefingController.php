@@ -20,6 +20,7 @@ class DailyBriefingController extends Controller
 
         $briefings = DailyBriefing::query()
             ->where('user_id', $user->id)
+            ->where('is_test', false)
             ->whereNotNull('summary')
             ->latest('briefing_date')
             ->latest('id')

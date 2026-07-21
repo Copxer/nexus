@@ -61,13 +61,13 @@ class GenerateDailyBriefingJobTest extends TestCase
         Queue::assertPushed(SendDailyBriefingJob::class, fn (SendDailyBriefingJob $job): bool => $job->briefingId === $briefing->id);
     }
 
-    public function test_does_not_regenerate_existing_generated_briefing(): void
+    public function test_existing_generated_briefing_is_sent_without_llm_regeneration(): void
     {
         Queue::fake();
         config(['services.llm.enabled' => true]);
         $user = User::factory()->create();
         DailyBriefingPreference::factory()->enabled()->create(['user_id' => $user->id]);
-        DailyBriefing::factory()->generated()->create([
+        $briefing = DailyBriefing::factory()->generated()->create([
             'user_id' => $user->id,
             'briefing_date' => '2026-07-20',
         ]);
@@ -81,7 +81,75 @@ class GenerateDailyBriefingJobTest extends TestCase
 
         $this->assertDatabaseCount('daily_briefings', 1);
         $this->assertNull($client->prompt);
-        Queue::assertNotPushed(SendDailyBriefingJob::class);
+        Queue::assertPushed(SendDailyBriefingJob::class, fn (SendDailyBriefingJob $job): bool => $job->briefingId === $briefing->id);
+    }
+
+    public function test_failed_delivery_with_generated_content_is_resent_without_llm_regeneration(): void
+    {
+        Queue::fake();
+        config(['services.llm.enabled' => true]);
+        $user = User::factory()->create();
+        DailyBriefingPreference::factory()->enabled()->create(['user_id' => $user->id]);
+        $briefing = DailyBriefing::factory()->generated()->create([
+            'user_id' => $user->id,
+            'briefing_date' => '2026-07-20',
+            'status' => DailyBriefingStatus::Failed->value,
+            'error_message' => 'Slack timed out',
+        ]);
+        $client = new GenerateJobFakeLlmClient;
+        $this->app->instance(LlmClient::class, $client);
+
+        (new GenerateDailyBriefingJob($user->id, '2026-07-20'))->handle(
+            app(GetDailyBriefingInputQuery::class),
+            app(GenerateDailyBriefingAction::class),
+        );
+
+        $this->assertNull($client->prompt);
+        $this->assertSame(DailyBriefingStatus::Failed, $briefing->refresh()->status);
+        Queue::assertPushed(SendDailyBriefingJob::class, fn (SendDailyBriefingJob $job): bool => $job->briefingId === $briefing->id);
+    }
+
+    public function test_pending_briefing_does_not_permanently_suppress_generation(): void
+    {
+        Queue::fake();
+        config(['services.llm.enabled' => true]);
+        $user = User::factory()->create();
+        DailyBriefingPreference::factory()->enabled()->create(['user_id' => $user->id]);
+        $pending = DailyBriefing::factory()->create([
+            'user_id' => $user->id,
+            'briefing_date' => '2026-07-20',
+            'status' => DailyBriefingStatus::Pending->value,
+        ]);
+        $client = new GenerateJobFakeLlmClient;
+        $this->app->instance(LlmClient::class, $client);
+
+        (new GenerateDailyBriefingJob($user->id, '2026-07-20'))->handle(
+            app(GetDailyBriefingInputQuery::class),
+            app(GenerateDailyBriefingAction::class),
+        );
+
+        $this->assertSame($pending->id, DailyBriefing::query()->sole()->id);
+        $this->assertSame(DailyBriefingStatus::Generated, $pending->refresh()->status);
+        $this->assertNotNull($client->prompt);
+        Queue::assertPushed(SendDailyBriefingJob::class, fn (SendDailyBriefingJob $job): bool => $job->briefingId === $pending->id);
+    }
+
+    public function test_failed_handler_marks_pending_briefing_failed_after_retries_are_exhausted(): void
+    {
+        $user = User::factory()->create();
+        $briefing = DailyBriefing::factory()->create([
+            'user_id' => $user->id,
+            'briefing_date' => '2026-07-20',
+            'status' => DailyBriefingStatus::Pending->value,
+        ]);
+        $job = new GenerateDailyBriefingJob($user->id, '2026-07-20');
+
+        $this->assertSame(2, $job->tries);
+
+        $job->failed(new \RuntimeException('Snapshot failed'));
+
+        $this->assertSame(DailyBriefingStatus::Failed, $briefing->refresh()->status);
+        $this->assertSame('Snapshot failed', $briefing->error_message);
     }
 
     public function test_does_not_generate_when_user_is_not_opted_in_or_ai_is_disabled(): void

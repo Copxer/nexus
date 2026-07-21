@@ -8,13 +8,14 @@ use App\Enums\DailyBriefingStatus;
 use App\Models\DailyBriefing;
 use App\Models\DailyBriefingPreference;
 use App\Models\User;
-use Carbon\CarbonImmutable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Str;
+use Throwable;
 
 class GenerateDailyBriefingJob implements ShouldBeUnique, ShouldQueue
 {
@@ -23,7 +24,7 @@ class GenerateDailyBriefingJob implements ShouldBeUnique, ShouldQueue
     use Queueable;
     use SerializesModels;
 
-    public int $tries = 1;
+    public int $tries = 2;
 
     public int $uniqueFor = 900;
 
@@ -62,14 +63,17 @@ class GenerateDailyBriefingJob implements ShouldBeUnique, ShouldQueue
             return;
         }
 
-        if ($this->alreadyGeneratedOrQueued($user->id)) {
+        $existing = $this->existingBriefing($user->id);
+
+        if ($existing?->status === DailyBriefingStatus::Delivered) {
             return;
         }
 
-        DailyBriefing::query()->firstOrCreate(
-            ['user_id' => $user->id, 'briefing_date' => CarbonImmutable::parse($this->briefingDate)->toDateString()],
-            ['status' => DailyBriefingStatus::Pending->value],
-        );
+        if ($existing?->status === DailyBriefingStatus::Generated || ($existing?->status === DailyBriefingStatus::Failed && $existing->summary !== null)) {
+            SendDailyBriefingJob::dispatch($existing->id);
+
+            return;
+        }
 
         $snapshot = $inputQuery->execute(
             $user,
@@ -85,16 +89,26 @@ class GenerateDailyBriefingJob implements ShouldBeUnique, ShouldQueue
         }
     }
 
-    private function alreadyGeneratedOrQueued(int $userId): bool
+    public function failed(Throwable $exception): void
+    {
+        $briefing = $this->existingBriefing($this->userId);
+
+        if ($briefing === null || $briefing->status !== DailyBriefingStatus::Pending) {
+            return;
+        }
+
+        $briefing->forceFill([
+            'status' => DailyBriefingStatus::Failed,
+            'error_message' => Str::limit($exception->getMessage(), 2_000, ''),
+        ])->save();
+    }
+
+    private function existingBriefing(int $userId): ?DailyBriefing
     {
         return DailyBriefing::query()
             ->where('user_id', $userId)
             ->whereDate('briefing_date', $this->briefingDate)
-            ->whereIn('status', [
-                DailyBriefingStatus::Pending->value,
-                DailyBriefingStatus::Generated->value,
-                DailyBriefingStatus::Delivered->value,
-            ])
-            ->exists();
+            ->where('is_test', false)
+            ->first();
     }
 }

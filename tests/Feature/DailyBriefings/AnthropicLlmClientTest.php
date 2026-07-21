@@ -56,4 +56,30 @@ class AnthropicLlmClientTest extends TestCase
                 && $request['messages'] === [['role' => 'user', 'content' => 'User prompt']];
         });
     }
+
+    public function test_anthropic_client_retries_once_for_transient_provider_errors(): void
+    {
+        config([
+            'services.llm.api_key' => 'test-key',
+            'services.llm.model' => 'claude-test-model',
+        ]);
+
+        Http::fakeSequence('api.anthropic.com/v1/messages')
+            ->push(['error' => ['message' => 'rate limited']], 429)
+            ->push([
+                'model' => 'claude-test-model',
+                'content' => [
+                    ['type' => 'text', 'text' => '{"summary":"retried"}'],
+                ],
+            ], 200);
+
+        $response = app(AnthropicLlmClient::class)->complete(new LlmPrompt(
+            version: 'daily-briefing-v1',
+            system: 'System instructions',
+            user: 'User prompt',
+        ));
+
+        $this->assertSame('{"summary":"retried"}', $response->text);
+        Http::assertSentCount(2);
+    }
 }
