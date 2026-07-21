@@ -6,11 +6,21 @@ use App\Domain\AI\Contracts\LlmClient;
 use App\Domain\AI\DataTransferObjects\LlmPrompt;
 use App\Domain\AI\DataTransferObjects\LlmResponse;
 use App\Domain\AiInsights\Actions\GeneratePullRequestRiskAssessmentAction;
+use App\Domain\Notifications\Jobs\DispatchAlertNotificationJob;
+use App\Enums\AlertSeverity;
+use App\Enums\AlertSource;
 use App\Enums\PullRequestRiskAssessmentStatus;
 use App\Enums\PullRequestRiskLevel;
+use App\Models\Alert;
+use App\Models\AlertNotificationChannel;
+use App\Models\AlertNotificationPreference;
 use App\Models\GithubPullRequest;
+use App\Models\Project;
 use App\Models\PullRequestRiskAssessment;
+use App\Models\Repository;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -21,6 +31,7 @@ class GeneratePullRequestRiskAssessmentActionTest extends TestCase
     public function test_builds_versioned_prompt_calls_llm_and_persists_scored_output(): void
     {
         config(['services.llm.enabled' => true]);
+        Bus::fake();
 
         $pullRequest = GithubPullRequest::factory()->create();
         $client = new RiskAssessmentFakeLlmClient(new LlmResponse(json_encode([
@@ -152,6 +163,145 @@ class GeneratePullRequestRiskAssessmentActionTest extends TestCase
         $this->assertDatabaseCount('pull_request_risk_assessments', 1);
     }
 
+    public function test_high_risk_increase_dispatches_one_spec_042_notification(): void
+    {
+        config(['services.llm.enabled' => true]);
+        Bus::fake();
+
+        $pullRequest = $this->ownedPullRequest();
+        $channel = AlertNotificationChannel::factory()->slack()->for($pullRequest->repository->project->owner)->create();
+        AlertNotificationPreference::factory()
+            ->for($pullRequest->repository->project->owner)
+            ->for($channel, 'channel')
+            ->create(['min_severity' => AlertSeverity::Warning->value]);
+        PullRequestRiskAssessment::factory()->for($pullRequest, 'pullRequest')->scored()->create([
+            'risk_level' => PullRequestRiskLevel::Medium->value,
+            'risk_score' => 45,
+        ]);
+        $this->app->instance(LlmClient::class, new RiskAssessmentFakeLlmClient(new LlmResponse(json_encode([
+            'risk_level' => 'high',
+            'risk_score' => 82,
+            'summary' => 'Large change with failing workflow needs careful review.',
+            'reasons' => ['Changed files are high.'],
+            'recommended_actions' => [],
+        ], JSON_THROW_ON_ERROR))));
+
+        app(GeneratePullRequestRiskAssessmentAction::class)->execute($pullRequest, $this->snapshot());
+
+        $alert = Alert::query()->where('source', AlertSource::Github->value)->firstOrFail();
+        $this->assertSame($pullRequest->repository->project_id, $alert->project_id);
+        $this->assertSame($pullRequest->id, $alert->source_id);
+        $this->assertSame('pull_request.risk.high', $alert->type);
+        $this->assertSame(AlertSeverity::Warning, $alert->severity);
+        $this->assertSame('high', $alert->metadata['risk_level']);
+        Bus::assertDispatchedTimes(DispatchAlertNotificationJob::class, 1);
+    }
+
+    public function test_unchanged_low_or_medium_risk_does_not_notify(): void
+    {
+        config(['services.llm.enabled' => true]);
+        Bus::fake();
+
+        $pullRequest = $this->ownedPullRequest();
+        AlertNotificationPreference::factory()
+            ->for($pullRequest->repository->project->owner)
+            ->for(AlertNotificationChannel::factory()->for($pullRequest->repository->project->owner)->create(), 'channel')
+            ->create(['min_severity' => AlertSeverity::Warning->value]);
+        PullRequestRiskAssessment::factory()->for($pullRequest, 'pullRequest')->scored()->create([
+            'risk_level' => PullRequestRiskLevel::Low->value,
+            'risk_score' => 14,
+        ]);
+        $this->app->instance(LlmClient::class, new RiskAssessmentFakeLlmClient(new LlmResponse(json_encode([
+            'risk_level' => 'medium',
+            'risk_score' => 51,
+            'summary' => 'Moderate risk from size.',
+            'reasons' => ['Changed files are moderate.'],
+            'recommended_actions' => [],
+        ], JSON_THROW_ON_ERROR))));
+
+        app(GeneratePullRequestRiskAssessmentAction::class)->execute($pullRequest, $this->snapshot());
+
+        $this->assertDatabaseCount('alerts', 0);
+        Bus::assertNotDispatched(DispatchAlertNotificationJob::class);
+    }
+
+    public function test_repeated_same_high_risk_level_does_not_notify_again(): void
+    {
+        config(['services.llm.enabled' => true]);
+        Bus::fake();
+
+        $pullRequest = $this->ownedPullRequest();
+        AlertNotificationPreference::factory()
+            ->for($pullRequest->repository->project->owner)
+            ->for(AlertNotificationChannel::factory()->for($pullRequest->repository->project->owner)->create(), 'channel')
+            ->create(['min_severity' => AlertSeverity::Warning->value]);
+        PullRequestRiskAssessment::factory()->for($pullRequest, 'pullRequest')->scored()->create([
+            'risk_level' => PullRequestRiskLevel::High->value,
+            'risk_score' => 76,
+        ]);
+        Alert::factory()->create([
+            'project_id' => $pullRequest->repository->project_id,
+            'source' => AlertSource::Github->value,
+            'source_id' => $pullRequest->id,
+            'type' => 'pull_request.risk.high',
+            'severity' => AlertSeverity::Warning->value,
+        ]);
+        $this->app->instance(LlmClient::class, new RiskAssessmentFakeLlmClient(new LlmResponse(json_encode([
+            'risk_level' => 'high',
+            'risk_score' => 84,
+            'summary' => 'Risk remains high.',
+            'reasons' => ['Changed files remain high.'],
+            'recommended_actions' => [],
+        ], JSON_THROW_ON_ERROR))));
+
+        app(GeneratePullRequestRiskAssessmentAction::class)->execute($pullRequest, $this->snapshot());
+
+        $this->assertDatabaseCount('alerts', 1);
+        Bus::assertNotDispatched(DispatchAlertNotificationJob::class);
+    }
+
+    public function test_high_to_critical_increase_dispatches_critical_notification(): void
+    {
+        config(['services.llm.enabled' => true]);
+        Bus::fake();
+
+        $pullRequest = $this->ownedPullRequest();
+        $channel = AlertNotificationChannel::factory()->for($pullRequest->repository->project->owner)->create();
+        AlertNotificationPreference::factory()
+            ->for($pullRequest->repository->project->owner)
+            ->for($channel, 'channel')
+            ->create(['min_severity' => AlertSeverity::Critical->value]);
+        PullRequestRiskAssessment::factory()->for($pullRequest, 'pullRequest')->scored()->create([
+            'risk_level' => PullRequestRiskLevel::High->value,
+            'risk_score' => 78,
+        ]);
+        Alert::factory()->create([
+            'project_id' => $pullRequest->repository->project_id,
+            'source' => AlertSource::Github->value,
+            'source_id' => $pullRequest->id,
+            'type' => 'pull_request.risk.high',
+            'severity' => AlertSeverity::Warning->value,
+        ]);
+        $this->app->instance(LlmClient::class, new RiskAssessmentFakeLlmClient(new LlmResponse(json_encode([
+            'risk_level' => 'critical',
+            'risk_score' => 96,
+            'summary' => 'Critical risk from failing checks and large scope.',
+            'reasons' => ['Failing checks combine with large scope.'],
+            'recommended_actions' => ['Escalate before merge.'],
+        ], JSON_THROW_ON_ERROR))));
+
+        app(GeneratePullRequestRiskAssessmentAction::class)->execute($pullRequest, $this->snapshot());
+
+        $this->assertDatabaseHas('alerts', [
+            'source' => AlertSource::Github->value,
+            'source_id' => $pullRequest->id,
+            'type' => 'pull_request.risk.critical',
+            'severity' => AlertSeverity::Critical->value,
+        ]);
+        $this->assertDatabaseCount('alerts', 2);
+        Bus::assertDispatchedTimes(DispatchAlertNotificationJob::class, 1);
+    }
+
     /** @return array<string, mixed> */
     private function snapshot(): array
     {
@@ -163,6 +313,15 @@ class GeneratePullRequestRiskAssessmentActionTest extends TestCase
             'recent_failed_workflows' => [['id' => 1, 'conclusion' => 'failure']],
             'active_alerts' => [],
         ];
+    }
+
+    private function ownedPullRequest(): GithubPullRequest
+    {
+        $user = User::factory()->create();
+        $project = Project::factory()->for($user, 'owner')->create();
+        $repository = Repository::factory()->for($project)->create();
+
+        return GithubPullRequest::factory()->for($repository, 'repository')->create();
     }
 }
 
@@ -177,7 +336,7 @@ class RiskAssessmentFakeLlmClient implements LlmClient
 
     public function complete(LlmPrompt $prompt): LlmResponse
     {
-        $this->prompt = $prompt;
+        $this->prompt ??= $prompt;
 
         if ($this->exception !== null) {
             throw $this->exception;

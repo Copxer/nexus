@@ -4,10 +4,15 @@ namespace App\Domain\AiInsights\Actions;
 
 use App\Domain\AI\Contracts\LlmClient;
 use App\Domain\AI\DataTransferObjects\LlmPrompt;
+use App\Domain\Alerts\Actions\TriggerAlertAction;
+use App\Enums\AlertSeverity;
+use App\Enums\AlertSource;
 use App\Enums\PullRequestRiskAssessmentStatus;
 use App\Enums\PullRequestRiskLevel;
+use App\Models\Alert;
 use App\Models\GithubPullRequest;
 use App\Models\PullRequestRiskAssessment;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -15,7 +20,10 @@ class GeneratePullRequestRiskAssessmentAction
 {
     public const PROMPT_VERSION = 'pr-risk-v1';
 
-    public function __construct(private readonly LlmClient $llm) {}
+    public function __construct(
+        private readonly LlmClient $llm,
+        private readonly TriggerAlertAction $triggerAlert,
+    ) {}
 
     /** @param array<string, mixed> $inputSnapshot */
     public function execute(GithubPullRequest $pullRequest, array $inputSnapshot): PullRequestRiskAssessment
@@ -28,7 +36,9 @@ class GeneratePullRequestRiskAssessmentAction
             $response = $this->llm->complete($this->prompt($inputSnapshot));
             $output = $this->validatedOutput($response->text);
 
-            return $this->writeAssessment($pullRequest, [
+            $previousRiskLevel = $this->currentRiskLevel($pullRequest);
+
+            $assessment = $this->writeAssessment($pullRequest, [
                 'status' => PullRequestRiskAssessmentStatus::Scored,
                 'risk_level' => $output['risk_level'],
                 'risk_score' => $output['risk_score'],
@@ -42,6 +52,10 @@ class GeneratePullRequestRiskAssessmentAction
                 'failed_at' => null,
                 'error_message' => null,
             ]);
+
+            $this->notifyForMaterialRiskIncrease($pullRequest, $previousRiskLevel, $assessment);
+
+            return $assessment;
         } catch (Throwable $exception) {
             return $this->markFailed($pullRequest, $inputSnapshot, $exception->getMessage());
         }
@@ -150,6 +164,90 @@ class GeneratePullRequestRiskAssessmentAction
         }
 
         return trim($text);
+    }
+
+    private function currentRiskLevel(GithubPullRequest $pullRequest): ?PullRequestRiskLevel
+    {
+        $riskLevel = PullRequestRiskAssessment::query()
+            ->where('github_pull_request_id', $pullRequest->id)
+            ->value('risk_level');
+
+        return is_string($riskLevel) ? PullRequestRiskLevel::tryFrom($riskLevel) : null;
+    }
+
+    private function notifyForMaterialRiskIncrease(
+        GithubPullRequest $pullRequest,
+        ?PullRequestRiskLevel $previousRiskLevel,
+        PullRequestRiskAssessment $assessment,
+    ): void {
+        $riskLevel = $assessment->risk_level;
+
+        if ($riskLevel === null || ! in_array($riskLevel, [PullRequestRiskLevel::High, PullRequestRiskLevel::Critical], true)) {
+            return;
+        }
+
+        if ($previousRiskLevel !== null && $this->riskRank($riskLevel) <= $this->riskRank($previousRiskLevel)) {
+            return;
+        }
+
+        $type = $this->notificationAlertType($riskLevel);
+
+        if (Alert::query()
+            ->where('source', AlertSource::Github->value)
+            ->where('source_id', $pullRequest->id)
+            ->where('type', $type)
+            ->exists()) {
+            return;
+        }
+
+        try {
+            $pullRequest->loadMissing('repository.project');
+            $repository = $pullRequest->repository;
+            $project = $repository?->project;
+
+            if ($project === null) {
+                return;
+            }
+
+            $this->triggerAlert->execute([
+                'project_id' => $project->id,
+                'source' => AlertSource::Github,
+                'source_id' => $pullRequest->id,
+                'type' => $type,
+                'severity' => $riskLevel === PullRequestRiskLevel::Critical ? AlertSeverity::Critical : AlertSeverity::Warning,
+                'title' => sprintf('PR #%d risk is %s', $pullRequest->number, $riskLevel->value),
+                'description' => $assessment->summary,
+                'metadata' => [
+                    'repository' => $repository?->full_name,
+                    'pull_request_id' => $pullRequest->id,
+                    'pull_request_number' => $pullRequest->number,
+                    'risk_level' => $riskLevel->value,
+                    'risk_score' => $assessment->risk_score,
+                    'assessment_id' => $assessment->id,
+                ],
+            ]);
+        } catch (Throwable $exception) {
+            Log::warning('PR risk notification dispatch failed', [
+                'pull_request_id' => $pullRequest->id,
+                'assessment_id' => $assessment->id,
+                'error' => $exception->getMessage(),
+            ]);
+        }
+    }
+
+    private function riskRank(PullRequestRiskLevel $riskLevel): int
+    {
+        return match ($riskLevel) {
+            PullRequestRiskLevel::Low => 1,
+            PullRequestRiskLevel::Medium => 2,
+            PullRequestRiskLevel::High => 3,
+            PullRequestRiskLevel::Critical => 4,
+        };
+    }
+
+    private function notificationAlertType(PullRequestRiskLevel $riskLevel): string
+    {
+        return 'pull_request.risk.'.$riskLevel->value;
     }
 
     /** @param array<string, mixed> $inputSnapshot */

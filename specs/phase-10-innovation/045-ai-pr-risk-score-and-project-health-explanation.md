@@ -233,29 +233,29 @@ health-score weights.
 
 ## Acceptance criteria
 
-- [ ] Feature stays inert unless `AI_FEATURES_ENABLED=true` and shared LLM
+- [x] Feature stays inert unless `AI_FEATURES_ENABLED=true` and shared LLM
       config is present.
-- [ ] Relevant incoming GitHub PR webhook actions enqueue at most one risk
+- [x] Relevant incoming GitHub PR webhook actions enqueue at most one risk
       assessment job per PR after the local PR row is updated.
-- [ ] Every assessed PR persists `risk_level`, `risk_score`, summary, reasons,
+- [x] Every assessed PR persists `risk_level`, `risk_score`, summary, reasons,
       input snapshot, prompt version, model, and assessment timestamp.
-- [ ] Work Items queue surfaces risk badges for PR rows without affecting issue
+- [x] Work Items queue surfaces risk badges for PR rows without affecting issue
       rows.
-- [ ] PR detail/drawer UI shows score, summary, reasons, recommended actions,
+- [x] PR detail/drawer UI shows score, summary, reasons, recommended actions,
       assessment timestamp, pending state, failed state, and gated regenerate.
 - [x] Existing open PRs can be backfilled through a scoped command/job without
       scoring closed PRs or other users' data.
-- [ ] Project health explanations describe the existing Phase 8/spec 046 health
+- [x] Project health explanations describe the existing Phase 8/spec 046 health
       score; they do not compute or display a competing score.
-- [ ] Overview/project health UI includes a natural-language "why" overlay with
+- [x] Overview/project health UI includes a natural-language "why" overlay with
       drivers, recommended actions, timestamp, pending state, and failed state.
-- [ ] High/critical PR risk creates at most one spec 042 notification per PR per
+- [x] High/critical PR risk creates at most one spec 042 notification per PR per
       material risk-level increase.
-- [ ] LLM input excludes secrets, webhook URLs, access tokens, raw diffs, raw
+- [x] LLM input excludes secrets, webhook URLs, access tokens, raw diffs, raw
       logs, and full PR bodies.
-- [ ] Failed LLM calls persist failed status/error context and do not fabricate
+- [x] Failed LLM calls persist failed status/error context and do not fabricate
       risk/explanation text.
-- [ ] Tests cover query scoping, generation validation/failure, webhook dispatch,
+- [x] Tests cover query scoping, generation validation/failure, webhook dispatch,
       backfill, UI payloads, notification guardrails, and health-score refresh
       triggers.
 - [ ] Pint clean, tests green, build clean, CI green on the eventual spec PR.
@@ -310,6 +310,11 @@ List of created/modified files. Fill in as work progresses.
 - `resources/js/types/index.d.ts` — adds the project health explanation payload type on `RiskyProjectRow`.
 - `tests/Feature/Dashboard/GetOverviewDashboardQueryTest.php` — covers Overview risky-project health explanation payload and cross-user isolation.
 - `tests/Feature/Dashboard/ProjectHealthExplanationUiTest.php` — covers Overview Inertia payload and health-explanation regenerate gate/authorization behavior.
+- `app/Domain/AiInsights/Actions/GeneratePullRequestRiskAssessmentAction.php` — dispatches conservative spec 042 notifications for material increases to high/critical PR risk.
+- `app/Enums/AlertSource.php` — clarifies that GitHub alert `source_id` can point at repositories or pull requests depending on alert type.
+- `database/migrations/2026_05_27_080000_create_alerts_table.php` — clarifies the historical alerts-table comment for GitHub repo/PR-scoped alerts.
+- `tests/Feature/AiInsights/GeneratePullRequestRiskAssessmentActionTest.php` — covers high/critical notification guardrails and quiet unchanged low/medium scores.
+- `docs/security/operator-checklist.md` — documents Spec 045 prompt-safety, webhook-trigger, notification, regenerate, and rate-limit expectations.
 
 ## Work log
 
@@ -362,11 +367,17 @@ List of created/modified files. Fill in as work progresses.
   with summary, drivers, recommended actions, timestamp, pending/failed/no-explanation
   states, and expose a throttled manual regenerate action for project owners when AI
   insights are enabled. Kept PR risk notifications and docs deferred.
+- Implemented the final planned small work unit: PR risk assessments now create conservative
+  spec 042 notifications only for material increases to `high` or `critical`, with one alert
+  per PR per risk level and no notifications for unchanged `low`/`medium`. Updated the
+  operator security checklist for prompt safety, webhook trigger, notification, regenerate,
+  and rate-limit expectations. Env docs needed no new keys because Spec 045 reuses the
+  shared Spec 044 LLM gate/config.
 
 ## Open questions / blockers
 
-- Should PR-risk notifications be opt-in via a dedicated setting, or is the
-  conservative high/critical-only spec 042 routing enough for v1?
+- Resolved for v1: PR-risk notifications reuse existing spec 042 routing preferences;
+  no dedicated opt-in setting was added beyond conservative high/critical-only dispatch.
 - Where should the PR detail risk panel live if the current Work Items UI has no
   drawer yet: inside the Work Items row expansion, repository PR list details,
   or a small dedicated PR show route?
