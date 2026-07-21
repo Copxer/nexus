@@ -279,15 +279,18 @@ Track actual files as implementation progresses. Expected touchpoints:
 - `app/Domain/AI/DataTransferObjects/LlmResponse.php` — added the structured client response DTO.
 - `app/Domain/AI/Services/AnthropicLlmClient.php` — added the Anthropic Messages API implementation with configured model, timeout, API key, and one transient retry.
 - `app/Domain/DailyBriefings/Actions/GenerateDailyBriefingAction.php` — added prompt v1 construction, LLM invocation, structured output validation/sanitization, generated persistence, and failed-state persistence.
+- `app/Domain/DailyBriefings/Jobs/DispatchDueDailyBriefingsJob.php` — added the scheduler-bound dispatcher for opted-in, locally due users, gated by AI config and idempotent against sent/generated/pending rows.
+- `app/Domain/DailyBriefings/Jobs/GenerateDailyBriefingJob.php` — added the unique per-user/date generation job that builds the input snapshot and delegates persistence to `GenerateDailyBriefingAction`.
 - `app/Providers/AppServiceProvider.php` — bound `LlmClient` to the configured Anthropic implementation.
+- `routes/console.php` — registered the daily briefing dispatcher every 15 minutes with `withoutOverlapping()`.
 - `tests/Feature/DailyBriefings/AnthropicLlmClientTest.php` — covered the LLM binding and Anthropic HTTP request/response mapping with `Http::fake`.
+- `tests/Feature/DailyBriefings/DispatchDueDailyBriefingsJobTest.php` — covered timezone due checks, opt-in, AI gate, `last_sent_for_date`, and generated-row idempotency.
 - `tests/Feature/DailyBriefings/GenerateDailyBriefingActionTest.php` — covered prompt construction, fake-client generation, output sanitization, failed LLM calls, disabled AI fail-closed behavior, invalid output, and same-day row reuse.
+- `tests/Feature/DailyBriefings/GenerateDailyBriefingJobTest.php` — covered unique ID, query-to-generate orchestration, opt-in/AI gates, and generated-row idempotency.
 
 Expected future touchpoints:
 
 - `app/Domain/DailyBriefings/DataTransferObjects/DailyBriefingPayload.php`
-- `app/Domain/DailyBriefings/Jobs/DispatchDueDailyBriefingsJob.php`
-- `app/Domain/DailyBriefings/Jobs/GenerateDailyBriefingJob.php`
 - `app/Domain/DailyBriefings/Jobs/SendDailyBriefingJob.php`
 - `app/Http/Controllers/Settings/DailyBriefingPreferenceController.php`
 - `app/Http/Controllers/DailyBriefingController.php`
@@ -296,13 +299,9 @@ Expected future touchpoints:
 - `resources/js/Pages/DailyBriefings/Show.vue`
 - `resources/js/lib/commands.ts`
 - `routes/web.php`
-- `routes/console.php`
 - `docs/env.production.example`
 - `docs/security/operator-checklist.md`
 - `tests/Feature/DailyBriefings/DailyBriefingPreferenceControllerTest.php`
-- `tests/Feature/DailyBriefings/DispatchDueDailyBriefingsJobTest.php`
-- `tests/Feature/DailyBriefings/GenerateDailyBriefingActionTest.php`
-- `tests/Feature/DailyBriefings/GenerateDailyBriefingJobTest.php`
 - `tests/Feature/DailyBriefings/SendDailyBriefingJobTest.php`
 - `tests/Feature/DailyBriefings/GetDailyBriefingInputQueryTest.php`
 - `tests/Feature/DailyBriefings/DailyBriefingHistoryControllerTest.php`
@@ -363,6 +362,18 @@ Dated notes as work progresses.
 - Discovery: `daily_briefings.briefing_date` is cast as an immutable date;
   when reusing a row for the unique `(user_id, briefing_date)` key, an
   explicit `whereDate` lookup avoids date-cast mismatches before save.
+- Implemented the scheduler/generation jobs work unit: `DispatchDueDailyBriefingsJob`
+  runs from `routes/console.php` every 15 minutes, gates on
+  `services.llm.enabled`, filters to enabled preferences whose local
+  delivery time has passed, skips `last_sent_for_date`, and avoids
+  dispatching when a pending/generated/delivered row already exists for the
+  local briefing date. `GenerateDailyBriefingJob` is unique by
+  `(user_id, briefing_date)`, re-checks AI/opt-in/idempotency gates, creates
+  a pending row for the unique key, builds the snapshot with the saved
+  timezone/project filter, and delegates LLM persistence to
+  `GenerateDailyBriefingAction`. Deliberately deferred delivery,
+  `SendDailyBriefingJob`, settings UI/controller, history UI, palette, and
+  docs.
 
 ## Open questions / blockers
 
