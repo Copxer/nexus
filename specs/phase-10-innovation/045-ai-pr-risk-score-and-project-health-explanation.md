@@ -1,7 +1,7 @@
 ---
 spec: ai-pr-risk-score-and-project-health-explanation
 phase: 10
-status: in-progress   # not-started | in-progress | blocked | done
+status: done   # not-started | in-progress | blocked | done
 owner: Yoany
 created: 2026-07-21
 updated: 2026-07-21
@@ -258,7 +258,7 @@ health-score weights.
 - [x] Tests cover query scoping, generation validation/failure, webhook dispatch,
       backfill, UI payloads, notification guardrails, and health-score refresh
       triggers.
-- [ ] Pint clean, tests green, build clean, CI green on the eventual spec PR.
+- [x] Pint clean, tests green, build clean, CI green on the eventual spec PR.
 
 ## Files touched
 
@@ -378,15 +378,11 @@ List of created/modified files. Fill in as work progresses.
   contract, marked existing pending rows skipped when the AI gate is disabled at execution
   time, and let spec 042 active-alert idempotency handle PR-risk notification duplicates so
   resolved historical alerts do not suppress later material increases.
+- PR #135 was squash-merged into `main` with CI green. Issue #134 closed as completed,
+  and the spec/tracker bookkeeping was updated to `done`.
 
 ## Open questions / blockers
 
-- Resolved for v1: PR-risk notifications reuse existing spec 042 routing preferences;
-  no dedicated opt-in setting was added beyond conservative high/critical-only dispatch.
-- Where should the PR detail risk panel live if the current Work Items UI has no
-  drawer yet: inside the Work Items row expansion, repository PR list details,
-  or a small dedicated PR show route?
-- What threshold counts as a "material" health-score change for regeneration:
-  score delta, band change, or either one?
-- Should regenerated PR risk assessments keep historical versions, or is the
-  current-assessment row plus `input_snapshot` enough for v1?
+- None for v1. Follow-up product iterations can add dedicated PR-risk notification
+  preferences, a dedicated PR detail route, historical risk versions, or health-score
+  history if those become necessary.

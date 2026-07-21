@@ -25,7 +25,7 @@ live.
 | 042 | `AlertNotificationService` — email + Slack + generic webhook channels, per-user routing preferences (severity, source, channel), rate-limit + dedupe, delivery observability | 🟢 |
 | 043 | Global command palette — `Cmd+K` fuzzy search across routes + entities (projects, repos, alerts, hosts, websites) via a shared indexer, keyboard-only navigation, recent actions | 🟢 |
 | 044 | AI daily briefing — LLM-generated morning digest ("yesterday: X new issues, Y merged PRs, Z alerts, N things that look off"), delivered via spec 042, per-user opt-in + delivery time | 🟢 |
-| 045 | AI PR risk score + project health explanation — LLM-scored PR risk tag on webhook arrival, natural-language "why" overlay on Phase 8 health-score card | ⬜ |
+| 045 | AI PR risk score + project health explanation — LLM-scored PR risk tag on webhook arrival, natural-language "why" overlay on Phase 8 health-score card | 🟢 |
 | 046 | User-tunable health-score weights + metric-driven alert rules — settings page for Phase 8's formula, §6.8 specification pattern for alert evaluators (queue backlog trend, deploy frequency drop, uptime slope) | 🟢 |
 | 047 | Public status page generator — unauthenticated `/status/{slug}` aggregating monitoring uptime + system alerts + subscribe form; per-project toggle in Settings | 🟢 |
 
@@ -38,7 +38,7 @@ live.
 - [x] A morning digest arrives on schedule (per-user configurable
       hour + timezone) summarizing yesterday's activity. Delivery
       rides on spec 042.
-- [ ] Every incoming PR gets an LLM-derived risk tag surfaced on the
+- [x] Every incoming PR gets an LLM-derived risk tag surfaced on the
       Work Items queue + PR drawer. Each project health-score card
       carries a natural-language "why" explanation.
 - [x] Health-score weights are editable per-user (falls back to
