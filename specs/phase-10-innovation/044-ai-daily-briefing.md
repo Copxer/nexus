@@ -299,19 +299,21 @@ Track actual files as implementation progresses. Expected touchpoints:
 - `app/Domain/DailyBriefings/Jobs/SendDailyBriefingJob.php` — added delivery through selected verified channel or fallback verified email, delivered/failure persistence, and `last_sent_for_date` update only after successful delivery.
 - `app/Domain/DailyBriefings/Jobs/GenerateDailyBriefingJob.php` — dispatches `SendDailyBriefingJob` after successful generated persistence.
 - `tests/Feature/DailyBriefings/SendDailyBriefingJobTest.php` — covered selected channel delivery, fallback verified email delivery, failure handling, successful retry of failed generated rows, delivered status/timestamps, and `last_sent_for_date` semantics.
+- `app/Http/Controllers/Settings/DailyBriefingPreferenceController.php` — added `/settings/daily-briefing` Inertia settings, guarded preference updates, and throttled synchronous test send.
+- `resources/js/Pages/Settings/DailyBriefing.vue` — added the daily briefing settings UI with opt-in, schedule, timezone, channel, project filter, status, and test send.
+- `resources/js/Pages/Settings/Index.vue` — linked Settings to the daily briefing settings page.
+- `routes/web.php` — added daily briefing settings routes with 20/min update and 5/min test-send throttles.
+- `tests/Feature/DailyBriefings/DailyBriefingPreferenceControllerTest.php` — covered settings render/update, guest rejection, channel ownership/verification/enabled guard, project ownership guard, test send, and throttling.
 
 Expected future touchpoints:
 
-- `app/Http/Controllers/Settings/DailyBriefingPreferenceController.php`
 - `app/Http/Controllers/DailyBriefingController.php`
-- `resources/js/Pages/Settings/DailyBriefing.vue`
 - `resources/js/Pages/DailyBriefings/Index.vue`
 - `resources/js/Pages/DailyBriefings/Show.vue`
 - `resources/js/lib/commands.ts`
 - `routes/web.php`
 - `docs/env.production.example`
 - `docs/security/operator-checklist.md`
-- `tests/Feature/DailyBriefings/DailyBriefingPreferenceControllerTest.php`
 - `tests/Feature/DailyBriefings/DailyBriefingHistoryControllerTest.php`
 
 ## Work log
@@ -394,6 +396,15 @@ Dated notes as work progresses.
   now dispatches the send job after successful generation. Deliberately
   deferred settings UI/controller, history UI/controller, command palette, and
   docs.
+- Implemented the settings UI/controller work unit: `/settings/daily-briefing`
+  now renders per-user preferences, verified delivery channels, owned projects,
+  and latest briefing status; updates persist opt-in, delivery time, timezone,
+  selected verified channel, and owned-project filters behind a 20/min throttle;
+  test send generates yesterday's current snapshot and delivers synchronously
+  through the selected channel/fallback email behind a 5/min throttle. The
+  controller rejects channels that are not owned, enabled, and verified, and
+  rejects project filters outside the authenticated user's ownership. Deliberately
+  deferred history UI/controller, command palette entries, and docs.
 
 ## Open questions / blockers
 

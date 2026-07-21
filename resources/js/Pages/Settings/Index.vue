@@ -15,6 +15,7 @@ import {
     Plug,
     PlugZap,
     ShieldCheck,
+    Sparkles,
     Sun,
     SunMoon,
     Unplug,
@@ -307,6 +308,27 @@ const disconnect = () => {
                         </span>
                         <span class="text-xs text-text-muted">
                             Route alerts to email, Slack, or generic webhooks.
+                        </span>
+                    </div>
+                </div>
+                <ExternalLink class="h-4 w-4 text-text-muted" aria-hidden="true" />
+            </Link>
+
+            <!-- Spec 044 — AI daily briefing settings entry point. -->
+            <Link
+                :href="route('settings.daily-briefing.index')"
+                class="glass-card flex items-center justify-between gap-3 p-5 transition hover:border-accent-cyan/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
+            >
+                <div class="flex items-center gap-3">
+                    <span class="flex h-10 w-10 items-center justify-center rounded-lg border border-border-subtle bg-background-panel-hover">
+                        <Sparkles class="h-5 w-5 text-accent-cyan" aria-hidden="true" />
+                    </span>
+                    <div class="flex min-w-0 flex-col">
+                        <span class="text-sm font-semibold text-text-primary">
+                            Daily briefing
+                        </span>
+                        <span class="text-xs text-text-muted">
+                            Configure your AI morning digest and test delivery.
                         </span>
                     </div>
                 </div>
