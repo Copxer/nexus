@@ -6,7 +6,7 @@ namespace App\Enums;
  * Origin domain of an Alert (spec 030). Matches roadmap §8.12.
  *
  * Spec 030 only emits `website` / `docker` / `deployment`; `github` is
- * reserved for future repo-scoped alerts (stale PR, merge conflict);
+ * reserved for repo/PR-scoped alerts (stale PR, PR risk, merge conflict);
  * `manual` is the user-pressed-the-button path; `system` is for Nexus's
  * own self-checks.
  *
@@ -14,7 +14,7 @@ namespace App\Enums;
  *   website     → websites.id
  *   docker      → hosts.id
  *   deployment  → workflow_runs.id
- *   github      → repositories.id
+ *   github      → repositories.id or github_pull_requests.id, depending on type
  *   manual      → null
  *   system      → null
  */

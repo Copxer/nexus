@@ -17,7 +17,7 @@ return new class extends Migration
 
             // website | docker | deployment | github | manual | system
             // (per AlertSource enum, subset of roadmap §8.12). `github` is
-            // reserved for future repo-scoped alerts; spec 030 only
+            // reserved for repo/PR-scoped alerts; spec 030 only
             // emits website / docker / deployment.
             $table->string('source', 16);
 

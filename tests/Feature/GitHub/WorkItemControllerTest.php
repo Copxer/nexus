@@ -2,14 +2,18 @@
 
 namespace Tests\Feature\GitHub;
 
+use App\Domain\AiInsights\Jobs\GeneratePullRequestRiskAssessmentJob;
 use App\Enums\GithubIssueState;
 use App\Enums\GithubPullRequestState;
+use App\Enums\PullRequestRiskAssessmentStatus;
 use App\Models\GithubIssue;
 use App\Models\GithubPullRequest;
 use App\Models\Project;
+use App\Models\PullRequestRiskAssessment;
 use App\Models\Repository;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Inertia\Testing\AssertableInertia;
 use Tests\TestCase;
 
@@ -90,6 +94,94 @@ class WorkItemControllerTest extends TestCase
                     ->where('items.0.state', 'open')
                     ->where('items.1.state', 'open')
             );
+    }
+
+    public function test_pull_request_rows_include_risk_assessment_payload_but_issue_rows_do_not(): void
+    {
+        $context = $this->setUpUserWithItems();
+        PullRequestRiskAssessment::factory()->scored()->create([
+            'github_pull_request_id' => $context['openPr']->id,
+            'risk_score' => 91,
+            'summary' => 'Critical files changed with failing checks.',
+            'reasons' => ['Critical path touched', 'Checks failing'],
+            'recommended_actions' => ['Review CI before merge'],
+            'assessed_at' => now()->subMinutes(10),
+        ]);
+
+        $this->actingAs($context['user'])
+            ->get(route('work-items.index'))
+            ->assertInertia(
+                fn (AssertableInertia $page) => $page
+                    ->where('items.0.kind', 'pull_request')
+                    ->where('items.0.risk_assessment.status', 'scored')
+                    ->where('items.0.risk_assessment.risk_score', 91)
+                    ->where('items.0.risk_assessment.summary', 'Critical files changed with failing checks.')
+                    ->where('items.0.risk_assessment.reasons.0', 'Critical path touched')
+                    ->where('items.0.risk_assessment.recommended_actions.0', 'Review CI before merge')
+                    ->where('items.1.kind', 'issue')
+                    ->missing('items.1.risk_assessment')
+            );
+    }
+
+    public function test_regenerate_marks_pull_request_risk_pending_and_dispatches_job_when_ai_is_enabled(): void
+    {
+        Queue::fake();
+        config(['services.llm.enabled' => true]);
+        $context = $this->setUpUserWithItems();
+        PullRequestRiskAssessment::factory()->scored()->create([
+            'github_pull_request_id' => $context['openPr']->id,
+            'error_message' => 'Old error',
+            'failed_at' => now()->subHour(),
+        ]);
+
+        $this->actingAs($context['user'])
+            ->from(route('work-items.index'))
+            ->post(route('work-items.pull-requests.risk.regenerate', $context['openPr']))
+            ->assertRedirect(route('work-items.index'))
+            ->assertSessionHas('status', 'PR risk assessment queued.');
+
+        $this->assertDatabaseHas('pull_request_risk_assessments', [
+            'github_pull_request_id' => $context['openPr']->id,
+            'status' => PullRequestRiskAssessmentStatus::Pending->value,
+            'failed_at' => null,
+            'error_message' => null,
+        ]);
+        Queue::assertPushed(
+            GeneratePullRequestRiskAssessmentJob::class,
+            fn (GeneratePullRequestRiskAssessmentJob $job): bool => $job->pullRequestId === $context['openPr']->id,
+        );
+    }
+
+    public function test_regenerate_is_rejected_when_ai_is_disabled(): void
+    {
+        Queue::fake();
+        config(['services.llm.enabled' => false]);
+        $context = $this->setUpUserWithItems();
+
+        $this->actingAs($context['user'])
+            ->from(route('work-items.index'))
+            ->post(route('work-items.pull-requests.risk.regenerate', $context['openPr']))
+            ->assertRedirect(route('work-items.index'))
+            ->assertSessionHasErrors('risk');
+
+        $this->assertDatabaseMissing('pull_request_risk_assessments', [
+            'github_pull_request_id' => $context['openPr']->id,
+        ]);
+        Queue::assertNotPushed(GeneratePullRequestRiskAssessmentJob::class);
+    }
+
+    public function test_regenerate_is_forbidden_for_other_users_pull_requests(): void
+    {
+        Queue::fake();
+        config(['services.llm.enabled' => true]);
+        $context = $this->setUpUserWithItems();
+        $other = User::factory()->create(['email_verified_at' => now()]);
+
+        $this->actingAs($other)
+            ->post(route('work-items.pull-requests.risk.regenerate', $context['openPr']))
+            ->assertForbidden();
+
+        Queue::assertNotPushed(GeneratePullRequestRiskAssessmentJob::class);
     }
 
     public function test_kind_filter_pulls_narrows_to_pull_requests(): void

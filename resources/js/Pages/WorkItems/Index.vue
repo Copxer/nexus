@@ -9,6 +9,7 @@ import {
     Inbox,
     MessageSquare,
     Search,
+    Sparkles,
 } from 'lucide-vue-next';
 import { reactive, watch } from 'vue';
 
@@ -30,6 +31,19 @@ interface WorkItem {
     updated_at_github: string | null;
     html_url: string | null;
     repository: RepositoryRef | null;
+    risk_assessment?: PullRequestRiskAssessment | null;
+}
+
+interface PullRequestRiskAssessment {
+    status: 'pending' | 'scored' | 'failed' | 'skipped' | string | null;
+    risk_level: 'low' | 'medium' | 'high' | 'critical' | string | null;
+    risk_score: number | null;
+    summary: string | null;
+    reasons: string[];
+    recommended_actions: string[];
+    assessed_at: string | null;
+    failed_at: string | null;
+    error_message: string | null;
 }
 
 interface Filters {
@@ -43,6 +57,7 @@ const props = defineProps<{
     items: WorkItem[];
     repositories: { id: number; full_name: string }[];
     filters: Filters;
+    canRegeneratePrRisk: boolean;
 }>();
 
 const local = reactive<Filters>({
@@ -65,6 +80,43 @@ const itemStateTone = (item: WorkItem) => {
         );
     }
     return item.state === 'open' ? 'info' : 'muted';
+};
+
+const riskTone = (assessment: PullRequestRiskAssessment | null | undefined) => {
+    if (!assessment || assessment.status === 'pending') return 'muted';
+    if (assessment.status === 'failed') return 'danger';
+
+    return (
+        (
+            ({
+                low: 'success',
+                medium: 'warning',
+                high: 'danger',
+                critical: 'danger',
+            }) as const
+        )[assessment.risk_level ?? ''] ?? 'muted'
+    );
+};
+
+const riskLabel = (assessment: PullRequestRiskAssessment | null | undefined) => {
+    if (!assessment) return 'Risk not assessed';
+    if (assessment.status === 'pending') return 'Risk pending';
+    if (assessment.status === 'failed') return 'Risk failed';
+    if (assessment.risk_level && assessment.risk_score !== null) {
+        return `${assessment.risk_level} ${assessment.risk_score}`;
+    }
+
+    return assessment.status ?? 'Risk unknown';
+};
+
+const regenerateRisk = (item: WorkItem) => {
+    if (item.kind !== 'pull_request' || !props.canRegeneratePrRisk) return;
+
+    router.post(
+        route('work-items.pull-requests.risk.regenerate', item.id.replace('pull-', '')),
+        {},
+        { preserveScroll: true },
+    );
 };
 
 // Push filter changes to the server. `preserveState: false` re-renders
@@ -237,93 +289,180 @@ watch(
                     <li
                         v-for="item in items"
                         :key="item.id"
-                        class="flex flex-col gap-2 px-6 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+                        class="flex flex-col gap-3 px-6 py-4"
                     >
-                        <div class="flex min-w-0 items-start gap-3">
-                            <CircleDot
-                                v-if="item.kind === 'issue'"
-                                class="mt-1 h-4 w-4 shrink-0"
-                                :class="
-                                    item.state === 'open'
-                                        ? 'text-accent-cyan'
-                                        : 'text-text-muted'
-                                "
-                                aria-hidden="true"
-                            />
-                            <GitPullRequest
-                                v-else
-                                class="mt-1 h-4 w-4 shrink-0"
-                                :class="{
-                                    'text-accent-cyan': item.state === 'open',
-                                    'text-status-success':
-                                        item.state === 'merged',
-                                    'text-text-muted':
-                                        item.state === 'closed' || !item.state,
-                                }"
-                                aria-hidden="true"
-                            />
-                            <div class="flex min-w-0 flex-col gap-1">
+                        <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                            <div class="flex min-w-0 items-start gap-3">
+                                <CircleDot
+                                    v-if="item.kind === 'issue'"
+                                    class="mt-1 h-4 w-4 shrink-0"
+                                    :class="
+                                        item.state === 'open'
+                                            ? 'text-accent-cyan'
+                                            : 'text-text-muted'
+                                    "
+                                    aria-hidden="true"
+                                />
+                                <GitPullRequest
+                                    v-else
+                                    class="mt-1 h-4 w-4 shrink-0"
+                                    :class="{
+                                        'text-accent-cyan': item.state === 'open',
+                                        'text-status-success':
+                                            item.state === 'merged',
+                                        'text-text-muted':
+                                            item.state === 'closed' || !item.state,
+                                    }"
+                                    aria-hidden="true"
+                                />
+                                <div class="flex min-w-0 flex-col gap-1">
+                                    <a
+                                        v-if="item.html_url"
+                                        :href="item.html_url"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        class="truncate text-sm font-semibold text-text-primary transition hover:text-accent-cyan"
+                                    >
+                                        <span class="font-mono text-text-muted">#{{ item.number }}</span>
+                                        {{ item.title }}
+                                    </a>
+                                    <span
+                                        v-else
+                                        class="truncate text-sm font-semibold text-text-primary"
+                                    >
+                                        <span class="font-mono text-text-muted">#{{ item.number }}</span>
+                                        {{ item.title }}
+                                    </span>
+                                    <p class="text-xs text-text-muted">
+                                        <span
+                                            v-if="item.repository"
+                                            class="font-mono text-text-secondary"
+                                        >
+                                            {{ item.repository.full_name }}
+                                        </span>
+                                        <template v-if="item.author_login">
+                                            ·
+                                            <span class="font-mono text-text-secondary">@{{ item.author_login }}</span>
+                                        </template>
+                                        · Updated {{ item.updated_at_github ?? '—' }}
+                                    </p>
+                                </div>
+                            </div>
+                            <div
+                                class="flex flex-shrink-0 items-center gap-3 text-xs text-text-muted"
+                            >
+                                <StatusBadge
+                                    v-if="item.kind === 'pull_request' && item.draft"
+                                    tone="muted"
+                                >
+                                    draft
+                                </StatusBadge>
+                                <StatusBadge
+                                    v-if="item.kind === 'pull_request'"
+                                    :tone="riskTone(item.risk_assessment)"
+                                    :title="item.risk_assessment?.summary ?? riskLabel(item.risk_assessment)"
+                                >
+                                    {{ riskLabel(item.risk_assessment) }}
+                                </StatusBadge>
+                                <StatusBadge :tone="itemStateTone(item)">
+                                    {{ item.state }}
+                                </StatusBadge>
+                                <span class="inline-flex items-center gap-1">
+                                    <MessageSquare
+                                        class="h-3.5 w-3.5"
+                                        aria-hidden="true"
+                                    />
+                                    {{ item.comments_count }}
+                                </span>
                                 <a
                                     v-if="item.html_url"
                                     :href="item.html_url"
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    class="truncate text-sm font-semibold text-text-primary transition hover:text-accent-cyan"
+                                    class="text-text-muted transition hover:text-accent-cyan"
+                                    :aria-label="`Open ${item.kind === 'pull_request' ? 'pull request' : 'issue'} #${item.number} on GitHub`"
                                 >
-                                    <span class="font-mono text-text-muted">#{{ item.number }}</span>
-                                    {{ item.title }}
+                                    <ExternalLink class="h-4 w-4" aria-hidden="true" />
                                 </a>
-                                <span
-                                    v-else
-                                    class="truncate text-sm font-semibold text-text-primary"
-                                >
-                                    <span class="font-mono text-text-muted">#{{ item.number }}</span>
-                                    {{ item.title }}
-                                </span>
-                                <p class="text-xs text-text-muted">
-                                    <span
-                                        v-if="item.repository"
-                                        class="font-mono text-text-secondary"
-                                    >
-                                        {{ item.repository.full_name }}
-                                    </span>
-                                    <template v-if="item.author_login">
-                                        ·
-                                        <span class="font-mono text-text-secondary">@{{ item.author_login }}</span>
-                                    </template>
-                                    · Updated {{ item.updated_at_github ?? '—' }}
-                                </p>
                             </div>
                         </div>
                         <div
-                            class="flex flex-shrink-0 items-center gap-3 text-xs text-text-muted"
+                            v-if="item.kind === 'pull_request'"
+                            class="rounded-xl border border-border-subtle bg-background-panel-hover/45 p-4 text-xs text-text-secondary"
                         >
-                            <StatusBadge
-                                v-if="item.kind === 'pull_request' && item.draft"
-                                tone="muted"
+                            <div class="flex flex-wrap items-start justify-between gap-3">
+                                <div class="space-y-1">
+                                    <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-text-muted">
+                                        AI risk panel
+                                    </p>
+                                    <p class="text-sm font-semibold text-text-primary">
+                                        {{ riskLabel(item.risk_assessment) }}
+                                    </p>
+                                    <p v-if="item.risk_assessment?.summary" class="max-w-3xl text-text-secondary">
+                                        {{ item.risk_assessment.summary }}
+                                    </p>
+                                    <p v-else-if="item.risk_assessment?.status === 'pending'" class="text-text-muted">
+                                        Assessment is queued or running.
+                                    </p>
+                                    <p v-else-if="item.risk_assessment?.status === 'failed'" class="text-status-danger">
+                                        {{ item.risk_assessment.error_message ?? 'Assessment failed.' }}
+                                    </p>
+                                    <p v-else class="text-text-muted">
+                                        No assessment has been stored for this pull request yet.
+                                    </p>
+                                </div>
+                                <button
+                                    v-if="canRegeneratePrRisk"
+                                    type="button"
+                                    class="inline-flex items-center gap-2 rounded-lg border border-accent-cyan/40 bg-accent-cyan/15 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-accent-cyan transition hover:border-accent-cyan/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
+                                    @click="regenerateRisk(item)"
+                                >
+                                    <Sparkles class="h-3.5 w-3.5" aria-hidden="true" />
+                                    Regenerate
+                                </button>
+                            </div>
+                            <dl class="mt-3 grid gap-3 sm:grid-cols-3">
+                                <div>
+                                    <dt class="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">Score</dt>
+                                    <dd class="mt-1 text-text-primary">
+                                        {{ item.risk_assessment?.risk_score ?? '—' }}
+                                    </dd>
+                                </div>
+                                <div>
+                                    <dt class="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">Status</dt>
+                                    <dd class="mt-1 text-text-primary">
+                                        {{ item.risk_assessment?.status ?? 'not assessed' }}
+                                    </dd>
+                                </div>
+                                <div>
+                                    <dt class="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">Assessed</dt>
+                                    <dd class="mt-1 text-text-primary">
+                                        {{ item.risk_assessment?.assessed_at ?? item.risk_assessment?.failed_at ?? '—' }}
+                                    </dd>
+                                </div>
+                            </dl>
+                            <div
+                                v-if="item.risk_assessment?.reasons?.length"
+                                class="mt-3"
                             >
-                                draft
-                            </StatusBadge>
-                            <StatusBadge :tone="itemStateTone(item)">
-                                {{ item.state }}
-                            </StatusBadge>
-                            <span class="inline-flex items-center gap-1">
-                                <MessageSquare
-                                    class="h-3.5 w-3.5"
-                                    aria-hidden="true"
-                                />
-                                {{ item.comments_count }}
-                            </span>
-                            <a
-                                v-if="item.html_url"
-                                :href="item.html_url"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                class="text-text-muted transition hover:text-accent-cyan"
-                                :aria-label="`Open ${item.kind === 'pull_request' ? 'pull request' : 'issue'} #${item.number} on GitHub`"
+                                <p class="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">Reasons</p>
+                                <ul class="mt-1 list-disc space-y-1 pl-4">
+                                    <li v-for="reason in item.risk_assessment.reasons" :key="reason">
+                                        {{ reason }}
+                                    </li>
+                                </ul>
+                            </div>
+                            <div
+                                v-if="item.risk_assessment?.recommended_actions?.length"
+                                class="mt-3"
                             >
-                                <ExternalLink class="h-4 w-4" aria-hidden="true" />
-                            </a>
+                                <p class="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">Recommended actions</p>
+                                <ul class="mt-1 list-disc space-y-1 pl-4">
+                                    <li v-for="action in item.risk_assessment.recommended_actions" :key="action">
+                                        {{ action }}
+                                    </li>
+                                </ul>
+                            </div>
                         </div>
                     </li>
                 </ul>

@@ -177,6 +177,17 @@ export interface RiskyProjectRow {
         | null;
     /** Humanized via `diffForHumans()`. */
     last_activity_at: string | null;
+    health_explanation: ProjectHealthExplanationPayload | null;
+}
+
+export interface ProjectHealthExplanationPayload {
+    status: 'pending' | 'explained' | 'failed' | 'skipped';
+    summary: string | null;
+    drivers: string[];
+    recommended_actions: string[];
+    explained_at: string | null;
+    failed_at: string | null;
+    error_message: string | null;
 }
 
 /**

@@ -60,6 +60,7 @@ class WorkItemController extends Controller
             'items' => $items,
             'repositories' => $repositories,
             'filters' => $filters,
+            'canRegeneratePrRisk' => config('services.llm.enabled', false),
         ]);
     }
 }

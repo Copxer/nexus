@@ -3,6 +3,7 @@
 namespace Tests\Feature\GitHub\Webhooks;
 
 use App\Domain\Activity\Actions\CreateActivityEventAction;
+use App\Domain\AiInsights\Jobs\GeneratePullRequestRiskAssessmentJob;
 use App\Domain\GitHub\Actions\NormalizeGitHubPullRequestAction;
 use App\Domain\GitHub\WebhookHandlers\PullRequestWebhookHandler;
 use App\Enums\WebhookDeliveryStatus;
@@ -12,6 +13,7 @@ use App\Models\Repository;
 use App\Models\User;
 use App\Models\WebhookDelivery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class PullRequestWebhookHandlerTest extends TestCase
@@ -134,12 +136,46 @@ class PullRequestWebhookHandlerTest extends TestCase
     public function test_unknown_action_is_skipped(): void
     {
         $this->importedRepository();
-        $delivery = $this->deliveryFor('synchronize');
+        $delivery = $this->deliveryFor('labeled');
 
         $status = $this->handler()->handle($delivery);
 
         $this->assertSame(WebhookDeliveryStatus::Skipped, $status);
         $this->assertNotNull($delivery->fresh()->error_message);
+    }
+
+    public function test_material_actions_dispatch_risk_assessment_after_pr_is_updated_when_ai_is_enabled(): void
+    {
+        Queue::fake();
+        config(['services.llm.enabled' => true]);
+        $this->importedRepository();
+        $delivery = $this->deliveryFor('synchronize', [
+            'id' => 4242,
+            'number' => 42,
+            'title' => 'Refresh cache layer',
+        ]);
+
+        $status = $this->handler()->handle($delivery);
+
+        $pullRequest = GithubPullRequest::query()->sole();
+        $this->assertSame(WebhookDeliveryStatus::Processed, $status);
+        $this->assertSame(42, $pullRequest->number);
+        Queue::assertPushed(
+            GeneratePullRequestRiskAssessmentJob::class,
+            fn (GeneratePullRequestRiskAssessmentJob $job): bool => $job->pullRequestId === $pullRequest->id,
+        );
+    }
+
+    public function test_material_actions_do_not_dispatch_risk_assessment_when_ai_is_disabled(): void
+    {
+        Queue::fake();
+        config(['services.llm.enabled' => false]);
+        $this->importedRepository();
+
+        $status = $this->handler()->handle($this->deliveryFor('opened'));
+
+        $this->assertSame(WebhookDeliveryStatus::Processed, $status);
+        Queue::assertNotPushed(GeneratePullRequestRiskAssessmentJob::class);
     }
 
     public function test_unimported_repository_is_skipped(): void

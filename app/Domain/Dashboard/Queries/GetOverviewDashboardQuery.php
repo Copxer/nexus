@@ -7,6 +7,7 @@ use App\Enums\AlertSeverity;
 use App\Enums\AlertStatus;
 use App\Enums\HealthScoreBand;
 use App\Enums\HostStatus;
+use App\Enums\ProjectHealthExplanationStatus;
 use App\Models\ActivityEvent;
 use App\Models\Alert;
 use App\Models\Host;
@@ -292,6 +293,7 @@ class GetOverviewDashboardQuery
     private function riskyProjects(User $user): array
     {
         return Project::query()
+            ->with('healthExplanation')
             ->where('owner_user_id', $user->id)
             ->orderByRaw('health_score IS NULL')
             ->orderBy('health_score', 'asc')
@@ -307,18 +309,33 @@ class GetOverviewDashboardQuery
                 'health_score',
                 'last_activity_at',
             ])
-            ->map(fn (Project $p): array => [
-                'id' => $p->id,
-                'slug' => $p->slug,
-                'name' => $p->name,
-                'color' => $p->color,
-                'icon' => $p->icon,
-                'health_score' => $p->health_score,
-                'health_band' => $p->health_score === null
-                    ? null
-                    : HealthScoreBand::fromScore($p->health_score)->value,
-                'last_activity_at' => $p->last_activity_at?->diffForHumans(),
-            ])
+            ->map(function (Project $p): array {
+                $explanation = $p->healthExplanation;
+
+                return [
+                    'id' => $p->id,
+                    'slug' => $p->slug,
+                    'name' => $p->name,
+                    'color' => $p->color,
+                    'icon' => $p->icon,
+                    'health_score' => $p->health_score,
+                    'health_band' => $p->health_score === null
+                        ? null
+                        : HealthScoreBand::fromScore($p->health_score)->value,
+                    'health_explanation' => $explanation === null ? null : [
+                        'status' => $explanation->status->value,
+                        'summary' => $explanation->summary,
+                        'drivers' => $explanation->drivers ?? [],
+                        'recommended_actions' => $explanation->recommended_actions ?? [],
+                        'explained_at' => $explanation->explained_at?->diffForHumans(),
+                        'failed_at' => $explanation->failed_at?->diffForHumans(),
+                        'error_message' => $explanation->status === ProjectHealthExplanationStatus::Failed
+                            ? $explanation->error_message
+                            : null,
+                    ],
+                    'last_activity_at' => $p->last_activity_at?->diffForHumans(),
+                ];
+            })
             ->all();
     }
 

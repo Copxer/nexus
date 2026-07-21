@@ -3,6 +3,7 @@
 namespace App\Domain\GitHub\WebhookHandlers;
 
 use App\Domain\Activity\Actions\CreateActivityEventAction;
+use App\Domain\AiInsights\Jobs\GeneratePullRequestRiskAssessmentJob;
 use App\Domain\GitHub\Actions\NormalizeGitHubPullRequestAction;
 use App\Enums\ActivitySeverity;
 use App\Enums\WebhookDeliveryStatus;
@@ -77,7 +78,7 @@ class PullRequestWebhookHandler
             return WebhookDeliveryStatus::Skipped;
         }
 
-        GithubPullRequest::query()->updateOrCreate(
+        $pullRequest = GithubPullRequest::query()->updateOrCreate(
             [
                 'repository_id' => $repository->id,
                 'github_id' => $normalized['github_id'],
@@ -87,6 +88,10 @@ class PullRequestWebhookHandler
                 'synced_at' => now(),
             ],
         );
+
+        if (config('services.llm.enabled', false) && $this->shouldDispatchRiskAssessment($action)) {
+            GeneratePullRequestRiskAssessmentJob::dispatch($pullRequest->id);
+        }
 
         $sender = $payload['sender']['login'] ?? null;
 
@@ -118,10 +123,25 @@ class PullRequestWebhookHandler
         return match ($action) {
             'opened' => ['type' => 'pull_request.opened', 'severity' => ActivitySeverity::Info],
             'reopened' => ['type' => 'pull_request.reopened', 'severity' => ActivitySeverity::Info],
+            'synchronize' => ['type' => 'pull_request.synchronize', 'severity' => ActivitySeverity::Info],
+            'ready_for_review' => ['type' => 'pull_request.ready_for_review', 'severity' => ActivitySeverity::Info],
+            'edited' => ['type' => 'pull_request.edited', 'severity' => ActivitySeverity::Info],
             'review_requested' => ['type' => 'pull_request.review_requested', 'severity' => ActivitySeverity::Info],
             'closed' => $this->resolveClosedRule($prPayload),
             default => null,
         };
+    }
+
+    private function shouldDispatchRiskAssessment(string $action): bool
+    {
+        return in_array($action, [
+            'opened',
+            'reopened',
+            'synchronize',
+            'ready_for_review',
+            'edited',
+            'review_requested',
+        ], true);
     }
 
     /**

@@ -7,6 +7,7 @@ use Database\Factories\GithubPullRequestFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class GithubPullRequest extends Model
 {
@@ -61,5 +62,10 @@ class GithubPullRequest extends Model
     public function repository(): BelongsTo
     {
         return $this->belongsTo(Repository::class);
+    }
+
+    public function riskAssessment(): HasOne
+    {
+        return $this->hasOne(PullRequestRiskAssessment::class);
     }
 }

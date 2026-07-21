@@ -94,6 +94,8 @@ Per-user limits via Laravel's `throttle:N,1` middleware:
 | `POST /settings/notifications/deliveries/{delivery}/retry` | 30/min (spec 042) |
 | `PATCH /settings/daily-briefing` | 20/min (spec 044) |
 | `POST /settings/daily-briefing/test` | 5/min (spec 044) |
+| `POST /work-items/pull-requests/{pullRequest}/risk/regenerate` | 10/min (spec 045) |
+| `POST /overview/projects/{project}/health-explanation/regenerate` | 10/min (spec 045) |
 | `PATCH /settings/rules/weights` | 20/min (spec 046) |
 | `DELETE /settings/rules/weights` | 20/min (spec 046) |
 | `POST /settings/rules` | 10/min (spec 046) |
@@ -158,6 +160,32 @@ Operators should verify:
   entity metadata, timestamps, labels, and short snippets, not secrets,
   tokens, webhook URLs, raw logs, or full issue/PR bodies.
 
+### AI PR risk + health explanations (spec 045)
+
+PR-risk scoring and project-health explanations reuse the shared LLM gate
+from spec 044. Keep the operator posture conservative:
+
+- **Feature gate.** Leave `AI_FEATURES_ENABLED=false` until an LLM provider,
+  model, timeout, and budget posture are approved for production.
+- **Prompt safety.** PR risk and health explanation input snapshots are
+  bounded Nexus metadata only. They must not include raw diffs, raw logs,
+  access tokens, webhook URLs, provider headers, environment values, or full
+  PR bodies.
+- **Webhook trigger.** Only PR webhook actions that can materially change
+  review risk enqueue PR-risk generation: opened, reopened, synchronize,
+  ready-for-review, edited, and review-requested.
+- **Notifications.** High/critical PR risk uses verified spec 042 channels
+  through the normal alert-notification routing. A PR creates at most one
+  notification per material increase to `high` or `critical`; unchanged
+  `low`/`medium` scores stay quiet.
+- **Regenerate controls.** Work Items PR-risk regenerate and Overview
+  health-explanation regenerate are owner-only, AI-gated, and throttled at
+  10/min per route.
+- **Health-explanation rate limit.** Automatic health explanation refreshes
+  only enqueue after material score/band changes or stale explanations, and
+  are rate-limited per project so noisy alerts do not produce repeated LLM
+  calls.
+
 ## 7. Deferred to follow-ups
 
 Documented for visibility; not blockers for spec 039 sign-off:
@@ -187,4 +215,7 @@ Documented for visibility; not blockers for spec 039 sign-off:
       rest; outbound webhook HMAC available on demand.
 - [ ] §6 (spec 044): AI daily briefing gate, throttles, scheduler, and
       sanitized LLM input reviewed before enabling `AI_FEATURES_ENABLED`.
+- [ ] §6 (spec 045): AI PR-risk/health prompt safety, webhook trigger,
+      notification, regenerate, and rate-limit posture reviewed before
+      enabling `AI_FEATURES_ENABLED`.
 - [ ] Run the suite: `php artisan test --filter=Security` passes.

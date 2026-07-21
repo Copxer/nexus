@@ -41,6 +41,7 @@ defineProps<{
     dashboard: DashboardPayload;
     activityHeatmap: ActivityHeatmapPayload;
     topWorkItems: TopWorkItem[];
+    canRegenerateProjectHealthExplanation: boolean;
 }>();
 
 // ─── Reverb subscription (spec 033) ──────────────────────────────────
@@ -567,7 +568,10 @@ const visualizationStubs = [
                      `users.{id}.dashboard` subscription wired in
                      spec 033. -->
                 <div class="lg:col-span-12">
-                    <RiskyProjects :projects="dashboard.riskyProjects" />
+                    <RiskyProjects
+                        :projects="dashboard.riskyProjects"
+                        :can-regenerate="canRegenerateProjectHealthExplanation"
+                    />
                 </div>
 
                 <!-- Activity Heatmap — 7 days × 6 four-hour buckets per §8.11 -->
