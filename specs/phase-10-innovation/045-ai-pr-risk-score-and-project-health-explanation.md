@@ -281,6 +281,10 @@ List of created/modified files. Fill in as work progresses.
 - `app/Domain/AiInsights/Queries/GetProjectHealthExplanationInputQuery.php` — builds scoped, bounded project-health explanation snapshots from existing score drivers.
 - `tests/Feature/AiInsights/GetPullRequestRiskInputQueryTest.php` — covers PR ownership scoping, bounded samples, and sensitive-field exclusion.
 - `tests/Feature/AiInsights/GetProjectHealthExplanationInputQueryTest.php` — covers project ownership scoping, health-driver samples/caps, and sensitive-field exclusion.
+- `app/Domain/AiInsights/Actions/GeneratePullRequestRiskAssessmentAction.php` — builds `pr-risk-v1` prompts, validates/sanitizes LLM output, persists scored or failed PR risk rows, and reuses the current row on regeneration.
+- `app/Domain/AiInsights/Actions/GenerateProjectHealthExplanationAction.php` — builds `project-health-explanation-v1` prompts, validates/sanitizes LLM output, persists explained or failed health explanation rows, and reuses the current row on regeneration.
+- `tests/Feature/AiInsights/GeneratePullRequestRiskAssessmentActionTest.php` — covers PR risk generation prompt, sanitization, failed client, disabled AI gate, invalid output, and regeneration row updates.
+- `tests/Feature/AiInsights/GenerateProjectHealthExplanationActionTest.php` — covers project health explanation prompt, sanitization, failed client, disabled AI gate, invalid output, and regeneration row updates.
 
 ## Work log
 
@@ -306,6 +310,11 @@ List of created/modified files. Fill in as work progresses.
   and `GetProjectHealthExplanationInputQuery`, with ownership scoping, deterministic
   bounded facts, sample caps, and focused tests proving snapshots exclude secrets,
   webhook URLs, access tokens, raw logs, raw diffs, and full PR bodies.
+- Implemented the third reviewable backend slice: `GeneratePullRequestRiskAssessmentAction`
+  and `GenerateProjectHealthExplanationAction`, reusing the shared `LlmClient` and
+  `services.llm.enabled` gate, building versioned prompts from bounded snapshots,
+  validating/sanitizing structured JSON output, persisting scored/explained rows,
+  failing closed with error context, and updating the existing current row on regeneration.
 
 ## Open questions / blockers
 
