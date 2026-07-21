@@ -19,6 +19,7 @@ use App\Http\Controllers\OverviewController;
 use App\Http\Controllers\PaletteSearchController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\ProjectHealthExplanationRegenerationController;
 use App\Http\Controllers\PublicStatus\ConfirmSubscriptionController;
 use App\Http\Controllers\PublicStatus\ShowController;
 use App\Http\Controllers\PublicStatus\SubscribeController;
@@ -216,6 +217,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/work-items/pull-requests/{pullRequest}/risk/regenerate', PullRequestRiskRegenerationController::class)
         ->middleware('throttle:10,1')
         ->name('work-items.pull-requests.risk.regenerate');
+    Route::post('/overview/projects/{project}/health-explanation/regenerate', ProjectHealthExplanationRegenerationController::class)
+        ->middleware('throttle:10,1')
+        ->name('overview.projects.health-explanation.regenerate');
 
     // Spec 018 — dedicated activity feed page. Right-rail shares the
     // same data via the activity.recent Inertia prop registered in

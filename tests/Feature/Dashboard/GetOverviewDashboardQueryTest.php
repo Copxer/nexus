@@ -4,11 +4,13 @@ namespace Tests\Feature\Dashboard;
 
 use App\Domain\Dashboard\Queries\GetOverviewDashboardQuery;
 use App\Enums\AlertSeverity;
+use App\Enums\ProjectHealthExplanationStatus;
 use App\Models\ActivityEvent;
 use App\Models\Alert;
 use App\Models\Host;
 use App\Models\HostMetricSnapshot;
 use App\Models\Project;
+use App\Models\ProjectHealthExplanation;
 use App\Models\Repository;
 use App\Models\User;
 use App\Models\WorkflowRun;
@@ -388,6 +390,58 @@ class GetOverviewDashboardQueryTest extends TestCase
         $this->assertNull($payload['dashboard']['uptime']['overall']);
         $this->assertSame('muted', $payload['dashboard']['uptime']['status']);
         $this->assertCount(12, $payload['dashboard']['uptime']['sparkline']);
+    }
+
+    public function test_risky_projects_include_latest_health_explanation_payload(): void
+    {
+        $owner = User::factory()->create();
+        $project = Project::factory()->create([
+            'owner_user_id' => $owner->id,
+            'health_score' => 42,
+        ]);
+        ProjectHealthExplanation::factory()->explained()->create([
+            'project_id' => $project->id,
+            'summary' => 'Critical alerts are dragging the score down.',
+            'drivers' => ['2 critical alerts'],
+            'recommended_actions' => ['Acknowledge or resolve the critical alerts'],
+            'explained_at' => now()->subMinutes(5),
+        ]);
+
+        $payload = (new GetOverviewDashboardQuery)->handle($owner);
+        $row = $payload['dashboard']['riskyProjects'][0];
+
+        $this->assertSame('explained', $row['health_explanation']['status']);
+        $this->assertSame('Critical alerts are dragging the score down.', $row['health_explanation']['summary']);
+        $this->assertSame(['2 critical alerts'], $row['health_explanation']['drivers']);
+        $this->assertSame(['Acknowledge or resolve the critical alerts'], $row['health_explanation']['recommended_actions']);
+        $this->assertNotNull($row['health_explanation']['explained_at']);
+        $this->assertNull($row['health_explanation']['error_message']);
+    }
+
+    public function test_risky_projects_include_failed_health_explanation_error_but_no_cross_user_rows(): void
+    {
+        $owner = User::factory()->create();
+        $project = Project::factory()->create([
+            'owner_user_id' => $owner->id,
+            'health_score' => 35,
+        ]);
+        ProjectHealthExplanation::factory()->create([
+            'project_id' => $project->id,
+            'status' => ProjectHealthExplanationStatus::Failed->value,
+            'error_message' => 'Provider unavailable',
+            'failed_at' => now()->subMinute(),
+        ]);
+        $otherProject = Project::factory()->create(['health_score' => 20]);
+        ProjectHealthExplanation::factory()->explained()->create([
+            'project_id' => $otherProject->id,
+            'summary' => 'Other user explanation',
+        ]);
+
+        $payload = (new GetOverviewDashboardQuery)->handle($owner);
+
+        $this->assertCount(1, $payload['dashboard']['riskyProjects']);
+        $this->assertSame('failed', $payload['dashboard']['riskyProjects'][0]['health_explanation']['status']);
+        $this->assertSame('Provider unavailable', $payload['dashboard']['riskyProjects'][0]['health_explanation']['error_message']);
     }
 
     // ────────────────────────────────────────────────────────────────

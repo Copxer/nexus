@@ -49,6 +49,7 @@ class OverviewController extends Controller
 
         return Inertia::render('Overview', array_merge($payload, [
             'topWorkItems' => $topWorkItems,
+            'canRegenerateProjectHealthExplanation' => config('services.llm.enabled', false),
         ]));
     }
 }

@@ -301,6 +301,15 @@ List of created/modified files. Fill in as work progresses.
 - `routes/web.php` — adds the throttled Work Items PR-risk regenerate route.
 - `resources/js/Pages/WorkItems/Index.vue` — renders PR-only risk badge and inline risk panel with summary, reasons, actions, timestamp, pending/failed state, and gated regenerate action.
 - `tests/Feature/GitHub/WorkItemControllerTest.php` — covers Work Items PR-risk payload boundaries and regenerate authorization/AI gate behavior.
+- `app/Domain/Dashboard/Queries/GetOverviewDashboardQuery.php` — includes the latest project health explanation payload on risky-project rows.
+- `app/Http/Controllers/OverviewController.php` — exposes the gated Overview health-explanation regenerate affordance flag.
+- `app/Http/Controllers/ProjectHealthExplanationRegenerationController.php` — queues manual health-explanation regeneration for project owners when AI insights are enabled.
+- `routes/web.php` — adds the throttled Overview project-health explanation regenerate route.
+- `resources/js/Components/Dashboard/RiskyProjects.vue` — renders the “Why?” health explanation affordance with summary, drivers, recommended actions, timestamps, pending/failed/no-explanation states, and gated regenerate.
+- `resources/js/Pages/Overview.vue` — passes the health-explanation regenerate gate into the Risky Projects panel.
+- `resources/js/types/index.d.ts` — adds the project health explanation payload type on `RiskyProjectRow`.
+- `tests/Feature/Dashboard/GetOverviewDashboardQueryTest.php` — covers Overview risky-project health explanation payload and cross-user isolation.
+- `tests/Feature/Dashboard/ProjectHealthExplanationUiTest.php` — covers Overview Inertia payload and health-explanation regenerate gate/authorization behavior.
 
 ## Work log
 
@@ -348,6 +357,11 @@ List of created/modified files. Fill in as work progresses.
   pending/failed states, and exposes a throttled manual regenerate action for project
   owners only when AI insights are enabled. Kept issue rows unchanged and deferred the
   Overview project-health overlay, notifications, and docs.
+- Implemented the seventh reviewable UI slice: Overview risky-project rows now carry the
+  latest project health explanation payload, render a natural-language “Why?” affordance
+  with summary, drivers, recommended actions, timestamp, pending/failed/no-explanation
+  states, and expose a throttled manual regenerate action for project owners when AI
+  insights are enabled. Kept PR risk notifications and docs deferred.
 
 ## Open questions / blockers
 
