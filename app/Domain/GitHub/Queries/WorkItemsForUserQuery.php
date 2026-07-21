@@ -4,6 +4,7 @@ namespace App\Domain\GitHub\Queries;
 
 use App\Models\GithubIssue;
 use App\Models\GithubPullRequest;
+use App\Models\PullRequestRiskAssessment;
 use App\Models\Repository;
 use App\Models\User;
 use Illuminate\Support\Collection;
@@ -138,7 +139,10 @@ class WorkItemsForUserQuery
     private function fetchPullRequests(Collection $repositoryIds, string $state, ?string $search): Collection
     {
         $query = GithubPullRequest::query()
-            ->with('repository:id,full_name,name')
+            ->with([
+                'repository:id,full_name,name',
+                'riskAssessment',
+            ])
             ->whereIn('repository_id', $repositoryIds);
 
         if ($state !== 'all') {
@@ -175,7 +179,30 @@ class WorkItemsForUserQuery
                     'full_name' => $pr->repository->full_name,
                     'name' => $pr->repository->name,
                 ] : null,
+                'risk_assessment' => $this->riskAssessmentPayload($pr->riskAssessment),
             ]);
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function riskAssessmentPayload(?PullRequestRiskAssessment $assessment): ?array
+    {
+        if ($assessment === null) {
+            return null;
+        }
+
+        return [
+            'status' => $assessment->status?->value,
+            'risk_level' => $assessment->risk_level?->value,
+            'risk_score' => $assessment->risk_score,
+            'summary' => $assessment->summary,
+            'reasons' => $assessment->reasons ?? [],
+            'recommended_actions' => $assessment->recommended_actions ?? [],
+            'assessed_at' => $assessment->assessed_at?->diffForHumans(),
+            'failed_at' => $assessment->failed_at?->diffForHumans(),
+            'error_message' => $assessment->error_message,
+        ];
     }
 
     /**

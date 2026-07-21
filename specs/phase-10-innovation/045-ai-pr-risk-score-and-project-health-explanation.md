@@ -295,6 +295,12 @@ List of created/modified files. Fill in as work progresses.
 - `tests/Unit/Domain/Analytics/RefreshProjectHealthScoreActionTest.php` — covers health explanation dispatch on material changes, stale explanations, rate limiting, and disabled-AI skip behavior.
 - `app/Console/Commands/BackfillPullRequestRiskAssessmentsCommand.php` — queues scoped PR risk assessment jobs for currently open PRs when AI is enabled.
 - `tests/Feature/AiInsights/PullRequestRiskBackfillCommandTest.php` — covers open-only/user/project/repository scoping, other-user exclusion, AI gate, and explicit-scope guard for the backfill command.
+- `app/Domain/GitHub/Queries/WorkItemsForUserQuery.php` — includes current PR risk assessment payload only on pull request rows.
+- `app/Http/Controllers/WorkItemController.php` — exposes the AI regenerate gate to the Work Items page.
+- `app/Http/Controllers/PullRequestRiskRegenerationController.php` — queues manual PR risk regeneration for project owners when AI insights are enabled.
+- `routes/web.php` — adds the throttled Work Items PR-risk regenerate route.
+- `resources/js/Pages/WorkItems/Index.vue` — renders PR-only risk badge and inline risk panel with summary, reasons, actions, timestamp, pending/failed state, and gated regenerate action.
+- `tests/Feature/GitHub/WorkItemControllerTest.php` — covers Work Items PR-risk payload boundaries and regenerate authorization/AI gate behavior.
 
 ## Work log
 
@@ -336,6 +342,12 @@ List of created/modified files. Fill in as work progresses.
   the UI surface slice because the current route/controller patterns are tied to existing
   authenticated UI pages and there is not yet a PR detail or Overview explanation surface
   for those actions.
+- Implemented the sixth reviewable UI slice: Work Items now receives current PR risk
+  assessment data only for pull request rows, renders a PR-only risk badge and inline risk
+  panel with score, summary, reasons, recommended actions, assessed/failed timestamp, and
+  pending/failed states, and exposes a throttled manual regenerate action for project
+  owners only when AI insights are enabled. Kept issue rows unchanged and deferred the
+  Overview project-health overlay, notifications, and docs.
 
 ## Open questions / blockers
 

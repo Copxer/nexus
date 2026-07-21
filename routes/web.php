@@ -23,6 +23,7 @@ use App\Http\Controllers\PublicStatus\ConfirmSubscriptionController;
 use App\Http\Controllers\PublicStatus\ShowController;
 use App\Http\Controllers\PublicStatus\SubscribeController;
 use App\Http\Controllers\PublicStatus\UnsubscribeController;
+use App\Http\Controllers\PullRequestRiskRegenerationController;
 use App\Http\Controllers\RepositoryController;
 use App\Http\Controllers\RepositoryIssuesSyncController;
 use App\Http\Controllers\RepositoryPullRequestsSyncController;
@@ -212,6 +213,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Spec 016 — unified Work Items queue (issues + PRs).
     Route::get('/work-items', WorkItemController::class)->name('work-items.index');
+    Route::post('/work-items/pull-requests/{pullRequest}/risk/regenerate', PullRequestRiskRegenerationController::class)
+        ->middleware('throttle:10,1')
+        ->name('work-items.pull-requests.risk.regenerate');
 
     // Spec 018 — dedicated activity feed page. Right-rail shares the
     // same data via the activity.recent Inertia prop registered in
