@@ -24,29 +24,29 @@ live.
 |---|------|--------|
 | 042 | `AlertNotificationService` — email + Slack + generic webhook channels, per-user routing preferences (severity, source, channel), rate-limit + dedupe, delivery observability | 🟢 |
 | 043 | Global command palette — `Cmd+K` fuzzy search across routes + entities (projects, repos, alerts, hosts, websites) via a shared indexer, keyboard-only navigation, recent actions | 🟢 |
-| 044 | AI daily briefing — LLM-generated morning digest ("yesterday: X new issues, Y merged PRs, Z alerts, N things that look off"), delivered via spec 042, per-user opt-in + delivery time | ⬜ |
+| 044 | AI daily briefing — LLM-generated morning digest ("yesterday: X new issues, Y merged PRs, Z alerts, N things that look off"), delivered via spec 042, per-user opt-in + delivery time | 🟢 |
 | 045 | AI PR risk score + project health explanation — LLM-scored PR risk tag on webhook arrival, natural-language "why" overlay on Phase 8 health-score card | ⬜ |
 | 046 | User-tunable health-score weights + metric-driven alert rules — settings page for Phase 8's formula, §6.8 specification pattern for alert evaluators (queue backlog trend, deploy frequency drop, uptime slope) | 🟢 |
 | 047 | Public status page generator — unauthenticated `/status/{slug}` aggregating monitoring uptime + system alerts + subscribe form; per-project toggle in Settings | 🟢 |
 
 ## Acceptance criteria (phase-level)
-- [ ] Operators receive alerts via at least one channel outside the
+- [x] Operators receive alerts via at least one channel outside the
       app (email, Slack, generic webhook). Per-user routing decides
       which severities / sources fire which channel.
-- [ ] `Cmd+K` opens a palette from any page; fuzzy-searches routes +
+- [x] `Cmd+K` opens a palette from any page; fuzzy-searches routes +
       user-scoped entities; keyboard-only navigation works.
-- [ ] A morning digest arrives on schedule (per-user configurable
+- [x] A morning digest arrives on schedule (per-user configurable
       hour + timezone) summarizing yesterday's activity. Delivery
       rides on spec 042.
 - [ ] Every incoming PR gets an LLM-derived risk tag surfaced on the
       Work Items queue + PR drawer. Each project health-score card
       carries a natural-language "why" explanation.
-- [ ] Health-score weights are editable per-user (falls back to
+- [x] Health-score weights are editable per-user (falls back to
       defaults). At least two metric-driven `AlertRule` evaluators
       ship (queue backlog trend + one other).
-- [ ] Public `/status/{slug}` renders monitoring uptime + open
+- [x] Public `/status/{slug}` renders monitoring uptime + open
       system alerts for opted-in projects. Rate-limited, cacheable.
-- [ ] Pint clean, tests green, build clean. CI green for each spec PR.
+- [x] Pint clean, tests green, build clean. CI green for each spec PR.
 
 ## Scope notes
 
