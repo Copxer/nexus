@@ -231,31 +231,31 @@ README LLM dependencies, spec 042 delivery layer.
 
 ## Acceptance criteria
 
-- [ ] Feature stays inert unless `AI_FEATURES_ENABLED=true`, LLM config is
+- [x] Feature stays inert unless `AI_FEATURES_ENABLED=true`, LLM config is
       present, and the user has enabled daily briefings.
-- [ ] Users can configure daily briefing opt-in, delivery time, timezone,
+- [x] Users can configure daily briefing opt-in, delivery time, timezone,
       channel, and included projects at `/settings/daily-briefing`.
-- [ ] Scheduler dispatches at most one briefing per user per local
+- [x] Scheduler dispatches at most one briefing per user per local
       briefing date, respecting timezone and `last_sent_for_date`.
-- [ ] Generated input snapshot is scoped to the user's projects and
+- [x] Generated input snapshot is scoped to the user's projects and
       contains bounded counts/samples for issues, PRs, deployments,
       alerts, monitoring/host health, health-score deltas, and activity.
-- [ ] LLM output persists in `daily_briefings` with summary, highlights,
+- [x] LLM output persists in `daily_briefings` with summary, highlights,
       risks, prompt version, status, and timestamps.
-- [ ] Failed LLM generation records `status: failed` and does not send a
+- [x] Failed LLM generation records `status: failed` and does not send a
       fabricated briefing.
-- [ ] Delivery uses a verified spec 042 channel; selected channel wins,
+- [x] Delivery uses a verified spec 042 channel; selected channel wins,
       otherwise first verified email channel is used when available.
-- [ ] Test-send endpoint generates and delivers a briefing immediately,
+- [x] Test-send endpoint generates and delivers a briefing immediately,
       throttled at 5/min.
-- [ ] `/daily-briefings` shows only the authenticated user's generated
+- [x] `/daily-briefings` shows only the authenticated user's generated
       briefings and their delivery status.
-- [ ] No secrets, tokens, webhook URLs, raw logs, or full bodies are sent
+- [x] No secrets, tokens, webhook URLs, raw logs, or full bodies are sent
       to the LLM provider.
-- [ ] Palette includes "Open daily briefings" and "Daily briefing
+- [x] Palette includes "Open daily briefings" and "Daily briefing
       settings" commands.
-- [ ] Every test in the §Tests block is green.
-- [ ] Pint clean, `php artisan test` green, `npm run build` clean.
+- [x] Every test in the §Tests block is green.
+- [x] Pint clean, `php artisan test` green, `npm run build` clean.
 
 ## Files touched
 
@@ -307,12 +307,9 @@ Track actual files as implementation progresses. Expected touchpoints:
 - `app/Http/Controllers/DailyBriefingController.php` — added authenticated briefing history payloads scoped to the current user's generated content.
 - `resources/js/Pages/DailyBriefings/Index.vue` — added the `/daily-briefings` history list with status, date, configured channel, summary preview, empty state, and inline expandable detail panel for full content.
 - `tests/Feature/DailyBriefings/DailyBriefingHistoryControllerTest.php` — covered authenticated-only access, user scoping, generated-content filtering, row payloads, and detail drawer payloads.
-
-Expected future touchpoints:
-
-- `resources/js/lib/commands.ts`
-- `docs/env.production.example`
-- `docs/security/operator-checklist.md`
+- `resources/js/lib/commands.ts` — added command palette entries for daily briefing history and settings, following spec 043 static command conventions.
+- `docs/env.production.example` — documented the production AI/LLM env gate and provider keys for daily briefings.
+- `docs/security/operator-checklist.md` — documented daily briefing settings/test-send throttles, scheduler behavior, verified-channel delivery posture, and sanitized LLM input expectations.
 
 ## Work log
 
@@ -413,6 +410,11 @@ Dated notes as work progresses.
   setting open state and null close timestamps. The factory can randomly create
   closed issues, which made opened-boundary sample assertions flaky when the full
   DailyBriefings suite ran with different generated timestamps.
+- Implemented the final palette/docs work unit: added static command palette
+  entries for `Open daily briefings` and `Daily briefing settings`, documented
+  production AI/LLM env keys, and extended the operator checklist with the
+  daily briefing settings/test-send throttles, scheduler behavior, verified
+  delivery channel posture, and sanitized LLM input expectations.
 
 ## Open questions / blockers
 

@@ -92,6 +92,8 @@ Per-user limits via Laravel's `throttle:N,1` middleware:
 | `PATCH /settings/notifications/preferences/{preference}` | 20/min (spec 042) |
 | `DELETE /settings/notifications/preferences/{preference}` | 20/min (spec 042) |
 | `POST /settings/notifications/deliveries/{delivery}/retry` | 30/min (spec 042) |
+| `PATCH /settings/daily-briefing` | 20/min (spec 044) |
+| `POST /settings/daily-briefing/test` | 5/min (spec 044) |
 | `PATCH /settings/rules/weights` | 20/min (spec 046) |
 | `DELETE /settings/rules/weights` | 20/min (spec 046) |
 | `POST /settings/rules` | 10/min (spec 046) |
@@ -138,6 +140,24 @@ configured under `/settings/notifications`. Two extra postures:
   the receiving side can `hash_equals`-verify them (mirrors the
   inbound GitHub-webhook shape).
 
+### AI daily briefings (spec 044)
+
+Daily briefings are opt-in and stay inert unless `AI_FEATURES_ENABLED=true`,
+LLM config is present, and the user has enabled `/settings/daily-briefing`.
+Operators should verify:
+
+- **Settings mutations are throttled.** `PATCH /settings/daily-briefing`
+  is limited to 20/min, and immediate test sends are limited to 5/min.
+- **Scheduler behavior is bounded.** `daily-briefings:dispatch-due` runs
+  every 15 minutes, respects each user's timezone and delivery time, and
+  skips users already sent for the local briefing date.
+- **Delivery uses verified channels only.** Selected channels must be owned,
+  enabled, and verified; otherwise the send job can fall back to the user's
+  first verified email channel when no channel is selected.
+- **LLM input remains sanitized.** Input snapshots carry scoped counts,
+  entity metadata, timestamps, labels, and short snippets, not secrets,
+  tokens, webhook URLs, raw logs, or full issue/PR bodies.
+
 ## 7. Deferred to follow-ups
 
 Documented for visibility; not blockers for spec 039 sign-off:
@@ -165,4 +185,6 @@ Documented for visibility; not blockers for spec 039 sign-off:
 - [ ] §5: Manual sync / probe / retry endpoints all throttled.
 - [ ] §5 (spec 042): Notification channel `config` encrypted at
       rest; outbound webhook HMAC available on demand.
+- [ ] §6 (spec 044): AI daily briefing gate, throttles, scheduler, and
+      sanitized LLM input reviewed before enabling `AI_FEATURES_ENABLED`.
 - [ ] Run the suite: `php artisan test --filter=Security` passes.
