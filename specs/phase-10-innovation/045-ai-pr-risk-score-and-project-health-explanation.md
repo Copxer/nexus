@@ -243,7 +243,7 @@ health-score weights.
       rows.
 - [ ] PR detail/drawer UI shows score, summary, reasons, recommended actions,
       assessment timestamp, pending state, failed state, and gated regenerate.
-- [ ] Existing open PRs can be backfilled through a scoped command/job without
+- [x] Existing open PRs can be backfilled through a scoped command/job without
       scoring closed PRs or other users' data.
 - [ ] Project health explanations describe the existing Phase 8/spec 046 health
       score; they do not compute or display a competing score.
@@ -293,6 +293,8 @@ List of created/modified files. Fill in as work progresses.
 - `tests/Feature/AiInsights/GenerateProjectHealthExplanationJobTest.php` — covers health explanation job uniqueness, AI gate, snapshot/generation path, and failed-handler recovery.
 - `tests/Feature/GitHub/Webhooks/PullRequestWebhookHandlerTest.php` — covers material PR webhook risk dispatch and disabled-AI skip behavior.
 - `tests/Unit/Domain/Analytics/RefreshProjectHealthScoreActionTest.php` — covers health explanation dispatch on material changes, stale explanations, rate limiting, and disabled-AI skip behavior.
+- `app/Console/Commands/BackfillPullRequestRiskAssessmentsCommand.php` — queues scoped PR risk assessment jobs for currently open PRs when AI is enabled.
+- `tests/Feature/AiInsights/PullRequestRiskBackfillCommandTest.php` — covers open-only/user/project/repository scoping, other-user exclusion, AI gate, and explicit-scope guard for the backfill command.
 
 ## Work log
 
@@ -328,6 +330,12 @@ List of created/modified files. Fill in as work progresses.
   local row, and health-score refresh dispatch after material score/band changes or stale
   explanations. The dispatch paths respect the shared AI gate, use uniqueness/rate-limit
   guards, and mark pending rows failed on terminal job failure so rows do not stay stuck.
+- Implemented the fifth reviewable backend slice: `ai-insights:backfill-pr-risk` queues
+  PR risk assessment jobs for explicitly scoped user/project/repository backfills, only
+  when AI is enabled and only for open PRs. Deferred UI-triggered regenerate endpoints to
+  the UI surface slice because the current route/controller patterns are tied to existing
+  authenticated UI pages and there is not yet a PR detail or Overview explanation surface
+  for those actions.
 
 ## Open questions / blockers
 
