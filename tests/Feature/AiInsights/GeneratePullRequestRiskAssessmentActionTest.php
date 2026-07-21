@@ -302,6 +302,46 @@ class GeneratePullRequestRiskAssessmentActionTest extends TestCase
         Bus::assertDispatchedTimes(DispatchAlertNotificationJob::class, 1);
     }
 
+    public function test_resolved_historical_risk_alert_does_not_suppress_later_material_increase(): void
+    {
+        config(['services.llm.enabled' => true]);
+        Bus::fake();
+
+        $pullRequest = $this->ownedPullRequest();
+        $channel = AlertNotificationChannel::factory()->slack()->for($pullRequest->repository->project->owner)->create();
+        AlertNotificationPreference::factory()
+            ->for($pullRequest->repository->project->owner)
+            ->for($channel, 'channel')
+            ->create(['min_severity' => AlertSeverity::Warning->value]);
+        PullRequestRiskAssessment::factory()->for($pullRequest, 'pullRequest')->scored()->create([
+            'risk_level' => PullRequestRiskLevel::Medium->value,
+            'risk_score' => 44,
+        ]);
+        Alert::factory()->resolved()->create([
+            'project_id' => $pullRequest->repository->project_id,
+            'source' => AlertSource::Github->value,
+            'source_id' => $pullRequest->id,
+            'type' => 'pull_request.risk.high',
+            'severity' => AlertSeverity::Warning->value,
+        ]);
+        $this->app->instance(LlmClient::class, new RiskAssessmentFakeLlmClient(new LlmResponse(json_encode([
+            'risk_level' => 'high',
+            'risk_score' => 86,
+            'summary' => 'Risk increased again after the prior alert was resolved.',
+            'reasons' => ['Changed files increased materially.'],
+            'recommended_actions' => [],
+        ], JSON_THROW_ON_ERROR))));
+
+        app(GeneratePullRequestRiskAssessmentAction::class)->execute($pullRequest, $this->snapshot());
+
+        $this->assertDatabaseCount('alerts', 2);
+        $this->assertSame(1, Alert::query()
+            ->where('type', 'pull_request.risk.high')
+            ->where('status', 'open')
+            ->count());
+        Bus::assertDispatchedTimes(DispatchAlertNotificationJob::class, 1);
+    }
+
     /** @return array<string, mixed> */
     private function snapshot(): array
     {

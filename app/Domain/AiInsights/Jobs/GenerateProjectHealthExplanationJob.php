@@ -25,7 +25,7 @@ class GenerateProjectHealthExplanationJob implements ShouldBeUnique, ShouldQueue
     use Queueable;
     use SerializesModels;
 
-    public int $tries = 2;
+    public int $tries = 1;
 
     public int $uniqueFor = 900;
 
@@ -39,6 +39,8 @@ class GenerateProjectHealthExplanationJob implements ShouldBeUnique, ShouldQueue
     public function handle(GetProjectHealthExplanationInputQuery $inputQuery, GenerateProjectHealthExplanationAction $generate): void
     {
         if (! config('services.llm.enabled', false)) {
+            $this->markSkippedByProjectId('AI features are disabled.');
+
             return;
         }
 
@@ -97,8 +99,13 @@ class GenerateProjectHealthExplanationJob implements ShouldBeUnique, ShouldQueue
 
     private function markSkipped(Project $project, string $reason): void
     {
+        $this->markSkippedByProjectId($reason, $project->id);
+    }
+
+    private function markSkippedByProjectId(string $reason, ?int $projectId = null): void
+    {
         ProjectHealthExplanation::query()
-            ->where('project_id', $project->id)
+            ->where('project_id', $projectId ?? $this->projectId)
             ->where('status', ProjectHealthExplanationStatus::Pending->value)
             ->update([
                 'status' => ProjectHealthExplanationStatus::Skipped,

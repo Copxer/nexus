@@ -13,12 +13,9 @@ use App\Models\Repository;
 use App\Models\User;
 use App\Models\WorkflowRun;
 use Carbon\CarbonImmutable;
-use Illuminate\Support\Str;
 
 class GetPullRequestRiskInputQuery
 {
-    public const BODY_PREVIEW_LIMIT = 500;
-
     public const FAILED_WORKFLOWS_LIMIT = 5;
 
     public const ALERTS_LIMIT = 5;
@@ -77,7 +74,6 @@ class GetPullRequestRiskInputQuery
             'id' => $pullRequest->id,
             'number' => $pullRequest->number,
             'title' => $this->sanitizeText($pullRequest->title),
-            'body_preview' => Str::limit($this->sanitizeText($pullRequest->body_preview), self::BODY_PREVIEW_LIMIT, ''),
             'state' => $pullRequest->state?->value,
             'author_login' => $pullRequest->author_login,
             'base_branch' => $pullRequest->base_branch,

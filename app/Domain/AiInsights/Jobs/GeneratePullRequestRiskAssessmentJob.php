@@ -24,7 +24,7 @@ class GeneratePullRequestRiskAssessmentJob implements ShouldBeUnique, ShouldQueu
     use Queueable;
     use SerializesModels;
 
-    public int $tries = 2;
+    public int $tries = 1;
 
     public int $uniqueFor = 900;
 
@@ -38,6 +38,8 @@ class GeneratePullRequestRiskAssessmentJob implements ShouldBeUnique, ShouldQueu
     public function handle(GetPullRequestRiskInputQuery $inputQuery, GeneratePullRequestRiskAssessmentAction $generate): void
     {
         if (! config('services.llm.enabled', false)) {
+            $this->markSkippedByPullRequestId('AI features are disabled.');
+
             return;
         }
 
@@ -98,8 +100,13 @@ class GeneratePullRequestRiskAssessmentJob implements ShouldBeUnique, ShouldQueu
 
     private function markSkipped(GithubPullRequest $pullRequest, string $reason): void
     {
+        $this->markSkippedByPullRequestId($reason, $pullRequest->id);
+    }
+
+    private function markSkippedByPullRequestId(string $reason, ?int $pullRequestId = null): void
+    {
         PullRequestRiskAssessment::query()
-            ->where('github_pull_request_id', $pullRequest->id)
+            ->where('github_pull_request_id', $pullRequestId ?? $this->pullRequestId)
             ->where('status', PullRequestRiskAssessmentStatus::Pending->value)
             ->update([
                 'status' => PullRequestRiskAssessmentStatus::Skipped,

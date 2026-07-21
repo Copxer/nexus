@@ -167,7 +167,7 @@ health-score weights.
   - `GeneratePullRequestRiskAssessmentActionTest` — happy path, output
     validation, failed LLM call, disabled AI gate, row update on regenerated
     score.
-  - `GeneratePullRequestRiskAssessmentJobTest` — unique by PR, retry/failure
+  - `GeneratePullRequestRiskAssessmentJobTest` — unique by PR, fail-closed
     handling, no dispatch when AI is disabled.
   - `PullRequestWebhookRiskDispatchTest` — risk job dispatches after relevant
     webhook actions and skips irrelevant actions.
@@ -285,8 +285,8 @@ List of created/modified files. Fill in as work progresses.
 - `app/Domain/AiInsights/Actions/GenerateProjectHealthExplanationAction.php` — builds `project-health-explanation-v1` prompts, validates/sanitizes LLM output, persists explained or failed health explanation rows, and reuses the current row on regeneration.
 - `tests/Feature/AiInsights/GeneratePullRequestRiskAssessmentActionTest.php` — covers PR risk generation prompt, sanitization, failed client, disabled AI gate, invalid output, and regeneration row updates.
 - `tests/Feature/AiInsights/GenerateProjectHealthExplanationActionTest.php` — covers project health explanation prompt, sanitization, failed client, disabled AI gate, invalid output, and regeneration row updates.
-- `app/Domain/AiInsights/Jobs/GeneratePullRequestRiskAssessmentJob.php` — queues PR risk assessment generation with AI gating, uniqueness, pending state, and terminal failure recovery.
-- `app/Domain/AiInsights/Jobs/GenerateProjectHealthExplanationJob.php` — queues project health explanation generation with AI gating, uniqueness, pending state, and terminal failure recovery.
+- `app/Domain/AiInsights/Jobs/GeneratePullRequestRiskAssessmentJob.php` — queues PR risk assessment generation with AI gating, uniqueness, pending state, pending-row skip when AI is disabled, and terminal failure recovery.
+- `app/Domain/AiInsights/Jobs/GenerateProjectHealthExplanationJob.php` — queues project health explanation generation with AI gating, uniqueness, pending state, pending-row skip when AI is disabled, and terminal failure recovery.
 - `app/Domain/GitHub/WebhookHandlers/PullRequestWebhookHandler.php` — dispatches PR risk assessment jobs after material `pull_request` webhook actions update the local PR row.
 - `app/Domain/Analytics/Actions/RefreshProjectHealthScoreAction.php` — dispatches health explanation jobs after material score/band changes or stale explanations, guarded by AI gate and rate limit.
 - `tests/Feature/AiInsights/GeneratePullRequestRiskAssessmentJobTest.php` — covers PR risk job uniqueness, AI gate, snapshot/generation path, and failed-handler recovery.
@@ -313,7 +313,7 @@ List of created/modified files. Fill in as work progresses.
 - `app/Domain/AiInsights/Actions/GeneratePullRequestRiskAssessmentAction.php` — dispatches conservative spec 042 notifications for material increases to high/critical PR risk.
 - `app/Enums/AlertSource.php` — clarifies that GitHub alert `source_id` can point at repositories or pull requests depending on alert type.
 - `database/migrations/2026_05_27_080000_create_alerts_table.php` — clarifies the historical alerts-table comment for GitHub repo/PR-scoped alerts.
-- `tests/Feature/AiInsights/GeneratePullRequestRiskAssessmentActionTest.php` — covers high/critical notification guardrails and quiet unchanged low/medium scores.
+- `tests/Feature/AiInsights/GeneratePullRequestRiskAssessmentActionTest.php` — covers high/critical notification guardrails, quiet unchanged low/medium scores, and resolved historical alert boundaries.
 - `docs/security/operator-checklist.md` — documents Spec 045 prompt-safety, webhook-trigger, notification, regenerate, and rate-limit expectations.
 
 ## Work log
@@ -373,6 +373,11 @@ List of created/modified files. Fill in as work progresses.
   operator security checklist for prompt safety, webhook trigger, notification, regenerate,
   and rate-limit expectations. Env docs needed no new keys because Spec 045 reuses the
   shared Spec 044 LLM gate/config.
+- Fixed fresh review findings: removed PR `body_preview` from LLM input snapshots entirely,
+  aligned PR-risk and health-explanation jobs to the existing fail-closed/no queue-retry
+  contract, marked existing pending rows skipped when the AI gate is disabled at execution
+  time, and let spec 042 active-alert idempotency handle PR-risk notification duplicates so
+  resolved historical alerts do not suppress later material increases.
 
 ## Open questions / blockers
 

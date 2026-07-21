@@ -121,7 +121,7 @@ class GetPullRequestRiskInputQueryTest extends TestCase
         $this->assertSame('nexus/billing-api', $snapshot['repository']['full_name']);
         $this->assertSame('failed', $snapshot['repository']['workflow_runs_sync_status']);
         $this->assertSame(123, $snapshot['pull_request']['number']);
-        $this->assertSame(500, strlen($snapshot['pull_request']['body_preview']));
+        $this->assertArrayNotHasKey('body_preview', $snapshot['pull_request']);
         $this->assertSame(10, $snapshot['pull_request']['age_days']);
         $this->assertTrue($snapshot['pull_request']['stale']);
         $this->assertCount(GetPullRequestRiskInputQuery::FAILED_WORKFLOWS_LIMIT, $snapshot['recent_failed_workflows']);
@@ -142,7 +142,7 @@ class GetPullRequestRiskInputQueryTest extends TestCase
         ]);
         $pullRequest = GithubPullRequest::factory()->create([
             'repository_id' => $repository->id,
-            'body_preview' => 'SECRET_TOKEN=abc123 bounded body preview only',
+            'body_preview' => '{"SECRET_TOKEN":"abc123"} SECRET_TOKEN=abc123 bounded body preview only',
         ]);
 
         $encoded = json_encode(app(GetPullRequestRiskInputQuery::class)->execute($user, $pullRequest), JSON_THROW_ON_ERROR);
@@ -154,5 +154,6 @@ class GetPullRequestRiskInputQueryTest extends TestCase
         $this->assertStringNotContainsString('abc123', $encoded);
         $this->assertStringNotContainsString('raw logs', $encoded);
         $this->assertStringNotContainsString('sync_error', $encoded);
+        $this->assertArrayNotHasKey('body_preview', json_decode($encoded, true, flags: JSON_THROW_ON_ERROR)['pull_request']);
     }
 }

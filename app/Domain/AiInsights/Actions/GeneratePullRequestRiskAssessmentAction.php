@@ -9,7 +9,6 @@ use App\Enums\AlertSeverity;
 use App\Enums\AlertSource;
 use App\Enums\PullRequestRiskAssessmentStatus;
 use App\Enums\PullRequestRiskLevel;
-use App\Models\Alert;
 use App\Models\GithubPullRequest;
 use App\Models\PullRequestRiskAssessment;
 use Illuminate\Support\Facades\Log;
@@ -191,14 +190,6 @@ class GeneratePullRequestRiskAssessmentAction
         }
 
         $type = $this->notificationAlertType($riskLevel);
-
-        if (Alert::query()
-            ->where('source', AlertSource::Github->value)
-            ->where('source_id', $pullRequest->id)
-            ->where('type', $type)
-            ->exists()) {
-            return;
-        }
 
         try {
             $pullRequest->loadMissing('repository.project');

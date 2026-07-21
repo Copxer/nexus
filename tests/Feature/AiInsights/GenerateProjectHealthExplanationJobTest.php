@@ -25,7 +25,7 @@ class GenerateProjectHealthExplanationJobTest extends TestCase
         $job = new GenerateProjectHealthExplanationJob(123);
 
         $this->assertSame('123', $job->uniqueId());
-        $this->assertSame(2, $job->tries);
+        $this->assertSame(1, $job->tries);
     }
 
     public function test_builds_input_snapshot_and_generates_health_explanation(): void
@@ -59,6 +59,26 @@ class GenerateProjectHealthExplanationJobTest extends TestCase
         );
 
         $this->assertDatabaseCount('project_health_explanations', 0);
+        $this->assertNull($client->prompt);
+    }
+
+    public function test_marks_existing_pending_explanation_skipped_when_ai_is_disabled(): void
+    {
+        config(['services.llm.enabled' => false]);
+        $project = $this->project();
+        $explanation = ProjectHealthExplanation::factory()->for($project)->create([
+            'status' => ProjectHealthExplanationStatus::Pending->value,
+        ]);
+        $client = new HealthJobFakeLlmClient;
+        $this->app->instance(LlmClient::class, $client);
+
+        (new GenerateProjectHealthExplanationJob($project->id))->handle(
+            app(GetProjectHealthExplanationInputQuery::class),
+            app(GenerateProjectHealthExplanationAction::class),
+        );
+
+        $this->assertSame(ProjectHealthExplanationStatus::Skipped, $explanation->refresh()->status);
+        $this->assertSame('AI features are disabled.', $explanation->error_message);
         $this->assertNull($client->prompt);
     }
 

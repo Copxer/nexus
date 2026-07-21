@@ -28,7 +28,7 @@ class GeneratePullRequestRiskAssessmentJobTest extends TestCase
         $job = new GeneratePullRequestRiskAssessmentJob(123);
 
         $this->assertSame('123', $job->uniqueId());
-        $this->assertSame(2, $job->tries);
+        $this->assertSame(1, $job->tries);
     }
 
     public function test_builds_input_snapshot_and_generates_risk_assessment(): void
@@ -63,6 +63,26 @@ class GeneratePullRequestRiskAssessmentJobTest extends TestCase
         );
 
         $this->assertDatabaseCount('pull_request_risk_assessments', 0);
+        $this->assertNull($client->prompt);
+    }
+
+    public function test_marks_existing_pending_assessment_skipped_when_ai_is_disabled(): void
+    {
+        config(['services.llm.enabled' => false]);
+        $pullRequest = $this->pullRequest();
+        $assessment = PullRequestRiskAssessment::factory()->for($pullRequest, 'pullRequest')->create([
+            'status' => PullRequestRiskAssessmentStatus::Pending->value,
+        ]);
+        $client = new RiskJobFakeLlmClient;
+        $this->app->instance(LlmClient::class, $client);
+
+        (new GeneratePullRequestRiskAssessmentJob($pullRequest->id))->handle(
+            app(GetPullRequestRiskInputQuery::class),
+            app(GeneratePullRequestRiskAssessmentAction::class),
+        );
+
+        $this->assertSame(PullRequestRiskAssessmentStatus::Skipped, $assessment->refresh()->status);
+        $this->assertSame('AI features are disabled.', $assessment->error_message);
         $this->assertNull($client->prompt);
     }
 
