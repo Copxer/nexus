@@ -285,6 +285,14 @@ List of created/modified files. Fill in as work progresses.
 - `app/Domain/AiInsights/Actions/GenerateProjectHealthExplanationAction.php` — builds `project-health-explanation-v1` prompts, validates/sanitizes LLM output, persists explained or failed health explanation rows, and reuses the current row on regeneration.
 - `tests/Feature/AiInsights/GeneratePullRequestRiskAssessmentActionTest.php` — covers PR risk generation prompt, sanitization, failed client, disabled AI gate, invalid output, and regeneration row updates.
 - `tests/Feature/AiInsights/GenerateProjectHealthExplanationActionTest.php` — covers project health explanation prompt, sanitization, failed client, disabled AI gate, invalid output, and regeneration row updates.
+- `app/Domain/AiInsights/Jobs/GeneratePullRequestRiskAssessmentJob.php` — queues PR risk assessment generation with AI gating, uniqueness, pending state, and terminal failure recovery.
+- `app/Domain/AiInsights/Jobs/GenerateProjectHealthExplanationJob.php` — queues project health explanation generation with AI gating, uniqueness, pending state, and terminal failure recovery.
+- `app/Domain/GitHub/WebhookHandlers/PullRequestWebhookHandler.php` — dispatches PR risk assessment jobs after material `pull_request` webhook actions update the local PR row.
+- `app/Domain/Analytics/Actions/RefreshProjectHealthScoreAction.php` — dispatches health explanation jobs after material score/band changes or stale explanations, guarded by AI gate and rate limit.
+- `tests/Feature/AiInsights/GeneratePullRequestRiskAssessmentJobTest.php` — covers PR risk job uniqueness, AI gate, snapshot/generation path, and failed-handler recovery.
+- `tests/Feature/AiInsights/GenerateProjectHealthExplanationJobTest.php` — covers health explanation job uniqueness, AI gate, snapshot/generation path, and failed-handler recovery.
+- `tests/Feature/GitHub/Webhooks/PullRequestWebhookHandlerTest.php` — covers material PR webhook risk dispatch and disabled-AI skip behavior.
+- `tests/Unit/Domain/Analytics/RefreshProjectHealthScoreActionTest.php` — covers health explanation dispatch on material changes, stale explanations, rate limiting, and disabled-AI skip behavior.
 
 ## Work log
 
@@ -315,6 +323,11 @@ List of created/modified files. Fill in as work progresses.
   `services.llm.enabled` gate, building versioned prompts from bounded snapshots,
   validating/sanitizing structured JSON output, persisting scored/explained rows,
   failing closed with error context, and updating the existing current row on regeneration.
+- Implemented the fourth reviewable backend slice: queued PR risk and project health
+  explanation jobs, PR webhook dispatch after material pull request actions update the
+  local row, and health-score refresh dispatch after material score/band changes or stale
+  explanations. The dispatch paths respect the shared AI gate, use uniqueness/rate-limit
+  guards, and mark pending rows failed on terminal job failure so rows do not stay stuck.
 
 ## Open questions / blockers
 
