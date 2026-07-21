@@ -272,6 +272,8 @@ Track actual files as implementation progresses. Expected touchpoints:
 - `database/factories/DailyBriefingPreferenceFactory.php`
 - `database/factories/DailyBriefingFactory.php`
 - `tests/Feature/DailyBriefings/DailyBriefingPersistenceTest.php`
+- `app/Domain/DailyBriefings/Queries/GetDailyBriefingInputQuery.php` — added scoped, timezone-aware bounded input snapshot query.
+- `tests/Feature/DailyBriefings/GetDailyBriefingInputQueryTest.php` — covered user/project scoping, timezone conversion, counts, and sample caps.
 
 Expected future touchpoints:
 
@@ -279,7 +281,6 @@ Expected future touchpoints:
 - `app/Domain/AI/DataTransferObjects/LlmPrompt.php`
 - `app/Domain/AI/DataTransferObjects/LlmResponse.php`
 - `app/Domain/AI/Services/AnthropicLlmClient.php`
-- `app/Domain/DailyBriefings/Queries/GetDailyBriefingInputQuery.php`
 - `app/Domain/DailyBriefings/Actions/GenerateDailyBriefingAction.php`
 - `app/Domain/DailyBriefings/DataTransferObjects/DailyBriefingPayload.php`
 - `app/Domain/DailyBriefings/Jobs/DispatchDueDailyBriefingsJob.php`
@@ -333,6 +334,19 @@ Dated notes as work progresses.
   factories, relationships, and persistence tests. Deliberately deferred
   input query, LLM client, jobs, delivery, UI, palette, and docs to keep
   the commit independently reviewable.
+- Implemented the input-query work unit: `GetDailyBriefingInputQuery`
+  builds a deterministic, bounded snapshot for one user and local briefing
+  date, converts the local midnight-to-midnight window to UTC for database
+  reads, scopes all data through the user's owned projects plus any
+  included-project filter, and caps project/work-item/alert/activity
+  samples. Added focused tests for scoping, timezone conversion, counts,
+  and caps. Deliberately deferred LLM client/action, scheduler jobs,
+  delivery, UI/history, palette, and docs.
+- Discovery: current health-score storage only keeps `projects.health_score`
+  as the latest value; there is no historical score table to compute true
+  score deltas. The input snapshot therefore returns current
+  `worst_projects` and an empty `health.deltas` array until a future slice
+  adds score history or defines a persisted delta source.
 
 ## Open questions / blockers
 
