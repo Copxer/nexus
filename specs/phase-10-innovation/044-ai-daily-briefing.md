@@ -1,7 +1,7 @@
 ---
 spec: ai-daily-briefing
 phase: 10
-status: in-progress   # not-started | in-progress | blocked | done
+status: done   # not-started | in-progress | blocked | done
 owner: Yoany
 created: 2026-07-21
 updated: 2026-07-21
@@ -415,12 +415,11 @@ Dated notes as work progresses.
   production AI/LLM env keys, and extended the operator checklist with the
   daily briefing settings/test-send throttles, scheduler behavior, verified
   delivery channel posture, and sanitized LLM input expectations.
+- PR #132 was squash-merged into `main` with CI green. Issue #131 closed as
+  completed, and the spec/tracker bookkeeping was updated to `done`.
 
 ## Open questions / blockers
 
-- **Default channel behavior.** Draft assumes "selected verified channel,
-  else first verified email channel." If operators should receive Slack
-  by default when available, adjust before implementation.
 - **Briefing history retention.** Draft persists every generated briefing
   indefinitely. If storage becomes a concern, add a retention policy in a
   follow-up rather than deleting operator-visible history in v1.
