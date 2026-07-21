@@ -63,6 +63,7 @@ health-score weights.
 - **Migration: `project_health_explanations`.** Persist the latest AI
   explanation for each project health score. Columns:
   - `id`, `project_id` (FK -> `projects`, cascade delete)
+  - `status` (`pending` | `explained` | `failed` | `skipped`)
   - `health_score` (unsigned tiny integer captured at explanation time)
   - `health_band` (nullable string matching the existing backend band)
   - `summary` (text; concise explanation)
@@ -264,6 +265,18 @@ health-score weights.
 List of created/modified files. Fill in as work progresses.
 
 - `specs/phase-10-innovation/045-ai-pr-risk-score-and-project-health-explanation.md` — created, draft spec.
+- `database/migrations/2026_07_21_150000_create_pull_request_risk_assessments_table.php` — adds one-current-row PR risk assessment persistence.
+- `database/migrations/2026_07_21_150001_create_project_health_explanations_table.php` — adds one-current-row project health explanation persistence.
+- `app/Models/PullRequestRiskAssessment.php` — PR risk assessment model, casts, and PR relationship.
+- `app/Models/ProjectHealthExplanation.php` — project health explanation model, casts, and project relationship.
+- `app/Enums/PullRequestRiskAssessmentStatus.php` — PR risk assessment lifecycle enum.
+- `app/Enums/PullRequestRiskLevel.php` — PR risk level enum.
+- `app/Enums/ProjectHealthExplanationStatus.php` — project health explanation lifecycle enum.
+- `database/factories/PullRequestRiskAssessmentFactory.php` — PR risk assessment factory states.
+- `database/factories/ProjectHealthExplanationFactory.php` — project health explanation factory states.
+- `tests/Feature/AiInsights/AiInsightPersistenceTest.php` — focused persistence, casts, uniqueness, relationship, and cascade tests.
+- `app/Models/GithubPullRequest.php` — adds current risk assessment relationship.
+- `app/Models/Project.php` — adds current health explanation relationship.
 
 ## Work log
 
@@ -280,6 +293,11 @@ List of created/modified files. Fill in as work progresses.
 - Started workflow on branch
   `spec/045-ai-pr-risk-score-and-project-health-explanation` with GitHub issue
   #134.
+- Implemented the first reviewable backend foundation slice: migrations, models,
+  enums, factories, current-row relationships, and focused persistence tests for
+  PR risk assessments and project health explanations. Added a health explanation
+  lifecycle `status` column so later pending/failed UI and job slices do not infer
+  state from nullable timestamps.
 
 ## Open questions / blockers
 
