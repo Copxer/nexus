@@ -277,6 +277,10 @@ List of created/modified files. Fill in as work progresses.
 - `tests/Feature/AiInsights/AiInsightPersistenceTest.php` — focused persistence, casts, uniqueness, relationship, and cascade tests.
 - `app/Models/GithubPullRequest.php` — adds current risk assessment relationship.
 - `app/Models/Project.php` — adds current health explanation relationship.
+- `app/Domain/AiInsights/Queries/GetPullRequestRiskInputQuery.php` — builds scoped, bounded PR-risk input snapshots from existing Nexus metadata.
+- `app/Domain/AiInsights/Queries/GetProjectHealthExplanationInputQuery.php` — builds scoped, bounded project-health explanation snapshots from existing score drivers.
+- `tests/Feature/AiInsights/GetPullRequestRiskInputQueryTest.php` — covers PR ownership scoping, bounded samples, and sensitive-field exclusion.
+- `tests/Feature/AiInsights/GetProjectHealthExplanationInputQueryTest.php` — covers project ownership scoping, health-driver samples/caps, and sensitive-field exclusion.
 
 ## Work log
 
@@ -298,6 +302,10 @@ List of created/modified files. Fill in as work progresses.
   PR risk assessments and project health explanations. Added a health explanation
   lifecycle `status` column so later pending/failed UI and job slices do not infer
   state from nullable timestamps.
+- Implemented the second reviewable backend slice: `GetPullRequestRiskInputQuery`
+  and `GetProjectHealthExplanationInputQuery`, with ownership scoping, deterministic
+  bounded facts, sample caps, and focused tests proving snapshots exclude secrets,
+  webhook URLs, access tokens, raw logs, raw diffs, and full PR bodies.
 
 ## Open questions / blockers
 
