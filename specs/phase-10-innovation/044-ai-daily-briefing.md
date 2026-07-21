@@ -274,14 +274,17 @@ Track actual files as implementation progresses. Expected touchpoints:
 - `tests/Feature/DailyBriefings/DailyBriefingPersistenceTest.php`
 - `app/Domain/DailyBriefings/Queries/GetDailyBriefingInputQuery.php` — added scoped, timezone-aware bounded input snapshot query.
 - `tests/Feature/DailyBriefings/GetDailyBriefingInputQueryTest.php` — covered user/project scoping, timezone conversion, counts, and sample caps.
+- `app/Domain/AI/Contracts/LlmClient.php` — added the provider-swappable LLM completion contract.
+- `app/Domain/AI/DataTransferObjects/LlmPrompt.php` — added the versioned prompt DTO.
+- `app/Domain/AI/DataTransferObjects/LlmResponse.php` — added the structured client response DTO.
+- `app/Domain/AI/Services/AnthropicLlmClient.php` — added the Anthropic Messages API implementation with configured model, timeout, API key, and one transient retry.
+- `app/Domain/DailyBriefings/Actions/GenerateDailyBriefingAction.php` — added prompt v1 construction, LLM invocation, structured output validation/sanitization, generated persistence, and failed-state persistence.
+- `app/Providers/AppServiceProvider.php` — bound `LlmClient` to the configured Anthropic implementation.
+- `tests/Feature/DailyBriefings/AnthropicLlmClientTest.php` — covered the LLM binding and Anthropic HTTP request/response mapping with `Http::fake`.
+- `tests/Feature/DailyBriefings/GenerateDailyBriefingActionTest.php` — covered prompt construction, fake-client generation, output sanitization, failed LLM calls, disabled AI fail-closed behavior, invalid output, and same-day row reuse.
 
 Expected future touchpoints:
 
-- `app/Domain/AI/Contracts/LlmClient.php`
-- `app/Domain/AI/DataTransferObjects/LlmPrompt.php`
-- `app/Domain/AI/DataTransferObjects/LlmResponse.php`
-- `app/Domain/AI/Services/AnthropicLlmClient.php`
-- `app/Domain/DailyBriefings/Actions/GenerateDailyBriefingAction.php`
 - `app/Domain/DailyBriefings/DataTransferObjects/DailyBriefingPayload.php`
 - `app/Domain/DailyBriefings/Jobs/DispatchDueDailyBriefingsJob.php`
 - `app/Domain/DailyBriefings/Jobs/GenerateDailyBriefingJob.php`
@@ -347,6 +350,19 @@ Dated notes as work progresses.
   score deltas. The input snapshot therefore returns current
   `worst_projects` and an empty `health.deltas` array until a future slice
   adds score history or defines a persisted delta source.
+- Implemented the generation/client work unit: `LlmClient`, prompt/response
+  DTOs, Anthropic client binding, and `GenerateDailyBriefingAction`. The
+  action receives the already-built input snapshot, builds prompt version
+  `daily-briefing-v1`, calls the LLM client only when AI features are
+  enabled, validates JSON output, strips tags/control characters from
+  summary/highlights/risks, persists generated rows, and persists failed
+  rows for disabled AI, provider exceptions, or invalid output. Added
+  `Http::fake` coverage for the Anthropic request/response shape.
+  Deliberately deferred scheduler jobs, delivery, UI/history, palette, and
+  docs.
+- Discovery: `daily_briefings.briefing_date` is cast as an immutable date;
+  when reusing a row for the unique `(user_id, briefing_date)` key, an
+  explicit `whereDate` lookup avoids date-cast mismatches before save.
 
 ## Open questions / blockers
 

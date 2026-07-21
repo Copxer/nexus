@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Domain\AI\Contracts\LlmClient;
+use App\Domain\AI\Services\AnthropicLlmClient;
 use App\Domain\PublicStatus\Listeners\InvalidatePublicStatusCacheListener;
 use App\Domain\PublicStatus\Listeners\NotifyPublicSubscribersOnAlertListener;
 use App\Events\AlertResolved;
@@ -31,7 +33,12 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->bind(LlmClient::class, function () {
+            return match (config('services.llm.provider', 'anthropic')) {
+                'anthropic' => new AnthropicLlmClient,
+                default => throw new \RuntimeException('Unsupported LLM provider.'),
+            };
+        });
     }
 
     /**
