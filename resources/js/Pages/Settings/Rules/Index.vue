@@ -7,6 +7,7 @@ import {
     AlertTriangle,
     ChevronLeft,
     Gauge,
+    Pencil,
     Plus,
     RotateCcw,
     Save,
@@ -69,7 +70,10 @@ const props = defineProps<{
 }>();
 
 type Tab = 'weights' | 'rules';
-const activeTab = ref<Tab>('weights');
+const initialTab = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tab') === 'rules'
+    ? 'rules'
+    : 'weights';
+const activeTab = ref<Tab>(initialTab);
 
 const weightFields: Array<keyof Weights> = [
     'alert_critical',
@@ -173,6 +177,47 @@ const toggleRule = (rule: Rule) => {
         route('settings.rules.update', { rule: rule.id }),
         { enabled: !rule.enabled },
         { preserveScroll: true },
+    );
+};
+
+const editingRuleId = ref<number | null>(null);
+const editRule = ref<{
+    name: string;
+    severity: Severity;
+    config: Record<string, number>;
+    enabled: boolean;
+    cool_down_minutes: number;
+}>({
+    name: '',
+    severity: 'warning',
+    config: {},
+    enabled: true,
+    cool_down_minutes: 30,
+});
+
+const startEditingRule = (rule: Rule) => {
+    editingRuleId.value = rule.id;
+    editRule.value = {
+        name: rule.name,
+        severity: rule.severity,
+        config: { ...rule.config },
+        enabled: rule.enabled,
+        cool_down_minutes: rule.cool_down_minutes,
+    };
+};
+
+const cancelEditingRule = () => {
+    editingRuleId.value = null;
+};
+
+const saveRule = (rule: Rule) => {
+    router.patch(
+        route('settings.rules.update', { rule: rule.id }),
+        editRule.value,
+        {
+            preserveScroll: true,
+            onSuccess: cancelEditingRule,
+        },
     );
 };
 
@@ -406,7 +451,87 @@ const hasOverride = computed(() => props.weights.overrides !== null);
                             :key="rule.id"
                             class="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
                         >
-                            <div class="flex min-w-0 items-start gap-3">
+                            <form
+                                v-if="editingRuleId === rule.id"
+                                class="min-w-0 flex-1 space-y-4"
+                                @submit.prevent="saveRule(rule)"
+                            >
+                                <div class="grid gap-4 sm:grid-cols-2">
+                                    <label class="flex flex-col gap-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-text-muted">
+                                        Name
+                                        <input
+                                            v-model="editRule.name"
+                                            type="text"
+                                            required
+                                            class="rounded-lg border border-border-subtle bg-background-panel-hover px-3 py-2 text-sm text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
+                                        >
+                                    </label>
+                                    <label class="flex flex-col gap-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-text-muted">
+                                        Severity
+                                        <select
+                                            v-model="editRule.severity"
+                                            class="rounded-lg border border-border-subtle bg-background-panel-hover px-3 py-2 text-sm text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
+                                        >
+                                            <option v-for="s in props.options.severities" :key="s" :value="s">
+                                                {{ capitalize(s) }}
+                                            </option>
+                                        </select>
+                                    </label>
+                                    <label class="flex flex-col gap-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-text-muted">
+                                        Cool-down (minutes)
+                                        <input
+                                            v-model.number="editRule.cool_down_minutes"
+                                            type="number"
+                                            min="1"
+                                            max="1440"
+                                            class="rounded-lg border border-border-subtle bg-background-panel-hover px-3 py-2 text-sm text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
+                                        >
+                                    </label>
+                                    <label class="flex items-center gap-2 self-end text-sm text-text-secondary">
+                                        <input
+                                            v-model="editRule.enabled"
+                                            type="checkbox"
+                                            class="h-4 w-4 rounded border-border-subtle bg-background-panel-hover"
+                                        >
+                                        Enabled
+                                    </label>
+                                </div>
+                                <fieldset class="grid gap-4 sm:grid-cols-2">
+                                    <legend class="col-span-full text-[11px] font-semibold uppercase tracking-[0.18em] text-text-muted">
+                                        Config
+                                    </legend>
+                                    <label
+                                        v-for="entry in configEntries(editRule.config)"
+                                        :key="entry.key"
+                                        class="flex flex-col gap-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-text-muted"
+                                    >
+                                        {{ entry.key.replace('_', ' ') }}
+                                        <input
+                                            v-model.number="editRule.config[entry.key]"
+                                            type="number"
+                                            step="any"
+                                            class="rounded-lg border border-border-subtle bg-background-panel-hover px-3 py-2 text-sm text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
+                                        >
+                                    </label>
+                                </fieldset>
+                                <div class="flex flex-wrap gap-2">
+                                    <button
+                                        type="submit"
+                                        class="inline-flex items-center gap-2 rounded-lg bg-accent-cyan px-3 py-1.5 text-xs font-semibold text-slate-950 transition hover:bg-accent-cyan/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
+                                    >
+                                        <Save class="h-3.5 w-3.5" aria-hidden="true" />
+                                        Save rule
+                                    </button>
+                                    <button
+                                        type="button"
+                                        class="inline-flex items-center gap-2 rounded-lg border border-border-subtle bg-background-panel-hover px-3 py-1.5 text-xs font-semibold text-text-secondary transition hover:border-accent-cyan/40 hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
+                                        @click="cancelEditingRule"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </form>
+                            <div v-else class="flex min-w-0 items-start gap-3">
                                 <AlertTriangle
                                     class="mt-0.5 h-5 w-5 shrink-0 text-accent-cyan"
                                     aria-hidden="true"
@@ -438,6 +563,15 @@ const hasOverride = computed(() => props.weights.overrides !== null);
                                 </div>
                             </div>
                             <div class="flex shrink-0 items-center gap-2">
+                                <button
+                                    v-if="editingRuleId !== rule.id"
+                                    type="button"
+                                    class="inline-flex items-center gap-2 rounded-lg border border-border-subtle bg-background-panel-hover px-3 py-1.5 text-xs font-semibold text-text-secondary transition hover:border-accent-cyan/40 hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
+                                    @click="startEditingRule(rule)"
+                                >
+                                    <Pencil class="h-3.5 w-3.5" aria-hidden="true" />
+                                    Edit
+                                </button>
                                 <button
                                     type="button"
                                     class="inline-flex items-center gap-2 rounded-lg border border-border-subtle bg-background-panel-hover px-3 py-1.5 text-xs font-semibold text-text-secondary transition hover:border-accent-cyan/40 hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"

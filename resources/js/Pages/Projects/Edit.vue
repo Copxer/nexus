@@ -2,7 +2,7 @@
 import AppLayout from '@/Layouts/AppLayout.vue';
 import ProjectForm from '@/Pages/Projects/Partials/ProjectForm.vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
-import { ChevronLeft, Copy, Globe2 } from 'lucide-vue-next';
+import { ChevronLeft, Copy, ExternalLink, Globe2 } from 'lucide-vue-next';
 import { ref } from 'vue';
 
 interface OptionPill {
@@ -151,6 +151,15 @@ const copyUrl = async () => {
                                     <Copy class="h-3.5 w-3.5" aria-hidden="true" />
                                     Copy
                                 </button>
+                                <a
+                                    :href="project.public_status_url"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    class="inline-flex items-center gap-2 rounded-lg border border-border-subtle bg-background-panel-hover px-3 py-2 text-xs font-semibold text-text-secondary transition hover:border-accent-cyan/40 hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
+                                >
+                                    <ExternalLink class="h-3.5 w-3.5" aria-hidden="true" />
+                                    Open
+                                </a>
                             </div>
                         </label>
                         <p class="text-[11px] text-text-muted">

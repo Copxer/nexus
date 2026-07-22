@@ -277,6 +277,8 @@ class DeploymentTimelineQueryTest extends TestCase
 
         $row = (new DeploymentTimelineQuery)->execute($context['user'])[0];
 
+        $this->assertNotNull($row['run_completed_at']);
+        $this->assertNotNull($row['run_completed_at_iso']);
         $this->assertNotNull($row['duration_seconds']);
         $this->assertGreaterThanOrEqual(295, $row['duration_seconds']);
         $this->assertLessThanOrEqual(305, $row['duration_seconds']);

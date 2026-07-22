@@ -98,6 +98,7 @@ class DeploymentTimelineQuery
                 'run_started_at_iso' => $run->run_started_at?->toIso8601String(),
                 'run_updated_at' => $run->run_updated_at?->diffForHumans(),
                 'run_updated_at_iso' => $run->run_updated_at?->toIso8601String(),
+                'run_completed_at' => $run->run_completed_at?->diffForHumans(),
                 'run_completed_at_iso' => $run->run_completed_at?->toIso8601String(),
                 // Duration in seconds — null until completion. Drawer
                 // formats this client-side (`4m 12s`).
