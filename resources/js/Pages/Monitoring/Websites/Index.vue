@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import StatusBadge from '@/Components/Dashboard/StatusBadge.vue';
+import SkeletonRow from '@/Components/Skeleton/SkeletonRow.vue';
 import { websiteStatusTone as statusTone } from '@/lib/websiteStyles';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { Head, Link, router } from '@inertiajs/vue3';
@@ -41,6 +42,7 @@ const props = defineProps<{
 // four consumers stay in sync when the WebsiteStatus enum grows.
 
 const statusFilter = ref<string | null>(props.filters.status);
+const isFiltering = ref(false);
 
 // Status lives in the query string so a filtered view is shareable and
 // survives reload — same pattern as the Deployments timeline filters.
@@ -52,6 +54,12 @@ const applyFilter = () => {
             preserveScroll: true,
             preserveState: true,
             only: ['websites', 'filters', 'filterOptions'],
+            onStart: () => {
+                isFiltering.value = true;
+            },
+            onFinish: () => {
+                isFiltering.value = false;
+            },
         },
     );
 };
@@ -137,7 +145,17 @@ const projectAccentClass = (color: string | null) =>
             </header>
 
             <div
-                v-if="websites.length === 0 && !statusFilter"
+                v-if="isFiltering"
+                class="flex flex-col gap-2"
+                role="status"
+                aria-label="Loading website monitors"
+            >
+                <SkeletonRow v-for="n in 4" :key="n" />
+                <span class="sr-only">Loading website monitors</span>
+            </div>
+
+            <div
+                v-else-if="websites.length === 0 && !statusFilter"
                 class="glass-card flex flex-col items-center justify-center gap-3 px-6 py-16 text-center"
             >
                 <span

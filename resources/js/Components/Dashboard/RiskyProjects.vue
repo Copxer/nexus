@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import HealthScoreBadge from '@/Components/Project/HealthScoreBadge.vue';
+import Skeleton from '@/Components/Skeleton/Skeleton.vue';
 import { projectIcon } from '@/lib/projectIcons';
 import type { RiskyProjectRow } from '@/types';
 import { Link, router } from '@inertiajs/vue3';
 import { FolderKanban, RefreshCw, ShieldCheck } from 'lucide-vue-next';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 
 /**
  * Spec 035 — Overview "Risky projects" panel. The query layer
@@ -29,6 +30,7 @@ const props = defineProps<{
 }>();
 
 const HIDING_BANDS = new Set(['healthy', 'good']);
+const regeneratingSlug = ref<string | null>(null);
 
 const shouldShowList = computed<boolean>(() => {
     if (props.projects.length === 0) {
@@ -68,10 +70,16 @@ const fallbackSummary = (project: RiskyProjectRow): string => {
 };
 
 const regenerateExplanation = (project: RiskyProjectRow): void => {
+    regeneratingSlug.value = project.slug;
     router.post(
         route('overview.projects.health-explanation.regenerate', project.slug),
         {},
-        { preserveScroll: true },
+        {
+            preserveScroll: true,
+            onFinish: () => {
+                regeneratingSlug.value = null;
+            },
+        },
     );
 };
 </script>
@@ -212,11 +220,27 @@ const regenerateExplanation = (project: RiskyProjectRow): void => {
                                     v-if="props.canRegenerate"
                                     type="button"
                                     class="inline-flex items-center justify-center gap-1.5 rounded-md border border-accent-cyan/30 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-accent-cyan transition hover:border-accent-cyan/60 hover:bg-accent-cyan/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
+                                    :disabled="regeneratingSlug !== null"
                                     @click="regenerateExplanation(project)"
                                 >
-                                    <RefreshCw class="h-3 w-3" aria-hidden="true" />
-                                    Regenerate
+                                    <RefreshCw
+                                        class="h-3 w-3"
+                                        :class="{ 'animate-spin': regeneratingSlug === project.slug }"
+                                        aria-hidden="true"
+                                    />
+                                    {{ regeneratingSlug === project.slug ? 'Regenerating…' : 'Regenerate' }}
                                 </button>
+                            </div>
+
+                            <div
+                                v-if="regeneratingSlug === project.slug"
+                                class="space-y-2 rounded-md border border-accent-cyan/20 bg-accent-cyan/5 p-3"
+                                role="status"
+                                aria-label="Regenerating health explanation"
+                            >
+                                <Skeleton width="70%" height="0.75rem" />
+                                <Skeleton width="45%" height="0.75rem" />
+                                <span class="sr-only">Regenerating health explanation</span>
                             </div>
                         </div>
                     </details>

@@ -3,6 +3,7 @@ import DateRangeFilter, {
     type RangeOption,
 } from '@/Components/Analytics/DateRangeFilter.vue';
 import KpiCard from '@/Components/Dashboard/KpiCard.vue';
+import SkeletonCard from '@/Components/Skeleton/SkeletonCard.vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { Head, router } from '@inertiajs/vue3';
 import {
@@ -16,7 +17,7 @@ import {
     ShieldCheck,
     Timer,
 } from 'lucide-vue-next';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 
 type Status = 'success' | 'warning' | 'danger' | 'info' | 'muted';
 
@@ -70,12 +71,20 @@ const props = defineProps<{
     };
 }>();
 
+const isRangeLoading = ref(false);
+
 const onRangeChange = (range: RangeOption) => {
     if (range === props.filters.range) return;
     router.visit(route('analytics.index'), {
         data: { range },
         preserveScroll: true,
         preserveState: false,
+        onStart: () => {
+            isRangeLoading.value = true;
+        },
+        onFinish: () => {
+            isRangeLoading.value = false;
+        },
     });
 };
 
@@ -136,8 +145,14 @@ const formatInt = (n: number | null): string =>
 
             <div
                 class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
+                :aria-busy="isRangeLoading"
             >
+                <template v-if="isRangeLoading">
+                    <SkeletonCard v-for="n in 8" :key="n" />
+                </template>
+
                 <KpiCard
+                    v-else
                     label="Deployment frequency"
                     :value="formatInt(props.metrics.deployments.frequency.total)"
                     secondary="Completed runs"
@@ -146,6 +161,7 @@ const formatInt = (n: number | null): string =>
                     :sparkline="props.metrics.deployments.frequency.sparkline"
                 />
                 <KpiCard
+                    v-if="!isRangeLoading"
                     label="Deployment success"
                     :value="formatPercent(props.metrics.deployments.success_rate.percent)"
                     secondary="Success / (success + failure)"
@@ -155,6 +171,7 @@ const formatInt = (n: number | null): string =>
                     :status-label="props.metrics.deployments.success_rate.percent === null ? 'No data' : 'Last range'"
                 />
                 <KpiCard
+                    v-if="!isRangeLoading"
                     label="Alert frequency"
                     :value="formatInt(props.metrics.alerts.frequency.total)"
                     secondary="Triggered in range"
@@ -163,6 +180,7 @@ const formatInt = (n: number | null): string =>
                     :sparkline="props.metrics.alerts.frequency.sparkline"
                 />
                 <KpiCard
+                    v-if="!isRangeLoading"
                     label="Mean time to recovery"
                     :value="props.metrics.alerts.mttr.label ?? '—'"
                     secondary="Resolved alerts only"
@@ -172,6 +190,7 @@ const formatInt = (n: number | null): string =>
                     :status-label="props.metrics.alerts.mttr.seconds === null ? 'No data' : 'Avg'"
                 />
                 <KpiCard
+                    v-if="!isRangeLoading"
                     label="Website uptime"
                     :value="formatPercent(props.metrics.websites.uptime.percent)"
                     secondary="Volume-weighted"
@@ -182,6 +201,7 @@ const formatInt = (n: number | null): string =>
                     :sparkline="props.metrics.websites.uptime.sparkline"
                 />
                 <KpiCard
+                    v-if="!isRangeLoading"
                     label="Response time"
                     :value="formatMs(props.metrics.websites.response_time.avg_ms)"
                     secondary="Average over up checks"
@@ -192,6 +212,7 @@ const formatInt = (n: number | null): string =>
                     :sparkline="fillNulls(props.metrics.websites.response_time.sparkline)"
                 />
                 <KpiCard
+                    v-if="!isRangeLoading"
                     label="Container CPU"
                     :value="formatPercent(props.metrics.containers.cpu.percent)"
                     secondary="Across user hosts"
@@ -202,6 +223,7 @@ const formatInt = (n: number | null): string =>
                     :sparkline="fillNulls(props.metrics.containers.cpu.sparkline)"
                 />
                 <KpiCard
+                    v-if="!isRangeLoading"
                     label="Container memory"
                     :value="formatPercent(props.metrics.containers.memory.percent)"
                     secondary="Across user hosts"
