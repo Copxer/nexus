@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import StatusBadge from '@/Components/Dashboard/StatusBadge.vue';
+import SkeletonRow from '@/Components/Skeleton/SkeletonRow.vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import type { PageProps } from '@/types';
 import { Head, router, usePage } from '@inertiajs/vue3';
@@ -68,6 +69,8 @@ const props = defineProps<{
 const page = usePage<PageProps>();
 
 const filterDraft = ref<FilterState>({ ...props.filters });
+const isAlertsLoading = ref(false);
+const actingAlertId = ref<number | null>(null);
 
 const hasFilterActive = computed<boolean>(() => {
     const f = props.filters;
@@ -99,6 +102,12 @@ const applyFilters = () => {
         preserveScroll: true,
         preserveState: true,
         only: ['alerts', 'filters', 'filterOptions'],
+        onStart: () => {
+            isAlertsLoading.value = true;
+        },
+        onFinish: () => {
+            isAlertsLoading.value = false;
+        },
     });
 };
 
@@ -116,28 +125,52 @@ const clearFilters = () => {
             preserveScroll: true,
             preserveState: true,
             only: ['alerts', 'filters', 'filterOptions'],
+            onStart: () => {
+                isAlertsLoading.value = true;
+            },
+            onFinish: () => {
+                isAlertsLoading.value = false;
+            },
         },
     );
 };
 
 const acknowledge = (alert: AlertRow) => {
+    actingAlertId.value = alert.id;
     router.post(
         route('alerts.acknowledge', alert.id),
         {},
-        { preserveScroll: true },
+        {
+            preserveScroll: true,
+            onFinish: () => {
+                actingAlertId.value = null;
+            },
+        },
     );
 };
 
 const resolve = (alert: AlertRow) => {
+    actingAlertId.value = alert.id;
     router.post(
         route('alerts.resolve', alert.id),
         {},
-        { preserveScroll: true },
+        {
+            preserveScroll: true,
+            onFinish: () => {
+                actingAlertId.value = null;
+            },
+        },
     );
 };
 
 const mute = (alert: AlertRow) => {
-    router.post(route('alerts.mute', alert.id), {}, { preserveScroll: true });
+    actingAlertId.value = alert.id;
+    router.post(route('alerts.mute', alert.id), {}, {
+        preserveScroll: true,
+        onFinish: () => {
+            actingAlertId.value = null;
+        },
+    });
 };
 
 const capitalize = (value: string | null): string =>
@@ -190,7 +223,15 @@ onMounted(() => {
     const channel = window.Echo.private(channelName);
 
     const reloadList = () => {
-        router.reload({ only: ['alerts', 'filters', 'filterOptions'] });
+        router.reload({
+            only: ['alerts', 'filters', 'filterOptions'],
+            onStart: () => {
+                isAlertsLoading.value = true;
+            },
+            onFinish: () => {
+                isAlertsLoading.value = false;
+            },
+        });
     };
 
     channel.listen('.AlertTriggered', reloadList);
@@ -381,7 +422,17 @@ onBeforeUnmount(() => {
             </header>
 
             <div
-                v-if="alerts.length === 0 && !hasFilterActive"
+                v-if="isAlertsLoading"
+                class="flex flex-col gap-2"
+                role="status"
+                aria-label="Loading alerts"
+            >
+                <SkeletonRow v-for="n in 4" :key="n" />
+                <span class="sr-only">Loading alerts</span>
+            </div>
+
+            <div
+                v-else-if="alerts.length === 0 && !hasFilterActive"
                 class="glass-card flex flex-col items-center justify-center gap-3 px-6 py-16 text-center"
             >
                 <span
@@ -505,31 +556,34 @@ onBeforeUnmount(() => {
                             v-if="alert.can_acknowledge"
                             type="button"
                             class="inline-flex items-center gap-1 rounded-md border border-border-subtle bg-background-panel-hover px-2 py-1 text-xs font-semibold text-text-secondary transition hover:border-accent-cyan/60 hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
+                            :disabled="actingAlertId !== null"
                             @click="acknowledge(alert)"
                         >
                             <Eye class="h-3 w-3" aria-hidden="true" />
-                            Ack
+                            {{ actingAlertId === alert.id ? 'Saving…' : 'Ack' }}
                         </button>
                         <button
                             v-if="alert.can_resolve"
                             type="button"
                             class="inline-flex items-center gap-1 rounded-md border border-status-success/40 bg-status-success/10 px-2 py-1 text-xs font-semibold text-status-success transition hover:border-status-success/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-status-success/60"
+                            :disabled="actingAlertId !== null"
                             @click="resolve(alert)"
                         >
                             <CheckCircle2
                                 class="h-3 w-3"
                                 aria-hidden="true"
                             />
-                            Resolve
+                            {{ actingAlertId === alert.id ? 'Saving…' : 'Resolve' }}
                         </button>
                         <button
                             v-if="alert.can_mute"
                             type="button"
                             class="inline-flex items-center gap-1 rounded-md border border-border-subtle bg-background-panel-hover px-2 py-1 text-xs font-semibold text-text-muted transition hover:border-status-warning/40 hover:text-status-warning focus:outline-none focus-visible:ring-2 focus-visible:ring-status-warning/60"
+                            :disabled="actingAlertId !== null"
                             @click="mute(alert)"
                         >
                             <BellOff class="h-3 w-3" aria-hidden="true" />
-                            Mute
+                            {{ actingAlertId === alert.id ? 'Saving…' : 'Mute' }}
                         </button>
                         <a
                             v-if="alert.affected_entity_url"

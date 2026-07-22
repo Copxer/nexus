@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import StatusBadge from '@/Components/Dashboard/StatusBadge.vue';
+import SkeletonRow from '@/Components/Skeleton/SkeletonRow.vue';
 import { projectIcon } from '@/lib/projectIcons';
 import {
     conclusionLabel as workflowConclusionLabel,
@@ -692,7 +693,11 @@ onBeforeUnmount(stopPolling);
                             :disabled="isIssuesSyncing"
                             @click="runIssuesSync"
                         >
-                            <RefreshCcw class="h-4 w-4" aria-hidden="true" />
+                            <RefreshCcw
+                                class="h-4 w-4"
+                                :class="{ 'animate-spin': isIssuesSyncing }"
+                                aria-hidden="true"
+                            />
                             {{ isIssuesSyncing ? 'Syncing…' : 'Run sync' }}
                         </button>
                     </header>
@@ -710,8 +715,18 @@ onBeforeUnmount(stopPolling);
                         </span>
                     </p>
 
+                    <div
+                        v-if="isIssuesSyncing && issues.length === 0"
+                        class="mt-4 flex flex-col gap-2"
+                        role="status"
+                        aria-label="Loading issues"
+                    >
+                        <SkeletonRow v-for="n in 3" :key="n" />
+                        <span class="sr-only">Loading issues</span>
+                    </div>
+
                     <ul
-                        v-if="issues.length > 0"
+                        v-else-if="issues.length > 0"
                         class="mt-2 divide-y divide-border-subtle"
                     >
                         <li
@@ -825,7 +840,11 @@ onBeforeUnmount(stopPolling);
                             :disabled="isPullRequestsSyncing"
                             @click="runPullRequestsSync"
                         >
-                            <RefreshCcw class="h-4 w-4" aria-hidden="true" />
+                            <RefreshCcw
+                                class="h-4 w-4"
+                                :class="{ 'animate-spin': isPullRequestsSyncing }"
+                                aria-hidden="true"
+                            />
                             {{ isPullRequestsSyncing ? 'Syncing…' : 'Run sync' }}
                         </button>
                     </header>
@@ -843,8 +862,18 @@ onBeforeUnmount(stopPolling);
                         </span>
                     </p>
 
+                    <div
+                        v-if="isPullRequestsSyncing && pullRequests.length === 0"
+                        class="mt-4 flex flex-col gap-2"
+                        role="status"
+                        aria-label="Loading pull requests"
+                    >
+                        <SkeletonRow v-for="n in 3" :key="n" />
+                        <span class="sr-only">Loading pull requests</span>
+                    </div>
+
                     <ul
-                        v-if="pullRequests.length > 0"
+                        v-else-if="pullRequests.length > 0"
                         class="mt-2 divide-y divide-border-subtle"
                     >
                         <li
@@ -968,7 +997,11 @@ onBeforeUnmount(stopPolling);
                             :disabled="isWorkflowRunsSyncing"
                             @click="runWorkflowRunsSync"
                         >
-                            <RefreshCcw class="h-4 w-4" aria-hidden="true" />
+                            <RefreshCcw
+                                class="h-4 w-4"
+                                :class="{ 'animate-spin': isWorkflowRunsSyncing }"
+                                aria-hidden="true"
+                            />
                             {{ isWorkflowRunsSyncing ? 'Syncing…' : 'Run sync' }}
                         </button>
                     </header>
@@ -986,8 +1019,18 @@ onBeforeUnmount(stopPolling);
                         </span>
                     </p>
 
+                    <div
+                        v-if="isWorkflowRunsSyncing && workflowRuns.length === 0"
+                        class="mt-4 flex flex-col gap-2"
+                        role="status"
+                        aria-label="Loading workflow runs"
+                    >
+                        <SkeletonRow v-for="n in 3" :key="n" />
+                        <span class="sr-only">Loading workflow runs</span>
+                    </div>
+
                     <ul
-                        v-if="workflowRuns.length > 0"
+                        v-else-if="workflowRuns.length > 0"
                         class="mt-2 divide-y divide-border-subtle"
                     >
                         <li

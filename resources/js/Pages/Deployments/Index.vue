@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import StatusBadge from '@/Components/Dashboard/StatusBadge.vue';
+import SkeletonRow from '@/Components/Skeleton/SkeletonRow.vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import {
     conclusionLabel,
@@ -92,6 +93,7 @@ const props = defineProps<{
 // Mirror the URL filter shape into reactive locals so dropdowns work
 // against `v-model` without poking the prop directly.
 const filterDraft = ref<FilterState>({ ...props.filters });
+const isTimelineLoading = ref(false);
 
 // Status / conclusion are static enums on the PHP side — hard-coded
 // here is safer than serializing them through Inertia (no type drift
@@ -143,6 +145,12 @@ const applyFilters = () => {
         preserveScroll: true,
         preserveState: true,
         only: ['deployments', 'filters', 'filterOptions'],
+        onStart: () => {
+            isTimelineLoading.value = true;
+        },
+        onFinish: () => {
+            isTimelineLoading.value = false;
+        },
     });
 };
 
@@ -167,6 +175,24 @@ const clearFilters = () => {
 const refresh = () => {
     router.reload({
         only: ['deployments', 'filterOptions'],
+        onStart: () => {
+            isTimelineLoading.value = true;
+        },
+        onFinish: () => {
+            isTimelineLoading.value = false;
+        },
+    });
+};
+
+const refreshTimeline = () => {
+    router.reload({
+        only: ['deployments', 'filterOptions'],
+        onStart: () => {
+            isTimelineLoading.value = true;
+        },
+        onFinish: () => {
+            isTimelineLoading.value = false;
+        },
     });
 };
 
@@ -265,9 +291,7 @@ onMounted(() => {
         // newly-imported repository arrives — without `filterOptions`
         // here, the new repo wouldn't appear in the dropdown until the
         // user navigates away and back.
-        router.reload({
-            only: ['deployments', 'filterOptions'],
-        });
+        refreshTimeline();
     });
 
     const connector = window.Echo.connector;
@@ -353,10 +377,15 @@ onBeforeUnmount(() => {
                     <button
                         type="button"
                         class="inline-flex items-center gap-2 rounded-lg border border-accent-cyan/40 bg-accent-cyan/15 px-3 py-2 text-sm font-semibold text-accent-cyan transition hover:border-accent-cyan/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
+                        :disabled="isTimelineLoading"
                         @click="refresh"
                     >
-                        <RefreshCcw class="h-4 w-4" aria-hidden="true" />
-                        Refresh
+                        <RefreshCcw
+                            class="h-4 w-4"
+                            :class="{ 'animate-spin': isTimelineLoading }"
+                            aria-hidden="true"
+                        />
+                        {{ isTimelineLoading ? 'Refreshing…' : 'Refresh' }}
                     </button>
                 </div>
             </header>
@@ -480,9 +509,19 @@ onBeforeUnmount(() => {
                 </button>
             </section>
 
+            <div
+                v-if="isTimelineLoading"
+                class="flex flex-col gap-2"
+                role="status"
+                aria-label="Loading deployments"
+            >
+                <SkeletonRow v-for="n in 5" :key="n" />
+                <span class="sr-only">Loading deployments</span>
+            </div>
+
             <!-- Empty states -->
             <div
-                v-if="deployments.length === 0 && !hasActiveFilter"
+                v-else-if="deployments.length === 0 && !hasActiveFilter"
                 class="glass-card flex flex-col items-center justify-center gap-3 px-6 py-16 text-center"
             >
                 <span

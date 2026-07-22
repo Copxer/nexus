@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import Sparkline from '@/Components/Dashboard/Sparkline.vue';
 import StatusBadge from '@/Components/Dashboard/StatusBadge.vue';
+import SkeletonRow from '@/Components/Skeleton/SkeletonRow.vue';
 import { websiteStatusTone as statusTone } from '@/lib/websiteStyles';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import type { PageProps } from '@/types';
@@ -69,6 +70,7 @@ const props = defineProps<{
 // `onMounted` works today but is idiomatically wrong (Inertia could
 // validate the call site at any release).
 const page = usePage<PageProps>();
+const isProbeLoading = ref(false);
 
 const formatUptime = (rate: number | null): string =>
     rate === null ? '—%' : `${rate}%`;
@@ -93,7 +95,15 @@ const runProbe = () => {
     router.post(
         route('monitoring.websites.probe', props.website.id),
         {},
-        { preserveScroll: true },
+        {
+            preserveScroll: true,
+            onStart: () => {
+                isProbeLoading.value = true;
+            },
+            onFinish: () => {
+                isProbeLoading.value = false;
+            },
+        },
     );
 };
 
@@ -159,7 +169,15 @@ onMounted(() => {
             // Only react to pulses for our own website. Other monitors'
             // pulses arrive on the same channel.
             if (payload.website_id !== props.website.id) return;
-            router.reload({ only: ['website', 'summary', 'checks'] });
+            router.reload({
+                only: ['website', 'summary', 'checks'],
+                onStart: () => {
+                    isProbeLoading.value = true;
+                },
+                onFinish: () => {
+                    isProbeLoading.value = false;
+                },
+            });
         },
     );
 
@@ -272,10 +290,15 @@ onBeforeUnmount(() => {
                             v-if="canProbe"
                             type="button"
                             class="inline-flex items-center gap-2 rounded-lg border border-accent-cyan/40 bg-accent-cyan/15 px-3 py-2 text-sm font-semibold text-accent-cyan transition hover:border-accent-cyan/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
+                            :disabled="isProbeLoading"
                             @click="runProbe"
                         >
-                            <Play class="h-4 w-4" aria-hidden="true" />
-                            Probe now
+                            <Play
+                                class="h-4 w-4"
+                                :class="{ 'animate-pulse': isProbeLoading }"
+                                aria-hidden="true"
+                            />
+                            {{ isProbeLoading ? 'Probing…' : 'Probe now' }}
                         </button>
                         <Link
                             v-if="canUpdate"
@@ -426,7 +449,19 @@ onBeforeUnmount(() => {
                 </p>
 
                 <ul
-                    v-if="checks.length > 0"
+                    v-if="isProbeLoading"
+                    class="mt-4 flex flex-col gap-2"
+                    role="status"
+                    aria-label="Loading recent checks"
+                >
+                    <li v-for="n in 3" :key="n">
+                        <SkeletonRow />
+                    </li>
+                    <span class="sr-only">Loading recent checks</span>
+                </ul>
+
+                <ul
+                    v-else-if="checks.length > 0"
                     class="mt-2 divide-y divide-border-subtle"
                 >
                     <li

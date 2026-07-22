@@ -4,6 +4,7 @@ import KpiCard from '@/Components/Dashboard/KpiCard.vue';
 import RiskyProjects from '@/Components/Dashboard/RiskyProjects.vue';
 import Sparkline from '@/Components/Dashboard/Sparkline.vue';
 import StatusBadge from '@/Components/Dashboard/StatusBadge.vue';
+import SkeletonCard from '@/Components/Skeleton/SkeletonCard.vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { hostStatusTone } from '@/lib/hostStyles';
 import type { ActivityHeatmapPayload, DashboardPayload, PageProps } from '@/types';
@@ -19,7 +20,7 @@ import {
     Server,
     ShieldCheck,
 } from 'lucide-vue-next';
-import { onBeforeUnmount, onMounted } from 'vue';
+import { onBeforeUnmount, onMounted, ref } from 'vue';
 
 interface TopWorkItem {
     id: string;
@@ -53,6 +54,7 @@ defineProps<{
 // fires; the visible payoff arrives in 035 when Overview renders the
 // "Risky projects" panel + per-project chips that this reload feeds.
 const page = usePage<PageProps>();
+const isDashboardRefreshing = ref(false);
 let teardown: (() => void) | null = null;
 
 onMounted(() => {
@@ -66,7 +68,15 @@ onMounted(() => {
     const channel = window.Echo.private(channelName);
 
     const refreshDashboard = () => {
-        router.reload({ only: ['dashboard'] });
+        router.reload({
+            only: ['dashboard'],
+            onStart: () => {
+                isDashboardRefreshing.value = true;
+            },
+            onFinish: () => {
+                isDashboardRefreshing.value = false;
+            },
+        });
     };
 
     channel.listen('.HealthScoreUpdated', refreshDashboard);
@@ -121,8 +131,14 @@ const stubServices = [
             <section
                 aria-label="Key metrics"
                 class="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6"
+                :aria-busy="isDashboardRefreshing"
             >
+                <template v-if="isDashboardRefreshing">
+                    <SkeletonCard v-for="n in 6" :key="n" />
+                </template>
+
                 <KpiCard
+                    v-else
                     :icon="FolderKanban"
                     accent="cyan"
                     label="Projects"
@@ -138,6 +154,7 @@ const stubServices = [
                     :sparkline="dashboard.projects.sparkline"
                 />
                 <KpiCard
+                    v-if="!isDashboardRefreshing"
                     :icon="Rocket"
                     accent="blue"
                     label="Deployments (24h)"
@@ -159,6 +176,7 @@ const stubServices = [
                     :sparkline="dashboard.deployments.sparkline"
                 />
                 <KpiCard
+                    v-if="!isDashboardRefreshing"
                     :icon="ShieldCheck"
                     accent="success"
                     label="Services"
@@ -173,6 +191,7 @@ const stubServices = [
                     :sparkline="dashboard.services.sparkline"
                 />
                 <KpiCard
+                    v-if="!isDashboardRefreshing"
                     :icon="Server"
                     accent="purple"
                     label="Hosts"
@@ -191,6 +210,7 @@ const stubServices = [
                     :sparkline="dashboard.hosts.sparkline"
                 />
                 <KpiCard
+                    v-if="!isDashboardRefreshing"
                     :icon="Bell"
                     accent="danger"
                     label="Alerts"
@@ -205,6 +225,7 @@ const stubServices = [
                     :sparkline="dashboard.alerts.sparkline"
                 />
                 <KpiCard
+                    v-if="!isDashboardRefreshing"
                     :icon="HeartPulse"
                     accent="magenta"
                     label="Uptime"

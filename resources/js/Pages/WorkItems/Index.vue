@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import StatusBadge from '@/Components/Dashboard/StatusBadge.vue';
+import SkeletonRow from '@/Components/Skeleton/SkeletonRow.vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { Head, router } from '@inertiajs/vue3';
 import {
@@ -11,7 +12,7 @@ import {
     Search,
     Sparkles,
 } from 'lucide-vue-next';
-import { reactive, watch } from 'vue';
+import { reactive, ref, watch } from 'vue';
 
 interface RepositoryRef {
     id: number;
@@ -67,6 +68,9 @@ const local = reactive<Filters>({
     q: props.filters.q,
 });
 
+const isFiltering = ref(false);
+const regeneratingRiskId = ref<string | null>(null);
+
 const itemStateTone = (item: WorkItem) => {
     if (item.kind === 'pull_request') {
         return (
@@ -111,11 +115,17 @@ const riskLabel = (assessment: PullRequestRiskAssessment | null | undefined) => 
 
 const regenerateRisk = (item: WorkItem) => {
     if (item.kind !== 'pull_request' || !props.canRegeneratePrRisk) return;
+    regeneratingRiskId.value = item.id;
 
     router.post(
         route('work-items.pull-requests.risk.regenerate', item.id.replace('pull-', '')),
         {},
-        { preserveScroll: true },
+        {
+            preserveScroll: true,
+            onFinish: () => {
+                regeneratingRiskId.value = null;
+            },
+        },
     );
 };
 
@@ -135,6 +145,12 @@ const applyFilters = () => {
             preserveState: false,
             preserveScroll: true,
             replace: true,
+            onStart: () => {
+                isFiltering.value = true;
+            },
+            onFinish: () => {
+                isFiltering.value = false;
+            },
         },
     );
 };
@@ -276,9 +292,20 @@ watch(
             <section
                 aria-label="Items"
                 class="glass-card p-0"
+                :aria-busy="isFiltering"
             >
+                <div
+                    v-if="isFiltering"
+                    class="flex flex-col gap-2 p-4"
+                    role="status"
+                    aria-label="Loading work items"
+                >
+                    <SkeletonRow v-for="n in 4" :key="n" />
+                    <span class="sr-only">Loading work items</span>
+                </div>
+
                 <ul
-                    v-if="items.length > 0"
+                    v-else-if="items.length > 0"
                     class="divide-y divide-border-subtle"
                 >
                     <li
@@ -410,11 +437,23 @@ watch(
                                     v-if="canRegeneratePrRisk"
                                     type="button"
                                     class="inline-flex items-center gap-2 rounded-lg border border-accent-cyan/40 bg-accent-cyan/15 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-accent-cyan transition hover:border-accent-cyan/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
+                                    :disabled="regeneratingRiskId !== null"
                                     @click="regenerateRisk(item)"
                                 >
-                                    <Sparkles class="h-3.5 w-3.5" aria-hidden="true" />
-                                    Regenerate
+                                    <Sparkles
+                                        class="h-3.5 w-3.5"
+                                        :class="{ 'animate-pulse': regeneratingRiskId === item.id }"
+                                        aria-hidden="true"
+                                    />
+                                    {{ regeneratingRiskId === item.id ? 'Regenerating…' : 'Regenerate' }}
                                 </button>
+                            </div>
+                            <div
+                                v-if="regeneratingRiskId === item.id"
+                                class="mt-3 rounded-lg border border-accent-cyan/20 bg-accent-cyan/5 p-3 text-xs text-text-muted"
+                                role="status"
+                            >
+                                Risk regeneration is queued. The panel will update after the request completes.
                             </div>
                             <dl class="mt-3 grid gap-3 sm:grid-cols-3">
                                 <div>

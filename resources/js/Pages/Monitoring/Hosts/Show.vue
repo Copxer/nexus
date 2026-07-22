@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import Sparkline from '@/Components/Dashboard/Sparkline.vue';
 import StatusBadge from '@/Components/Dashboard/StatusBadge.vue';
+import SkeletonCard from '@/Components/Skeleton/SkeletonCard.vue';
 import AgentTokenPanel from '@/Components/Hosts/AgentTokenPanel.vue';
 import ContainerTable from '@/Components/Hosts/ContainerTable.vue';
 import HostMetricsPanel from '@/Components/Hosts/HostMetricsPanel.vue';
@@ -161,6 +162,7 @@ const currentMemory = computed<number | null>(
 // agent posts telemetry. Filter client-side by host_id and partial-
 // reload host + telemetry props on a match. Mirrors spec 025.
 const realtimeConnected = ref<boolean | null>(null);
+const isTelemetryLoading = ref(false);
 let teardown: (() => void) | null = null;
 
 onMounted(() => {
@@ -183,7 +185,15 @@ onMounted(() => {
         '.HostTelemetryRecorded',
         (payload: { host_id: number }) => {
             if (payload.host_id !== props.host.id) return;
-            router.reload({ only: ['host', 'telemetry'] });
+            router.reload({
+                only: ['host', 'telemetry'],
+                onStart: () => {
+                    isTelemetryLoading.value = true;
+                },
+                onFinish: () => {
+                    isTelemetryLoading.value = false;
+                },
+            });
         },
     );
 
@@ -400,7 +410,18 @@ onBeforeUnmount(() => {
             </section>
 
             <section
-                v-if="telemetry.current === null"
+                v-if="isTelemetryLoading"
+                class="grid gap-4 sm:grid-cols-2"
+                role="status"
+                aria-label="Loading telemetry"
+            >
+                <SkeletonCard />
+                <SkeletonCard />
+                <span class="sr-only">Loading telemetry</span>
+            </section>
+
+            <section
+                v-else-if="telemetry.current === null"
                 class="glass-card flex flex-col items-center gap-3 border-dashed p-8 text-center"
             >
                 <Clock
