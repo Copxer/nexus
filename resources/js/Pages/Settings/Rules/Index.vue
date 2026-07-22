@@ -55,6 +55,18 @@ interface Weights {
     gh_sync_failed: number | null;
 }
 
+type WeightPayloadField =
+    | 'deduct_alert_critical'
+    | 'deduct_alert_warning'
+    | 'deduct_deploy_failed'
+    | 'deduct_website_slow'
+    | 'deduct_website_down'
+    | 'deduct_host_offline'
+    | 'deduct_container_unhealthy'
+    | 'deduct_gh_sync_failed';
+
+type WeightPayload = Record<WeightPayloadField, number>;
+
 const props = defineProps<{
     weights: {
         defaults: Weights;
@@ -111,10 +123,21 @@ const draftWeights = ref<Record<keyof Weights, number>>({
     gh_sync_failed: props.weights.resolved.gh_sync_failed ?? 0,
 });
 
+const weightPayload = (): WeightPayload => ({
+    deduct_alert_critical: draftWeights.value.alert_critical,
+    deduct_alert_warning: draftWeights.value.alert_warning,
+    deduct_deploy_failed: draftWeights.value.deploy_failed,
+    deduct_website_slow: draftWeights.value.website_slow,
+    deduct_website_down: draftWeights.value.website_down,
+    deduct_host_offline: draftWeights.value.host_offline,
+    deduct_container_unhealthy: draftWeights.value.container_unhealthy,
+    deduct_gh_sync_failed: draftWeights.value.gh_sync_failed,
+});
+
 const saveWeights = () => {
     router.patch(
         route('settings.rules.weights.update'),
-        draftWeights.value,
+        weightPayload(),
         { preserveScroll: true },
     );
 };
@@ -150,6 +173,14 @@ const applyTemplate = (tpl: Template) => {
         config: { ...tpl.config },
         cool_down_minutes: 30,
     };
+};
+
+const resetNewRuleConfigForKind = () => {
+    const tpl = props.options.templates.find((candidate) => candidate.kind === newRule.value.kind);
+    if (!tpl) return;
+
+    newRuleFromTemplate.value = null;
+    newRule.value.config = { ...tpl.config };
 };
 
 const submitRule = () => {
@@ -388,6 +419,7 @@ const hasOverride = computed(() => props.weights.overrides !== null);
                                 <select
                                     v-model="newRule.kind"
                                     class="rounded-lg border border-border-subtle bg-background-panel-hover px-3 py-2 text-sm text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
+                                    @change="resetNewRuleConfigForKind"
                                 >
                                     <option v-for="k in props.options.kinds" :key="k.value" :value="k.value">
                                         {{ k.label }}
