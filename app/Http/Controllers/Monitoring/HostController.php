@@ -211,8 +211,8 @@ class HostController extends Controller
                 'value' => $case->value,
                 'label' => match ($case) {
                     HostConnectionType::Agent => 'Agent (push)',
-                    HostConnectionType::Ssh => 'SSH (coming soon)',
-                    HostConnectionType::DockerApi => 'Docker API (coming soon)',
+                    HostConnectionType::Ssh => 'SSH (unavailable)',
+                    HostConnectionType::DockerApi => 'Docker API (unavailable)',
                     HostConnectionType::Manual => 'Manual / inventory only',
                 },
                 'enabled' => $case === HostConnectionType::Agent || $case === HostConnectionType::Manual,

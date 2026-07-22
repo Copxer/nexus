@@ -499,7 +499,7 @@ const indexOf = (cmd: Command) => filtered.value.indexOf(cmd);
                         to run
                     </span>
                     <span class="ms-auto">
-                        Greyed entries land in later phases.
+                        Disabled entries are unavailable in this context.
                     </span>
                 </div>
             </div>

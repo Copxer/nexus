@@ -174,8 +174,7 @@ const syncStatusTone = (status: string | null) =>
 // consumers (this page + Monitoring/Websites/Index + Show + future
 // fourth) stay in sync when the WebsiteStatus enum grows a new case.
 
-// Tab definitions. Overview + Settings have content this spec; the others
-// advertise the phase that ships their real implementation.
+// Tab definitions for the project detail surface.
 type TabKey =
     | 'overview'
     | 'repositories'
@@ -185,14 +184,14 @@ type TabKey =
     | 'activity'
     | 'settings';
 
-const tabs: { key: TabKey; label: string; icon: LucideIcon; pendingPhase: string | null }[] = [
-    { key: 'overview', label: 'Overview', icon: BarChart3, pendingPhase: null },
-    { key: 'repositories', label: 'Repositories', icon: GitBranch, pendingPhase: null },
-    { key: 'deployments', label: 'Deployments', icon: Rocket, pendingPhase: null },
-    { key: 'hosts', label: 'Hosts', icon: Server, pendingPhase: null },
-    { key: 'monitoring', label: 'Monitoring', icon: Globe, pendingPhase: null },
-    { key: 'activity', label: 'Activity', icon: Activity, pendingPhase: null },
-    { key: 'settings', label: 'Settings', icon: Settings, pendingPhase: null },
+const tabs: { key: TabKey; label: string; icon: LucideIcon }[] = [
+    { key: 'overview', label: 'Overview', icon: BarChart3 },
+    { key: 'repositories', label: 'Repositories', icon: GitBranch },
+    { key: 'deployments', label: 'Deployments', icon: Rocket },
+    { key: 'hosts', label: 'Hosts', icon: Server },
+    { key: 'monitoring', label: 'Monitoring', icon: Globe },
+    { key: 'activity', label: 'Activity', icon: Activity },
+    { key: 'settings', label: 'Settings', icon: Settings },
 ];
 
 // Tone helpers live in `@/lib/workflowRunStyles` so the four
@@ -417,7 +416,7 @@ const confirmDelete = () => {
                 </h3>
                 <p class="mt-2 text-sm text-text-secondary">
                     Repository count, deployment health, alert volume, and the
-                    activity stream populate here as their owning phases ship.
+                    activity stream help summarize this project's current state.
                 </p>
                 <dl
                     class="mt-6 grid grid-cols-2 gap-4 text-sm md:grid-cols-3"
@@ -625,7 +624,7 @@ const confirmDelete = () => {
                     >
                         Paste a GitHub URL or
                         <code class="font-mono">owner/name</code> above to link
-                        one. Real metadata syncs in once phase 2 ships.
+                        one and start syncing metadata.
                     </p>
                     <p v-else class="max-w-sm text-xs text-text-muted">
                         Only the project owner can link repositories.
@@ -1055,13 +1054,10 @@ const confirmDelete = () => {
                 </div>
             </section>
 
-            <!-- Phase-pending placeholder for any tab still flagged as
-                 not-yet-shipped. With Hosts wired in this fix, no tab
-                 carries `pendingPhase` today; the block stays so future
-                 tabs (e.g. health-score in phase 8) can drop in cheaply. -->
+            <!-- Fallback for any tab that is intentionally unavailable. -->
             <section
                 v-else
-                :aria-label="`${activeTab} (coming soon)`"
+                :aria-label="`${activeTab} unavailable`"
                 class="glass-card flex flex-col items-center gap-3 p-10 text-center"
             >
                 <h3 class="text-sm font-semibold text-text-primary">
@@ -1072,11 +1068,7 @@ const confirmDelete = () => {
                     <strong class="text-text-secondary">{{
                         tabs.find((t) => t.key === activeTab)?.label
                     }}</strong>
-                    tab populates with real data when
-                    <strong class="text-text-secondary">{{
-                        tabs.find((t) => t.key === activeTab)?.pendingPhase
-                    }}</strong>
-                    ships.
+                    tab is not available for this project yet.
                 </p>
             </section>
         </div>

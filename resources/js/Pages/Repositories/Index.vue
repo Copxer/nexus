@@ -71,11 +71,6 @@ const projectAccentClass = (color: string | null) =>
     <AppLayout>
         <template #title>
             <div class="flex flex-col">
-                <span
-                    class="text-[11px] font-semibold uppercase tracking-[0.32em] text-accent-cyan"
-                >
-                    Phase 1
-                </span>
                 <h1 class="text-lg font-semibold text-text-primary">
                     Repositories
                 </h1>
@@ -89,7 +84,7 @@ const projectAccentClass = (color: string | null) =>
                     {{ repositories.length === 1 ? 'repository' : 'repositories' }}
                 </p>
                 <p class="font-mono text-[11px] text-text-muted">
-                    Manual links · GitHub auto-sync arrives with phase 2
+                    Linked GitHub repositories
                 </p>
             </header>
 
@@ -203,8 +198,7 @@ const projectAccentClass = (color: string | null) =>
                 </h2>
                 <p class="max-w-sm text-sm text-text-muted">
                     Open a project and link a GitHub repository from its
-                    Repositories tab. Real GitHub metadata will sync in once
-                    the integration ships in phase 2.
+                    Repositories tab to start syncing metadata.
                 </p>
                 <Link
                     :href="route('projects.index')"
