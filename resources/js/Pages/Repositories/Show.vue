@@ -613,9 +613,9 @@ onBeforeUnmount(stopPolling);
                         Sync activity
                     </h3>
                     <p class="mt-2 text-sm text-text-secondary">
-                        Repository metadata refreshes via spec 014's sync job
-                        on import and on demand. Spec 015 adds the issues
-                        mirror — see the Issues tab.
+                        Repository metadata refreshes on import and on demand.
+                        Issue and pull request activity is available in the
+                        work item tabs.
                     </p>
                     <dl
                         class="mt-6 grid grid-cols-2 gap-4 text-sm md:grid-cols-3"

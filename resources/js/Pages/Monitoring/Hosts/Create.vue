@@ -132,8 +132,8 @@ const submit = () => {
                         </option>
                     </select>
                     <p class="text-xs text-text-muted">
-                        Phase 6 ships the agent (push) path. SSH and
-                        Docker API will be wired up in a later phase.
+                        Agent push and manual inventory modes are available.
+                        Unavailable connection types cannot be selected yet.
                     </p>
                     <InputError :message="form.errors.connection_type" />
                 </div>

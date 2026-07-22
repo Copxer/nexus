@@ -1,7 +1,6 @@
 import type { PaletteEntity } from '@/types';
 import { router } from '@inertiajs/vue3';
 import {
-    Activity,
     AlertTriangle,
     BarChart3,
     Bell,
@@ -21,7 +20,6 @@ import {
     Rocket,
     Server,
     Settings as SettingsIcon,
-    SunMoon,
     UserCog,
     type LucideIcon,
 } from 'lucide-vue-next';
@@ -110,9 +108,7 @@ export interface PaletteEntityBundle {
 
 /**
  * Build the static command registry — navigation + actions + system.
- * Real commands (`run` defined) navigate or trigger Inertia actions
- * today. Disabled "Soon" entries advertise the roadmap and stay inert
- * until their owning spec ships — same treatment as the sidebar nav.
+ * Real commands (`run` defined) navigate or trigger existing Inertia actions.
  *
  * Live entity rows (spec 043) are appended via `buildEntityCommands()`
  * so the pure static registry stays cheap + deterministic.
@@ -159,16 +155,6 @@ export function getCommands(): Command[] {
             icon: GitPullRequest,
             keywords: ['issues', 'pull requests', 'prs', 'work items'],
             run: () => router.visit(route('work-items.index')),
-        },
-        {
-            id: 'go-pipelines',
-            label: 'Go to Pipelines',
-            group: 'navigation',
-            icon: Activity,
-            // Pipelines is a planned nav view (roadmap §7.6/§8.6) with
-            // no assigned phase yet — stays inert like Analytics/Alerts.
-            disabled: true,
-            soonLabel: 'Planned',
         },
         {
             id: 'go-deployments',
@@ -295,22 +281,47 @@ export function getCommands(): Command[] {
             run: () => router.visit(route('settings.rules.index')),
         },
         {
+            id: 'add-alert-rule',
+            label: 'Add alert rule',
+            group: 'actions',
+            icon: Plus,
+            keywords: ['rules', 'alerts', 'metric', 'threshold', 'new rule'],
+            run: () => router.visit(`${route('settings.rules.index')}?tab=rules`),
+        },
+        {
+            id: 'reset-health-score-weights',
+            label: 'Reset health-score weights',
+            group: 'actions',
+            icon: RefreshCw,
+            keywords: ['rules', 'weights', 'health', 'score', 'defaults'],
+            run: () => {
+                if (!confirm('Reset every health-score weight to its default?')) return;
+                router.delete(route('settings.rules.weights.reset'), { preserveScroll: true });
+            },
+        },
+        {
+            id: 'notification-settings',
+            label: 'Notification settings',
+            group: 'actions',
+            icon: Bell,
+            keywords: ['settings', 'notifications', 'channels', 'deliveries', 'alerts'],
+            run: () => router.visit(route('settings.notifications.index')),
+        },
+        {
+            id: 'webhook-deliveries',
+            label: 'Webhook deliveries',
+            group: 'actions',
+            icon: Plug,
+            keywords: ['settings', 'webhooks', 'deliveries', 'github', 'retry'],
+            run: () => router.visit(route('settings.webhook-deliveries.index')),
+        },
+        {
             id: 'daily-briefing-settings',
             label: 'Daily briefing settings',
             group: 'actions',
             icon: SettingsIcon,
             keywords: ['ai', 'briefing', 'digest', 'preferences', 'schedule', 'delivery'],
             run: () => router.visit(route('settings.daily-briefing.index')),
-        },
-
-        // ────── System ────── //
-        {
-            id: 'toggle-theme',
-            label: 'Toggle theme',
-            group: 'system',
-            icon: SunMoon,
-            disabled: true,
-            soonLabel: 'Phase 9',
         },
     ];
 }

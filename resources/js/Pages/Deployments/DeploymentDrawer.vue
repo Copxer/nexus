@@ -28,6 +28,7 @@ const isOpen = computed(() => props.run !== null);
 
 const closeButtonRef = ref<HTMLButtonElement | null>(null);
 const drawerRef = ref<HTMLDivElement | null>(null);
+let returnFocusTo: HTMLElement | null = null;
 
 // `4m 12s` / `1h 03m 14s` style duration. Bounded by `duration_seconds`
 // from the controller payload (server already abs'd it).
@@ -45,20 +46,59 @@ const formatDuration = (seconds: number | null): string => {
 // Short SHA + tooltip with full SHA. GitHub's convention is 7 chars.
 const shortSha = (sha: string): string => sha.slice(0, 7);
 
+const focusableSelector = [
+    'a[href]',
+    'button:not([disabled])',
+    'input:not([disabled])',
+    'select:not([disabled])',
+    'textarea:not([disabled])',
+    '[tabindex]:not([tabindex="-1"])',
+].join(',');
+
 // Esc-to-close + focus management.
 const onKeydown = (ev: KeyboardEvent) => {
     if (ev.key === 'Escape' && isOpen.value) {
         emit('close');
+        return;
+    }
+
+    if (ev.key !== 'Tab' || !isOpen.value || !drawerRef.value) {
+        return;
+    }
+
+    const focusable = [...drawerRef.value.querySelectorAll<HTMLElement>(focusableSelector)]
+        .filter((el) => !el.hasAttribute('disabled') && el.offsetParent !== null);
+
+    if (focusable.length === 0) {
+        ev.preventDefault();
+        drawerRef.value.focus();
+        return;
+    }
+
+    const first = focusable[0]!;
+    const last = focusable[focusable.length - 1]!;
+
+    if (ev.shiftKey && document.activeElement === first) {
+        ev.preventDefault();
+        last.focus();
+    } else if (!ev.shiftKey && document.activeElement === last) {
+        ev.preventDefault();
+        first.focus();
     }
 };
 
 watch(isOpen, async (open) => {
     if (open) {
+        returnFocusTo = document.activeElement as HTMLElement | null;
         document.addEventListener('keydown', onKeydown);
         await nextTick();
         closeButtonRef.value?.focus();
     } else {
         document.removeEventListener('keydown', onKeydown);
+        if (returnFocusTo && document.contains(returnFocusTo)) {
+            returnFocusTo.focus();
+        }
+        returnFocusTo = null;
     }
 });
 
@@ -261,6 +301,16 @@ onBeforeUnmount(() => {
                         </dt>
                         <dd class="text-text-secondary">
                             {{ run.run_updated_at ?? '—' }}
+                        </dd>
+                    </div>
+                    <div class="flex flex-col gap-1">
+                        <dt
+                            class="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted"
+                        >
+                            Completed
+                        </dt>
+                        <dd class="text-text-secondary">
+                            {{ run.run_completed_at ?? '—' }}
                         </dd>
                     </div>
                 </dl>

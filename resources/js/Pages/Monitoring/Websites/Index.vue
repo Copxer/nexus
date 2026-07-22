@@ -83,11 +83,6 @@ const projectAccentClass = (color: string | null) =>
     <AppLayout>
         <template #title>
             <div class="flex flex-col">
-                <span
-                    class="text-[11px] font-semibold uppercase tracking-[0.32em] text-accent-cyan"
-                >
-                    Phase 5
-                </span>
                 <h1 class="text-lg font-semibold text-text-primary">
                     Monitoring
                 </h1>
@@ -157,10 +152,8 @@ const projectAccentClass = (color: string | null) =>
                     No website monitors yet
                 </p>
                 <p class="max-w-sm text-xs text-text-muted">
-                    Add one to start tracking response times. Spec 024
-                    will run scheduled checks every interval; for now
-                    use the manual "Probe now" button on the detail
-                    page.
+                    Add one to start tracking response times and status
+                    codes on every scheduled probe.
                 </p>
             </div>
 

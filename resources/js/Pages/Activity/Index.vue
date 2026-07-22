@@ -25,11 +25,6 @@ const { events: liveEvents, connected: realtimeConnected } = useActivityFeed({
     <AppLayout :hide-activity-rail="true">
         <template #title>
             <div class="flex flex-col">
-                <span
-                    class="text-[11px] font-semibold uppercase tracking-[0.32em] text-accent-cyan"
-                >
-                    Phase 3
-                </span>
                 <h1 class="text-lg font-semibold text-text-primary">Activity</h1>
             </div>
         </template>

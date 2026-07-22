@@ -184,8 +184,7 @@ const accentClasses: Record<Capability['accent'], { dot: string; ring: string }>
                 >
                     A single command center for GitHub repositories,
                     deployments, Docker hosts, website probes, and alerts —
-                    being built phase by phase, in the open. Authentication and
-                    the visual foundation are live; the integrations are next.
+                    one place to spot risk before it reaches production.
                 </p>
 
                 <div
@@ -277,7 +276,7 @@ const accentClasses: Record<Capability['accent'], { dot: string; ring: string }>
                     Nexus Control Center · An engineering operations cockpit.
                 </span>
                 <span class="font-mono uppercase tracking-[0.2em]">
-                    Phase 0 · Foundation
+                    Engineering operations cockpit
                 </span>
             </div>
         </footer>

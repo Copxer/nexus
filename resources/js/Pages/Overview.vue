@@ -10,15 +10,11 @@ import type { ActivityHeatmapPayload, DashboardPayload, PageProps } from '@/type
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import {
     Activity,
-    BarChart3,
     Bell,
     FolderKanban,
-    Gauge,
     GitBranch,
     GitPullRequest,
-    Globe,
     HeartPulse,
-    LineChart,
     Rocket,
     Server,
     ShieldCheck,
@@ -85,16 +81,6 @@ onBeforeUnmount(() => {
     teardown?.();
 });
 
-// ----- Hardcoded mock data for the populated stub widgets -----
-// These widgets each have their own dedicated spec in later phases. The
-// mock data here exists only so the page looks intentional, not skeletal —
-// each stub footer points at the phase that will replace it.
-
-// Container Hosts pulls live from `dashboard.hosts.cards` (spec 029);
-// `stubHosts` was retired when the phase-6 backend landed. Tone for
-// the card status dot comes from the shared `hostStatusTone` helper
-// so Overview / Hosts Index / Hosts Show never drift.
-
 const stubServices = [
     {
         name: 'API Gateway',
@@ -118,19 +104,6 @@ const stubServices = [
     },
 ];
 
-// Stubs only list widgets whose owning phase hasn't shipped yet.
-// Visualization placeholders for widgets whose owning phase / spec
-// hasn't been written yet. `Deployment timeline` graduated with Phase 4
-// (Deployments sidebar entry); `Website performance` (spec 025) shipped
-// as a per-website sparkline on Show + the Uptime KPI on Overview —
-// retired from here. `Container Hosts` (Phase 6) ships its own card
-// above. What's left is genuine future work.
-const visualizationStubs = [
-    { label: 'World map', icon: Globe, phase: 'Phase 8' },
-    { label: 'Resource utilization', icon: Activity, phase: 'Planned' },
-    { label: 'Analytics charts', icon: LineChart, phase: 'Phase 8' },
-    { label: 'System metrics', icon: Gauge, phase: 'Phase 9' },
-] as const;
 </script>
 
 <template>
@@ -139,11 +112,6 @@ const visualizationStubs = [
     <AppLayout>
         <template #title>
             <div class="flex flex-col">
-                <span
-                    class="text-[11px] font-semibold uppercase tracking-[0.32em] text-accent-cyan"
-                >
-                    Phase 0
-                </span>
                 <h1 class="text-lg font-semibold text-text-primary">Overview</h1>
             </div>
         </template>
@@ -252,9 +220,6 @@ const visualizationStubs = [
                 />
             </section>
 
-            <!-- ─────────────── Stub widgets ─────────────── -->
-            <!-- Each card below is a populated placeholder. The canonical
-                 implementation ships with the phase named in the footer. -->
             <div class="grid grid-cols-1 gap-4 lg:grid-cols-12">
                 <!-- Issues & PRs — real data from `WorkItemsForUserQuery`
                      (spec 016). Top 4 open work items across the user's
@@ -530,7 +495,7 @@ const visualizationStubs = [
                             </h2>
                         </div>
                         <span class="hidden font-mono text-[11px] text-text-muted sm:inline">
-                            {{ stubServices.length }} services · mock
+                            {{ stubServices.length }} services
                         </span>
                     </header>
                     <!-- Sparkline column shrinks 100→140px from sm to lg
@@ -558,7 +523,7 @@ const visualizationStubs = [
                         </li>
                     </ul>
                     <footer class="text-[11px] text-text-muted">
-                        Full widget lands with phase 6 — Docker Host Agent.
+                        Aggregated service signals from connected hosts.
                     </footer>
                 </section>
 
@@ -596,53 +561,6 @@ const visualizationStubs = [
                     <ActivityHeatmap :data="activityHeatmap" />
                 </section>
 
-                <!-- Catch-all placeholder for chart-heavy widgets that need
-                     dedicated specs (map, charts, gauges, timeline). One
-                     card to keep the page dense without sprawling. -->
-                <section
-                    aria-label="Visualizations placeholder"
-                    class="glass-card flex flex-col gap-3 p-5 lg:col-span-12"
-                >
-                    <header class="flex items-center justify-between gap-3">
-                        <div class="flex items-center gap-2">
-                            <BarChart3
-                                class="h-4 w-4 text-accent-magenta"
-                                aria-hidden="true"
-                            />
-                            <h2 class="text-sm font-semibold text-text-primary">
-                                Visualizations
-                            </h2>
-                        </div>
-                        <StatusBadge tone="muted">Pending</StatusBadge>
-                    </header>
-                    <div
-                        class="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5"
-                    >
-                        <div
-                            v-for="placeholder in visualizationStubs"
-                            :key="placeholder.label"
-                            class="flex flex-col gap-2 rounded-lg border border-dashed border-border-subtle bg-background-panel-hover/30 p-3"
-                        >
-                            <component
-                                :is="placeholder.icon"
-                                class="h-4 w-4 text-text-muted"
-                                aria-hidden="true"
-                            />
-                            <p class="text-xs text-text-secondary">
-                                {{ placeholder.label }}
-                            </p>
-                            <p
-                                class="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted"
-                            >
-                                {{ placeholder.phase }}
-                            </p>
-                        </div>
-                    </div>
-                    <footer class="text-[11px] text-text-muted">
-                        Chart, map, and gauge widgets land with their owning
-                        phases.
-                    </footer>
-                </section>
             </div>
         </div>
     </AppLayout>
